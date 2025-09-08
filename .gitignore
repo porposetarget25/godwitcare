@@ -1,0 +1,26 @@
+# Java / Maven / Gradle
+target/
+build/
+out/
+*.log
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ / Eclipse / VSCode
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+
+# Node / React
+node_modules/
+dist/
+.env*
+npm-debug.log*
+yarn-error.log*
