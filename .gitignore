@@ -1,5 +1,6 @@
 # Java / Maven / Gradle
 **/target/
+**/backend/target
 **/build/
 out/
 *.log
