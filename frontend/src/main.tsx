@@ -1,6 +1,7 @@
+// src/main.tsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import Dashboard from './screens/Dashboard'
 import Login from './screens/Login'
 import Step1 from './screens/RegisterStep1'
@@ -10,21 +11,25 @@ import Home from './screens/Home'
 import Consultation from './screens/Consultation'
 import { RegProvider } from './state/registration'
 
-function Shell({ children }: { children: React.ReactNode }){
+function Shell({ children }: { children: React.ReactNode }) {
+  // Use BASE_URL so assets work both locally and on GitHub Pages (with base=/godwitcare/)
+  const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`
+
   return (
     <div className="container">
       <header>
         <div className="nav">
-          <div className="row" style={{alignItems:'center', gap:10}}>
-            <img className="logo" src="/assets/logo.png" alt="GodwitCare"/>
+          <div className="row" style={{ alignItems: 'center', gap: 10 }}>
+            <img className="logo" src={logoSrc} alt="GodwitCare" />
             <strong>GodwitCare</strong>
           </div>
           <div className="navlinks">
             <Link to="/dashboard">Home</Link>
-            <a href="#how">How it Works</a>
-            <a href="#features">Features</a>
+            {/* For section links on a HashRouter site, route to the page; we can scroll to sections inside Dashboard later */}
+            <Link to="/dashboard">How it Works</Link>
+            <Link to="/dashboard">Features</Link>
             <Link to="/consultation">Consultation</Link>
-            <a href="#testimonials">Testimonials</a>
+            <Link to="/dashboard">Testimonials</Link>
           </div>
         </div>
       </header>
@@ -33,23 +38,22 @@ function Shell({ children }: { children: React.ReactNode }){
   )
 }
 
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <RegProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace/>} />
-          <Route path="/dashboard" element={<Shell><Dashboard/></Shell>} />
-          <Route path="/login" element={<Shell><Login/></Shell>} />
-          <Route path="/register/1" element={<Shell><Step1/></Shell>} />
-          <Route path="/register/2" element={<Shell><Step2/></Shell>} />
-          <Route path="/register/3" element={<Shell><Step3/></Shell>} />
-          <Route path="/home" element={<Shell><Home/></Shell>} />
-          <Route path="/consultation" element={<Shell><Consultation/></Shell>} />
-          <Route path="*" element={<Navigate to="/dashboard" replace/>} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Shell><Dashboard /></Shell>} />
+          <Route path="/login" element={<Shell><Login /></Shell>} />
+          <Route path="/register/1" element={<Shell><Step1 /></Shell>} />
+          <Route path="/register/2" element={<Shell><Step2 /></Shell>} />
+          <Route path="/register/3" element={<Shell><Step3 /></Shell>} />
+          <Route path="/home" element={<Shell><Home /></Shell>} />
+          <Route path="/consultation" element={<Shell><Consultation /></Shell>} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </RegProvider>
   </React.StrictMode>
 )

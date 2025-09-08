@@ -1,6 +1,6 @@
 # Java / Maven / Gradle
-target/
-build/
+**/target/
+**/build/
 out/
 *.log
 *.class
@@ -10,7 +10,7 @@ out/
 .gradle/
 !gradle/wrapper/gradle-wrapper.jar
 
-# IntelliJ / Eclipse / VSCode
+# IDE
 .idea/
 *.iml
 .project
@@ -19,8 +19,9 @@ out/
 .vscode/
 
 # Node / React
-node_modules/
-dist/
+**/node_modules/
+**/dist/
 .env*
 npm-debug.log*
 yarn-error.log*
+pnpm-lock.yaml
