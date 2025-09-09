@@ -66,7 +66,7 @@ export default function Home() {
           <div className="offer-title">Food & Drink Offers</div>
         </a>
         <a className="offer-card" href="#" aria-label="Taxi & Transport Offers">
-          <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=1600&auto=format&fit=crop" alt="" />
+          <img src="https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="" />
           <div className="offer-title">Taxi & Transport Offers</div>
         </a>
         <a className="offer-card" href="#" aria-label="Entertainment Offers">
@@ -74,7 +74,7 @@ export default function Home() {
           <div className="offer-title">Entertainment Offers</div>
         </a>
         <a className="offer-card" href="#" aria-label="Accommodation Offers">
-          <img src="https://images.unsplash.com/photo-1501117716987-c8e0041a2878?q=80&w=1600&auto=format&fit=crop" alt="" />
+          <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8aG90ZWxzfGVufDB8fDB8fHww" alt="" />
           <div className="offer-title">Accommodation Offers</div>
         </a>
       </div>
