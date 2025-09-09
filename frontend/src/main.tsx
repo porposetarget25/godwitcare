@@ -10,6 +10,8 @@ import Step3 from './screens/RegisterStep3'
 import Home from './screens/Home'
 import Consultation from './screens/Consultation'
 import { RegProvider } from './state/registration'
+import ScrollToHash from './components/ScrollToHash'
+
 
 function Shell({ children }: { children: React.ReactNode }) {
   // Use BASE_URL so assets work both locally and on GitHub Pages (with base=/godwitcare/)
@@ -24,13 +26,12 @@ function Shell({ children }: { children: React.ReactNode }) {
             <strong>GodwitCare</strong>
           </div>
           <div className="navlinks">
-            <Link to="/dashboard">Home</Link>
-            {/* For section links on a HashRouter site, route to the page; we can scroll to sections inside Dashboard later */}
-            <Link to="/dashboard">How it Works</Link>
-            <Link to="/dashboard">Features</Link>
-            <Link to="/consultation">Consultation</Link>
-            <Link to="/dashboard">Testimonials</Link>
-          </div>
+              <Link to="/dashboard#top">Home</Link>
+              <Link to="/dashboard#how">How it Works</Link>
+              <Link to="/dashboard#features">Features</Link>
+              <Link to="/dashboard#testimonials">Testimonials</Link>
+              <Link to="/consultation">Consultation</Link>
+        </div>
         </div>
       </header>
       <main>{children}</main>
@@ -42,6 +43,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <RegProvider>
       <HashRouter>
+        <ScrollToHash /> 
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Shell><Dashboard /></Shell>} />
