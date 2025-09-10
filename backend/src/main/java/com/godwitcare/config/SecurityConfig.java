@@ -89,9 +89,11 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://porposetarget25.github.io"
+                "http://localhost:5173",                // local dev
+                "https://porposetarget25.github.io",    // GitHub Pages main domain
+                "https://porposetarget25.github.io/godwitcare" // project subpath
         ));
+
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true); // allow JSESSIONID cookie
