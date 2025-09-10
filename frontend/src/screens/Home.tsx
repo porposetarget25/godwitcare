@@ -196,11 +196,18 @@ export default function Home() {
                   <a className="btn" href={dlUrl} target="_blank" rel="noreferrer">Download</a>
                 </div>
                 {isPreviewable && (
-                  <iframe
-                    title={d.fileName}
-                    src={viewUrl}
-                    style={{width:'100%', height:400, marginTop:10, border:'1px solid var(--line)', borderRadius:12}}
-                  />
+                    <iframe
+                      title={d.fileName}
+                      src={viewUrl}
+                      style={{
+                        width: '100%',
+                        height: 200,              // 👈 smaller height (was 400)
+                        marginTop: 10,
+                        border: '1px solid var(--line)',
+                        borderRadius: 12,
+                        objectFit: 'contain'      // keep aspect ratio
+                      }}
+                    />
                 )}
               </div>
             )
