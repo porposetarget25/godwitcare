@@ -2,8 +2,8 @@ package com.godwitcare.web;
 
 import com.godwitcare.entity.Registration;
 import com.godwitcare.entity.RegistrationDocument;
-import com.godwitcare.repo.RegistrationRepository;
 import com.godwitcare.repo.RegistrationDocumentRepository;
+import com.godwitcare.repo.RegistrationRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -23,14 +23,16 @@ public class RegistrationController {
         this.docs = docs;
     }
 
+    /* ---------------- Registrations ---------------- */
+
     @PostMapping("/registrations")
-    public ResponseEntity<Registration> create(@Valid @RequestBody Registration r){
+    public ResponseEntity<Registration> create(@Valid @RequestBody Registration r) {
         Registration saved = repo.save(r);
         return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/registrations/{id}")
-    public ResponseEntity<Registration> update(@PathVariable("id") Long id, @Valid @RequestBody Registration r){
+    public ResponseEntity<Registration> update(@PathVariable("id") Long id, @Valid @RequestBody Registration r) {
         return repo.findById(id)
                 .map(existing -> {
                     r.setId(id);
@@ -40,11 +42,19 @@ public class RegistrationController {
     }
 
     @GetMapping("/registrations/{id}")
-    public ResponseEntity<Registration> get(@PathVariable("id") Long id){
+    public ResponseEntity<Registration> get(@PathVariable("id") Long id) {
         return repo.findById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
-    // ---- Document APIs ----
+    // Latest registration by email (used by Home page)
+    @GetMapping("/registrations")
+    public ResponseEntity<Registration> getMostRecentByEmail(@RequestParam("email") String email) {
+        return repo.findTopByEmailAddressOrderByIdDesc(email)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build()); // 204 when none exists
+    }
+
+    /* ---------------- Documents ---------------- */
 
     @PostMapping(value = "/registrations/{id}/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> upload(
@@ -57,10 +67,8 @@ public class RegistrationController {
 
         RegistrationDocument d = new RegistrationDocument();
         d.setRegistration(r);
-        d.setOriginalFileName(
-                Optional.ofNullable(file.getOriginalFilename()).orElse("upload.bin"));
-        d.setContentType(
-                Optional.ofNullable(file.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE));
+        d.setOriginalFileName(Optional.ofNullable(file.getOriginalFilename()).orElse("upload.bin"));
+        d.setContentType(Optional.ofNullable(file.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE));
         d.setSizeBytes(file.getSize());
         d.setData(file.getBytes());
         d = docs.save(d);
@@ -75,7 +83,7 @@ public class RegistrationController {
     @GetMapping("/registrations/{id}/documents")
     public ResponseEntity<List<Map<String, Object>>> listDocs(@PathVariable("id") Long id) {
         if (!repo.existsById(id)) return ResponseEntity.notFound().build();
-        var list = docs.findByRegistrationIdOrderByCreatedAtDesc(id).stream().map(d -> {
+        List<Map<String, Object>> list = docs.findByRegistrationIdOrderByCreatedAtDesc(id).stream().map(d -> {
             Map<String, Object> m = new HashMap<>();
             m.put("id", d.getId());
             m.put("fileName", d.getOriginalFileName());
@@ -86,8 +94,13 @@ public class RegistrationController {
         return ResponseEntity.ok(list);
     }
 
+    /**
+     * Legacy/Existing: DOWNLOAD (kept for backward-compat).
+     * GET /api/registrations/{regId}/documents/{docId}
+     * Forces download via Content-Disposition: attachment.
+     */
     @GetMapping(value = "/registrations/{regId}/documents/{docId}")
-    public ResponseEntity<byte[]> download(
+    public ResponseEntity<byte[]> downloadLegacy(
             @PathVariable("regId") Long regId,
             @PathVariable("docId") Long docId
     ) {
@@ -100,5 +113,40 @@ public class RegistrationController {
                         .body(d.getData()))
                 .orElse(ResponseEntity.notFound().build());
     }
-}
 
+    /**
+     * NEW: VIEW inline for iframe preview (no Content-Disposition header).
+     * GET /api/registrations/{regId}/documents/{docId}/view
+     */
+    @GetMapping("/registrations/{regId}/documents/{docId}/view")
+    public ResponseEntity<byte[]> viewDoc(
+            @PathVariable Long regId,
+            @PathVariable Long docId
+    ) {
+        return docs.findById(docId)
+                .filter(d -> Objects.equals(d.getRegistration().getId(), regId))
+                .map(d -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(d.getContentType()))
+                        .body(d.getData()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * NEW: Explicit download alias (same behavior as legacy).
+     * GET /api/registrations/{regId}/documents/{docId}/download
+     */
+    @GetMapping("/registrations/{regId}/documents/{docId}/download")
+    public ResponseEntity<byte[]> downloadDoc(
+            @PathVariable Long regId,
+            @PathVariable Long docId
+    ) {
+        return docs.findById(docId)
+                .filter(d -> Objects.equals(d.getRegistration().getId(), regId))
+                .map(d -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(d.getContentType()))
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"" + d.getOriginalFileName() + "\"")
+                        .body(d.getData()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+}
