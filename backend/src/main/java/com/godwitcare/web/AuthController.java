@@ -1,0 +1,74 @@
+package com.godwitcare.web;
+
+import com.godwitcare.entity.User;
+import com.godwitcare.repo.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    private final UserRepository users;
+    private final PasswordEncoder encoder;
+    private final AuthenticationManager authManager;
+
+    public AuthController(UserRepository users, PasswordEncoder encoder, AuthenticationManager authManager) {
+        this.users = users;
+        this.encoder = encoder;
+        this.authManager = authManager;
+    }
+
+    // DTOs
+    public record RegisterReq(
+            @NotBlank String firstName,
+            @NotBlank String lastName,
+            @Email String email,
+            @NotBlank String password) {}
+
+    public record LoginReq(@Email String email, @NotBlank String password) {}
+    public record UserDto(Long id, String firstName, String lastName, String email) {}
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterReq req) {
+        if (users.existsByEmail(req.email())) {
+            return ResponseEntity.badRequest().body("Email already registered");
+        }
+        User u = new User();
+        u.setFirstName(req.firstName());
+        u.setLastName(req.lastName());
+        u.setEmail(req.email());
+        u.setPassword(encoder.encode(req.password()));
+        users.save(u);
+        return ResponseEntity.ok(new UserDto(u.getId(), u.getFirstName(), u.getLastName(), u.getEmail()));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginReq req) {
+        Authentication auth = authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(req.email(), req.password()));
+        UserDetails principal = (UserDetails) auth.getPrincipal();
+        User u = users.findByEmail(principal.getUsername()).orElseThrow();
+        return ResponseEntity.ok(new UserDto(u.getId(), u.getFirstName(), u.getLastName(), u.getEmail()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request) throws Exception {
+        request.logout();
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).build();
+        User u = users.findByEmail(auth.getName()).orElseThrow();
+        return ResponseEntity.ok(new UserDto(u.getId(), u.getFirstName(), u.getLastName(), u.getEmail()));
+    }
+}

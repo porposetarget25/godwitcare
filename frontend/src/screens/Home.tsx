@@ -1,11 +1,46 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { me, logout, type UserDto } from '../api'   // <-- use your api.ts
 
 export default function Home() {
+  const [user, setUser] = useState<UserDto | null>(null)
+  const [checking, setChecking] = useState(true)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const u = await me()       // returns null if not logged in
+        if (alive) setUser(u)
+      } finally {
+        if (alive) setChecking(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  async function onLogout() {
+    await logout()
+    navigate('/dashboard#top')
+  }
+
   return (
     <section className="section home">
-      <div className="page-head">
+      <div className="page-head" style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
         <h1 className="page-title">My Travel Package</h1>
+
+        {/* Right side: user + logout (appears if session exists; won’t break if not) */}
+        <div style={{display:'flex', alignItems:'center', gap:10}}>
+          {!checking && user && (
+            <span className="muted" style={{fontSize:14}}>
+              Signed in as <strong>{user.email}</strong>
+            </span>
+          )}
+          <button className="btn secondary" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* PACKAGE CARD */}
@@ -18,22 +53,20 @@ export default function Home() {
           </div>
 
           <div className="pc-actions">
-            <a 
-              className="btn" 
-              href="https://wa.me/64211899955" 
-              target="_blank" 
+            <a
+              className="btn"
+              href="https://wa.me/64211899955"
+              target="_blank"
               rel="noreferrer"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M20.5 11.5a8.5 8.5 0 1 1-15.5 5L3 21l4.5-2a8.5 8.5 0 1 1 13  -7.5Z" stroke="white" strokeWidth="1.6"/>
+                <path d="M20.5 11.5a8.5 8.5 0 1 1-15.5 5L3 21l4.5-2a8.5 8.5 0 1 1 13-7.5Z" stroke="white" strokeWidth="1.6"/>
                 <path d="M16.2 14.5c-.2.6-1.1 1.1-1.7 1.1-.5 0-1.1-.1-1.9-.5a8.6 8.6 0 0 1-3.4-3.2c-.6-1-.9-1.8-.9-2.4 0-.6.4-1.5 1-1.7.2-.1.4-.1.7 0 .2.1.5.9.6 1.2.1.3.1.5 0 .7-.1.2-.2.4-.4.6-.2.1-.2.3-.1.6.1.3.5 1.1 1.2 1.7.8.9 1.6 1.2 1.8 1.3.3.1.5.1.7 0 .2-.1.4-.3.6-.5.2-.3.5-.4.8-.3.3.1 1.3.6 1.4.8.1.2 0 .5-.2.6Z" fill="white"/>
               </svg>
               <span>WhatsApp</span>
-          </a>
-
+            </a>
 
             <button className="btn outline">
-              {/* Phone icon */}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 3h4l1 4-2 1a11 11 0 0 0 5 5l1.1-2H19l2 4-2 2c-1.2.5-3.5.5-6.8-1.6C8.8 13.8 6.7 11.2 6 9c-.5-1.3-.5-2.3 0-3.1L6 3Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
               <span>Call</span>
             </button>

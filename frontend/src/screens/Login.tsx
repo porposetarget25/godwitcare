@@ -1,15 +1,28 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { login } from '../api'   // <-- use your api.ts login
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    // fake success -> go to dashboard Home section
-    navigate('/dashboard#top')
+    setError(null)
+    setLoading(true)
+    try {
+      // Real session login (sets JSESSIONID cookie)
+      await login(email, password)
+      // On success: go to the app Home
+      navigate('/home')
+    } catch (err: any) {
+      setError(err?.message || 'Login failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -23,6 +36,22 @@ export default function Login() {
           </div>
         </div>
 
+        {error && (
+          <div
+            style={{
+              background:'#fee2e2',
+              border:'1px solid #fecaca',
+              color:'#991b1b',
+              borderRadius:10,
+              padding:'10px 12px',
+              marginBottom:12,
+              fontSize:14
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         <form className="auth-form" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="email">Email</label>
@@ -33,6 +62,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="username"
             />
           </div>
 
@@ -45,6 +75,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
           </div>
 
@@ -57,7 +88,9 @@ export default function Login() {
             </Link>
           </div>
 
-          <button type="submit" className="btn block">Continue</button>
+          <button type="submit" className="btn block" disabled={loading}>
+            {loading ? 'Signing in…' : 'Continue'}
+          </button>
         </form>
       </div>
     </section>

@@ -317,3 +317,6 @@ html { scroll-behavior: smooth; }
   .quick-grid { grid-template-columns: 1fr; }
 }
 
+/* in app.css (optional, for consistent error color) */
+.help.error { color: #e11d48; }
+

@@ -8,10 +8,12 @@ spring:
     password: ""
   jpa:
     hibernate:
-      ddl-auto: create
-    open-in-view: false
-    defer-datasource-initialization: true
+      ddl-auto: update
+    show-sql: true
   h2:
     console:
       enabled: true
       path: /h2-console
+  logging:
+    level:
+      org.hibernate.SQL: INFO

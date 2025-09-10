@@ -1,6 +1,9 @@
 package com.godwitcare.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
 import java.time.LocalDate;
 
 @Entity
@@ -15,6 +18,10 @@ public class Registration {
   private String gender;
   private String primaryWhatsAppNumber;
   private String carerSecondaryWhatsAppNumber;
+
+    @NotBlank
+    @Email
+    @Column(name = "email_address", nullable = false)
   private String emailAddress;
 
   private Boolean longTermMedication;

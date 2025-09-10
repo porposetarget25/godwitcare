@@ -1,6 +1,7 @@
 # Java / Maven / Gradle
 **/target/
 **/backend/target
+**/ backend/.idea/**
 **/build/
 out/
 *.log
@@ -18,6 +19,8 @@ out/
 .classpath
 .settings/
 .vscode/
+*.iws
+*.ipr
 
 # Node / React
 **/node_modules/
