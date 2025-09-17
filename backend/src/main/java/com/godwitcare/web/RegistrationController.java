@@ -27,31 +27,53 @@ public class RegistrationController {
 
     @PostMapping("/registrations")
     public ResponseEntity<Registration> create(@Valid @RequestBody Registration r) {
+        if (r.getTravelers() == null) r.setTravelers(new java.util.ArrayList<>());
+
+        // Drop empty rows to avoid @NotBlank/@NotNull violations
+        r.getTravelers().removeIf(t ->
+                t.getFullName() == null || t.getFullName().isBlank() || t.getDateOfBirth() == null);
+
+        // Safety cap (adjust if you want a different limit)
+        if (r.getTravelers().size() > 6) return ResponseEntity.badRequest().build();
+
+        // IMPORTANT: set parent on each child so JPA writes the FK
+        r.getTravelers().forEach(t -> t.setRegistration(r));
+
         Registration saved = repo.save(r);
         return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/registrations/{id}")
-    public ResponseEntity<Registration> update(@PathVariable("id") Long id, @Valid @RequestBody Registration r) {
+    public ResponseEntity<?> update(
+            @PathVariable("id") Long id, @Valid @RequestBody Registration r) {
+
         return repo.findById(id)
                 .map(existing -> {
                     r.setId(id);
+
+                    if (r.getTravelers() == null) r.setTravelers(new java.util.ArrayList<>());
+                    r.getTravelers().removeIf(t ->
+                            t.getFullName() == null || t.getFullName().isBlank() || t.getDateOfBirth() == null);
+                    if (r.getTravelers().size() > 6) return ResponseEntity.badRequest().build();
+
+                    r.getTravelers().forEach(t -> t.setRegistration(r));
+
                     return ResponseEntity.ok(repo.save(r));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
 
     @GetMapping("/registrations/{id}")
     public ResponseEntity<Registration> get(@PathVariable("id") Long id) {
         return repo.findById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
-    // Latest registration by email (used by Home page)
     @GetMapping("/registrations")
     public ResponseEntity<Registration> getMostRecentByEmail(@RequestParam("email") String email) {
         return repo.findTopByEmailAddressOrderByIdDesc(email)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.noContent().build()); // 204 when none exists
+                .orElse(ResponseEntity.noContent().build());
     }
 
     /* ---------------- Documents ---------------- */
@@ -94,11 +116,7 @@ public class RegistrationController {
         return ResponseEntity.ok(list);
     }
 
-    /**
-     * Legacy/Existing: DOWNLOAD (kept for backward-compat).
-     * GET /api/registrations/{regId}/documents/{docId}
-     * Forces download via Content-Disposition: attachment.
-     */
+    /** Legacy: forces download (Content-Disposition: attachment). */
     @GetMapping(value = "/registrations/{regId}/documents/{docId}")
     public ResponseEntity<byte[]> downloadLegacy(
             @PathVariable("regId") Long regId,
@@ -114,10 +132,7 @@ public class RegistrationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * NEW: VIEW inline for iframe preview (no Content-Disposition header).
-     * GET /api/registrations/{regId}/documents/{docId}/view
-     */
+    /** New: VIEW inline for iframe preview (no Content-Disposition). */
     @GetMapping("/registrations/{regId}/documents/{docId}/view")
     public ResponseEntity<byte[]> viewDoc(
             @PathVariable Long regId,
@@ -131,10 +146,7 @@ public class RegistrationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * NEW: Explicit download alias (same behavior as legacy).
-     * GET /api/registrations/{regId}/documents/{docId}/download
-     */
+    /** New: explicit download alias (same behavior as legacy). */
     @GetMapping("/registrations/{regId}/documents/{docId}/download")
     public ResponseEntity<byte[]> downloadDoc(
             @PathVariable Long regId,

@@ -4,19 +4,16 @@ import { useReg } from '../state/registration'
 import {
   saveRegistration,
   uploadDocument,
-  registerAuthUser,  // create user account
-  login,              // optional auto-login
+  registerAuthUser,
+  login,
 } from '../api'
 
 type Errors = Partial<Record<
-  | 'from'
-  | 'to'
-  | 'start'
-  | 'end'
-  | 'dates'
-  | 'package',
+  'from' | 'to' | 'start' | 'end' | 'dates' | 'package' | 'travelers',
   string
 >>
+
+type Person = { fullName: string; dateOfBirth: string }
 
 export default function Step3() {
   const { draft, setDraft } = useReg()
@@ -25,6 +22,12 @@ export default function Step3() {
   const [file, setFile] = useState<File | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
+
+  // NEW: local lists for adults and children
+  const [adults, setAdults] = useState<Person[]>([])
+  const [children, setChildren] = useState<Person[]>([])
+
+  const MAX_TRAVELERS = 6
 
   // Helpers to read values safely
   const from = draft['Travelling From']?.trim() ?? ''
@@ -46,6 +49,20 @@ export default function Step3() {
     }
   }, [start, end])
 
+  const totalTravelers = adults.length + children.length
+
+  function addAdult() {
+    if (totalTravelers >= MAX_TRAVELERS) return
+    setAdults(a => [...a, { fullName: '', dateOfBirth: '' }])
+  }
+  function removeAdult(idx: number) { setAdults(a => a.filter((_, i) => i !== idx)) }
+
+  function addChild() {
+    if (totalTravelers >= MAX_TRAVELERS) return
+    setChildren(c => [...c, { fullName: '', dateOfBirth: '' }])
+  }
+  function removeChild(idx: number) { setChildren(c => c.filter((_, i) => i !== idx)) }
+
   function validate(): boolean {
     const next: Errors = {}
     if (!from) next.from = 'Required'
@@ -54,6 +71,16 @@ export default function Step3() {
     if (!end) next.end = 'Required'
     if (!pkg) next.package = 'Please select a package'
     if (!next.start && !next.end && dateProblem) next.dates = dateProblem
+
+    // NEW: validate travelers (optional but recommended)
+    const merged = [...adults, ...children]
+    const cleaned = merged.filter(t => t.fullName.trim() && t.dateOfBirth)
+    if (cleaned.length !== merged.length) {
+      // Allow blank rows, but they will be dropped silently on submit.
+      // If you want a hard requirement, uncomment the next line:
+      // next.travelers = 'Please fill name and date of birth for each traveler or remove blank rows.'
+    }
+    if (cleaned.length > MAX_TRAVELERS) next.travelers = `Maximum ${MAX_TRAVELERS} travelers allowed.`
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -65,8 +92,16 @@ export default function Step3() {
     setSubmitting(true)
 
     try {
-      // 1) Save registration
-      const created = await saveRegistration(draft as any)
+      // Merge adults + children -> travelers
+      const travelers = [...adults, ...children]
+        .filter(t => t.fullName.trim() && t.dateOfBirth)           // keep valid rows
+        .map(t => ({ fullName: t.fullName.trim(), dateOfBirth: t.dateOfBirth })) // yyyy-MM-dd
+
+      // Put the travelers array on the draft object so api.ts can map it
+      const payload = { ...draft, travelers } as any
+
+      // 1) Save registration (now includes travelers)
+      const created = await saveRegistration(payload)
 
       // 2) Optional document upload
       if (file) {
@@ -80,22 +115,13 @@ export default function Step3() {
       const password  = (draft['Account Password'] || '').trim()
 
       if (email && password) {
-        try {
-          await registerAuthUser(firstName, lastName, email, password)
-        } catch (err) {
-          // If the email already exists, backend can return 400/409. Not fatal.
-          console.warn('registerAuthUser failed or user already exists:', err)
-        }
-
-        // 4) Auto-login so the session is established now (optional)
-        try {
-          await login(email, password)
-        } catch (err) {
-          console.warn('auto-login failed:', err)
-        }
+        try { await registerAuthUser(firstName, lastName, email, password) }
+        catch (err) { console.warn('registerAuthUser:', err) }
+        try { await login(email, password) }
+        catch (err) { console.warn('auto-login failed:', err) }
       }
 
-      // 5) Finish
+      // 4) Finish
       localStorage.removeItem('reg-draft')
       nav('/home')
     } catch (err) {
@@ -115,34 +141,22 @@ export default function Step3() {
           {/* From / To */}
           <div className="grid two">
             <div className="field">
-              <label>
-                Travelling From <span style={{color:'#e11d48'}}>*</span>
-              </label>
+              <label>Travelling From <span style={{color:'#e11d48'}}>*</span></label>
               <input
                 required
                 value={from}
-                onChange={(e) =>
-                  setDraft({ ...draft, ['Travelling From']: e.target.value })
-                }
+                onChange={(e) => setDraft({ ...draft, ['Travelling From']: e.target.value })}
                 aria-invalid={!!errors.from}
               />
               {errors.from && <div className="help" style={{color:'#e11d48'}}>{errors.from}</div>}
             </div>
 
             <div className="field">
-              <label>
-                Travelling To (UK &amp; Europe){' '}
-                <span style={{color:'#e11d48'}}>*</span>
-              </label>
+              <label>Travelling To (UK &amp; Europe) <span style={{color:'#e11d48'}}>*</span></label>
               <input
                 required
                 value={to}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    ['Travelling To (UK & Europe)']: e.target.value,
-                  })
-                }
+                onChange={(e) => setDraft({ ...draft, ['Travelling To (UK & Europe)']: e.target.value })}
                 aria-invalid={!!errors.to}
               />
               {errors.to && <div className="help" style={{color:'#e11d48'}}>{errors.to}</div>}
@@ -152,45 +166,113 @@ export default function Step3() {
           {/* Dates */}
           <div className="grid two">
             <div className="field">
-              <label>
-                Travel Start Date <span style={{color:'#e11d48'}}>*</span>
-              </label>
+              <label>Travel Start Date <span style={{color:'#e11d48'}}>*</span></label>
               <input
                 type="date"
                 required
                 value={start}
-                onChange={(e) =>
-                  setDraft({ ...draft, ['Travel Start Date']: e.target.value })
-                }
+                onChange={(e) => setDraft({ ...draft, ['Travel Start Date']: e.target.value })}
                 aria-invalid={!!(errors.start || errors.dates)}
               />
               {errors.start && <div className="help" style={{color:'#e11d48'}}>{errors.start}</div>}
             </div>
 
             <div className="field">
-              <label>
-                Travel End Date <span style={{color:'#e11d48'}}>*</span>
-              </label>
+              <label>Travel End Date <span style={{color:'#e11d48'}}>*</span></label>
               <input
                 type="date"
                 required
                 value={end}
-                onChange={(e) =>
-                  setDraft({ ...draft, ['Travel End Date']: e.target.value })
-                }
+                onChange={(e) => setDraft({ ...draft, ['Travel End Date']: e.target.value })}
                 aria-invalid={!!(errors.end || errors.dates)}
               />
               {errors.end && <div className="help" style={{color:'#e11d48'}}>{errors.end}</div>}
             </div>
           </div>
 
-          {/* Cross-field date error */}
           {!errors.start && !errors.end && errors.dates && (
             <div className="help" style={{color:'#e11d48'}}>{errors.dates}</div>
           )}
 
-          {/* Optional document */}
+          {/* Adults only */}
           <div className="field">
+            <label className="h3" style={{display:'block', marginBottom:8}}>Adults only</label>
+            <button type="button" className="btn" onClick={addAdult} disabled={totalTravelers >= MAX_TRAVELERS}>
+              + Add Adult
+            </button>
+            {adults.map((a, i) => (
+              <div key={`a-${i}`} className="card" style={{marginTop:10, padding:12}}>
+                <div className="grid two">
+                  <div className="field">
+                    <label>Full Name</label>
+                    <input
+                      value={a.fullName}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setAdults(list => list.map((row, idx) => idx === i ? { ...row, fullName: v } : row))
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={a.dateOfBirth}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setAdults(list => list.map((row, idx) => idx === i ? { ...row, dateOfBirth: v } : row))
+                      }}
+                    />
+                  </div>
+                </div>
+                <button type="button" className="btn secondary" onClick={() => removeAdult(i)}>Remove</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Children */}
+          <div className="field" style={{marginTop:16}}>
+            <label className="h3" style={{display:'block', marginBottom:8}}>Children</label>
+            <button type="button" className="btn" onClick={addChild} disabled={totalTravelers >= MAX_TRAVELERS}>
+              + Add Child
+            </button>
+            {children.map((c, i) => (
+              <div key={`c-${i}`} className="card" style={{marginTop:10, padding:12}}>
+                <div className="grid two">
+                  <div className="field">
+                    <label>Full Name</label>
+                    <input
+                      value={c.fullName}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setChildren(list => list.map((row, idx) => idx === i ? { ...row, fullName: v } : row))
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={c.dateOfBirth}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setChildren(list => list.map((row, idx) => idx === i ? { ...row, dateOfBirth: v } : row))
+                      }}
+                    />
+                  </div>
+                </div>
+                <button type="button" className="btn secondary" onClick={() => removeChild(i)}>Remove</button>
+              </div>
+            ))}
+          </div>
+
+          <div className="muted" style={{marginTop:8}}>
+            Total Travelers: {totalTravelers} / {MAX_TRAVELERS}
+          </div>
+          {errors.travelers && <div className="help" style={{color:'#e11d48'}}>{errors.travelers}</div>}
+
+          {/* Optional document */}
+          <div className="field" style={{marginTop:16}}>
             <label>Boarding Pass / E-Ticket (optional)</label>
             <input
               type="file"

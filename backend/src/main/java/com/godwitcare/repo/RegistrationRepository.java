@@ -1,6 +1,7 @@
 package com.godwitcare.repo;
 
 import com.godwitcare.entity.Registration;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -13,6 +14,7 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
     // All registrations for an email (newest first)
     List<Registration> findByEmailAddressOrderByIdDesc(String emailAddress);
 
+    @EntityGraph(attributePaths = "travelers")
     Optional<Registration> findTopByEmailAddressOrderByIdDesc(String emailAddress);
 
     // Only the newest one (Top/First are synonyms)

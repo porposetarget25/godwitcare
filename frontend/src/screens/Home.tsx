@@ -3,6 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { me, logout, type UserDto } from '../api'
 import { API_BASE_URL } from '../api'
 
+type Traveler = {
+  id?: number
+  fullName: string
+  dateOfBirth?: string
+}
+
 type RegApi = {
   id: number
   travellingFrom?: string
@@ -10,7 +16,9 @@ type RegApi = {
   travelStartDate?: string
   travelEndDate?: string
   primaryWhatsAppNumber?: string
+  travelers?: Traveler[]
 
+  // legacy field names (from earlier steps)
   ['Travelling From']?: string
   ['Travelling To (UK & Europe)']?: string
   ['Travel Start Date']?: string
@@ -32,7 +40,8 @@ function normalizeReg(r: RegApi | null | undefined) {
   const start = r['Travel Start Date'] ?? r.travelStartDate ?? ''
   const end = r['Travel End Date'] ?? r.travelEndDate ?? ''
   const phone = r['Primary WhatsApp Number'] ?? r.primaryWhatsAppNumber ?? ''
-  return { id: r.id, from, to, start, end, phone }
+  const travelers = Array.isArray(r.travelers) ? r.travelers : []
+  return { id: r.id, from, to, start, end, phone, travelers }
 }
 
 export default function Home() {
@@ -129,7 +138,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Travel details card (from registration) */}
+      {/* Travel details card */}
       {reg && (
         <div className="package-card" style={{marginBottom:16}}>
           <div className="pc-body">
@@ -139,11 +148,30 @@ export default function Home() {
               <div className="muted"><span className="strong">Travel Dates:</span> {reg.start || '—'} → {reg.end || '—'}</div>
               <div className="muted"><span className="strong">Primary WhatsApp:</span> {reg.phone || '—'}</div>
             </div>
+
+            {/* Travelers list */}
+            {reg.travelers && reg.travelers.length > 0 && (
+              <div style={{marginTop:12}}>
+                <h3 className="h3">Travelers</h3>
+                <ul style={{marginTop:6, paddingLeft:18}}>
+                  {reg.travelers.map((t, i) => (
+                    <li key={t.id ?? `${t.fullName}-${i}`} style={{marginBottom:4}}>
+                      <span className="strong">{t.fullName}</span>{' '}
+                      {t.dateOfBirth && (
+                        <span className="muted small">
+                          (DOB: {new Date(t.dateOfBirth).toLocaleDateString()})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Your existing static package card */}
+      {/* Static support card */}
       <div className="package-card">
         <div className="pc-body">
           <div className="pc-lines">
@@ -151,22 +179,9 @@ export default function Home() {
             <div className="muted">Daily Support: 9:00am - 9:00pm</div>
             <div className="muted">Time Difference: +6 hours from Origin (GMT+2)</div>
           </div>
-
           <div className="pc-actions">
-            <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M20.5 11.5a8.5 8.5 0 1 1-15.5 5L3 21l4.5-2a8.5 8.5 0 1 1 13-7.5Z" stroke="white" strokeWidth="1.6"/>
-                <path d="M16.2 14.5c-.2.6-1.1 1.1-1.7 1.1-.5 0-1.1-.1-1.9-.5a8.6 8.6 0 0 1-3.4-3.2c-.6-1-.9-1.8-.9-2.4 0-.6.4-1.5 1-1.7.2-.1.4-.1.7 0 .2.1.5.9.6 1.2.1.3.1.5 0 .7-.1.2-.2.4-.4.6-.2.1-.2.3-.1.6.1.3.5 1.1 1.2 1.7.8.9 1.6 1.2 1.8 1.3.3.1.5.1.7 0 .2-.1.4-.3.6-.5.2-.3.5-.4.8-.3.3.1 1.3.6 1.4.8.1.2 0 .5-.2.6Z" fill="white"/>
-              </svg>
-              <span>WhatsApp</span>
-            </a>
-
-            <button className="btn outline">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M6 3h4l1 4-2 1a11 11 0 0 0 5 5l1.1-2H19l2 4-2 2c-1.2.5-3.5.5-6.8-1.6C8.8 13.8 6.7 11.2 6 9c-.5-1.3-.5-2.3 0-3.1L6 3Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span>Call</span>
-            </button>
+            <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">WhatsApp</a>
+            <button className="btn outline">Call</button>
           </div>
         </div>
       </div>
@@ -175,7 +190,7 @@ export default function Home() {
         <div className="muted" style={{margin:'10px 0'}}>Loading your travel details…</div>
       )}
 
-      {/* Travel document(s) */}
+      {/* Travel documents */}
       {reg && docs.length > 0 && (
         <div style={{marginTop:24}}>
           <h2 className="h2" style={{textAlign:'left'}}>Your Travel Document</h2>
@@ -196,18 +211,11 @@ export default function Home() {
                   <a className="btn" href={dlUrl} target="_blank" rel="noreferrer">Download</a>
                 </div>
                 {isPreviewable && (
-                    <iframe
-                      title={d.fileName}
-                      src={viewUrl}
-                      style={{
-                        width: '100%',
-                        height: 200,              // 👈 smaller height (was 400)
-                        marginTop: 10,
-                        border: '1px solid var(--line)',
-                        borderRadius: 12,
-                        objectFit: 'contain'      // keep aspect ratio
-                      }}
-                    />
+                  <iframe
+                    title={d.fileName}
+                    src={viewUrl}
+                    style={{width:'100%', height:200, marginTop:10, border:'1px solid var(--line)', borderRadius:12}}
+                  />
                 )}
               </div>
             )
@@ -215,42 +223,21 @@ export default function Home() {
         </div>
       )}
 
-      {/* Quick links (unchanged) */}
+      {/* Quick links */}
       <div className="ql-head">Quick Links</div>
       <div className="quick-grid">
-        <Link to="/consultation" className="quick">
-          <span>I Need a Consultation</span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </Link>
-        <Link to="/home#cases" className="quick">
-          <span>Case Notes</span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" /></svg>
-        </Link>
-        <Link to="/home#appts" className="quick">
-          <span>Appointments</span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" /></svg>
-        </Link>
+        <Link to="/consultation" className="quick"><span>I Need a Consultation</span></Link>
+        <Link to="/home#cases" className="quick"><span>Case Notes</span></Link>
+        <Link to="/home#appts" className="quick"><span>Appointments</span></Link>
       </div>
 
-      {/* Featured offers (unchanged) */}
+      {/* Offers */}
       <div className="offers-head">Featured Offers</div>
       <div className="offers">
-        <a className="offer-card" href="#" aria-label="Food & Drink Offers">
-          <img src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1600&auto=format&fit=crop" alt="" />
-          <div className="offer-title">Food & Drink Offers</div>
-        </a>
-        <a className="offer-card" href="#" aria-label="Taxi & Transport Offers">
-          <img src="https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="" />
-          <div className="offer-title">Taxi & Transport Offers</div>
-        </a>
-        <a className="offer-card" href="#" aria-label="Entertainment Offers">
-          <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1600&auto=format&fit=crop" alt="" />
-          <div className="offer-title">Entertainment Offers</div>
-        </a>
-        <a className="offer-card" href="#" aria-label="Accommodation Offers">
-          <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8aG90ZWxzfGVufDB8fDB8fHww" alt="" />
-          <div className="offer-title">Accommodation Offers</div>
-        </a>
+        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1600&auto=format&fit=crop" alt="" /><div className="offer-title">Food & Drink</div></a>
+        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=687&auto=format&fit=crop" alt="" /><div className="offer-title">Taxi & Transport</div></a>
+        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1600&auto=format&fit=crop" alt="" /><div className="offer-title">Entertainment</div></a>
+        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?fm=jpg&q=60&w=3000&auto=format&fit=crop" alt="" /><div className="offer-title">Accommodation</div></a>
       </div>
     </section>
   )

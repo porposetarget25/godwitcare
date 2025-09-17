@@ -1,6 +1,10 @@
 // ========================= api.ts =========================
 
 // ---------- Types ----------
+export type Traveler = {
+  fullName: string
+  dateOfBirth: string
+}
 export type Registration = {
   id?: number
   'First Name': string
@@ -11,7 +15,6 @@ export type Registration = {
   'Primary WhatsApp Number': string
   'Carer/Secondary WhatsApp Number': string
   'Email Address': string
-  // UI-only; DO NOT send in /registrations payload
   'Account Password'?: string
 
   'Are you on any long-term/regular medication that we should be aware of?': boolean
@@ -25,7 +28,11 @@ export type Registration = {
   'Travel End Date': string
   'Package Days': number
   'Document File Name'?: string
+
+  // NEW
+  'Travelers'?: Traveler[]
 }
+
 
 export type UserDto = {
   id: number
@@ -42,8 +49,8 @@ export type DocSummary = {
 }
 
 // ---------- Model -> Backend payload mapper ----------
-function toBackend(r: Registration) {
-  return {
+function toBackend(r: Registration | any) {
+  const base = {
     id: r.id,
     firstName: r['First Name'],
     middleName: r['Middle Name'],
@@ -52,7 +59,7 @@ function toBackend(r: Registration) {
     gender: r['Gender'],
     primaryWhatsAppNumber: r['Primary WhatsApp Number'],
     carerSecondaryWhatsAppNumber: r['Carer/Secondary WhatsApp Number'],
-    emailAddress: r['Email Address'], // required server-side
+    emailAddress: r['Email Address'],
     longTermMedication: r['Are you on any long-term/regular medication that we should be aware of?'],
     healthCondition: r['Do you have any health condition that can affect your trip?'],
     allergies: r['Do you have any allergies that can affect your trip?'],
@@ -63,9 +70,23 @@ function toBackend(r: Registration) {
     travelEndDate: r['Travel End Date'],
     packageDays: r['Package Days'],
     documentFileName: r['Document File Name'],
-    // intentionally NOT sending 'Account Password'
   }
+
+  // Accept either draft['Travelers'] or draft.travelers
+  const raw = (r['Travelers'] ?? r.travelers ?? []) as Array<{ fullName?: string; dateOfBirth?: string }>
+
+  const travelers = Array.isArray(raw)
+    ? raw
+        .filter(t => t && t.fullName && t.dateOfBirth) // keep only valid rows
+        .map(t => ({
+          fullName: String(t.fullName).trim(),
+          dateOfBirth: String(t.dateOfBirth), // yyyy-MM-dd
+        }))
+    : []
+
+  return { ...base, travelers }
 }
+
 
 // ---------- API base (auto-detect) ----------
 const isGithubPages =

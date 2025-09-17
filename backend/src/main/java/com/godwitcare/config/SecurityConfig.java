@@ -73,9 +73,19 @@ public class SecurityConfig {
                 .headers(h -> h.frameOptions(f -> f.disable()))
                 .securityContext(sc -> sc.securityContextRepository(scr))
                 .authorizeHttpRequests(reg -> reg
+                        // Public auth endpoints + H2 console
                         .requestMatchers("/api/auth/**", "/h2-console/**").permitAll()
+
+                        // Public creation endpoints
                         .requestMatchers(HttpMethod.POST, "/api/registrations").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/registrations/*/document").permitAll()
+
+                        // ✅ Public, read-only document access (list + view + download)
+                        // Keep ** only at the END of the pattern.
+                        .requestMatchers(HttpMethod.GET, "/api/registrations/{id}/documents").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/registrations/{id}/documents/**").permitAll()
+
+                        // Everything else requires auth
                         .anyRequest().authenticated()
                 )
                 .formLogin(f -> f.disable())
@@ -89,11 +99,10 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of(
-                "http://localhost:5173",                // local dev
-                "https://porposetarget25.github.io",    // GitHub Pages main domain
-                "https://porposetarget25.github.io/godwitcare" // project subpath
+                "http://localhost:5173",                      // local dev
+                "https://porposetarget25.github.io",          // GitHub Pages root
+                "https://porposetarget25.github.io/godwitcare"// project subpath (safe to keep)
         ));
-
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true); // allow JSESSIONID cookie
