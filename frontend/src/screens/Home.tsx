@@ -181,7 +181,37 @@ export default function Home() {
           </div>
           <div className="pc-actions">
             <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">WhatsApp</a>
-            <button className="btn outline">Call</button>
+            <Link
+              to="/consultation/tracker"
+              className="btn"
+              style={{
+                backgroundColor: '#B94A48',
+                color: 'white',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="white"
+                strokeWidth="2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6.6 10.8c1.2 2.4 3.2 4.4 5.6 5.6l2-2c.3-.3.7-.4 1.1-.3 1.2.4 2.6.6 4 .6.6 0 1 .4 1 1v3.5c0 .6-.4 1-1 1C11.3 20 4 12.7 4 4.5c0-.6.4-1 1-1H8.5c.6 0 1 .4 1 1 0 1.4.2 2.8.6 4 .1.4 0 .8-.3 1.1l-2.2 2.2Z"
+                />
+              </svg>
+              Log a call with GodwitCare
+            </Link>
+
+
           </div>
         </div>
       </div>

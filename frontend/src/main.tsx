@@ -11,6 +11,9 @@ import Home from './screens/Home'
 import Consultation from './screens/Consultation'
 import { RegProvider } from './state/registration'
 import ScrollToHash from './components/ScrollToHash'
+import ConsultationTracker from './screens/ConsultationTracker'
+import PreConsultation from './screens/PreConsultation'
+import ConsultationDetails from './screens/ConsultationDetails'
 
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -54,6 +57,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/home" element={<Shell><Home /></Shell>} />
           <Route path="/consultation" element={<Shell><Consultation /></Shell>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/consultation/tracker" element={<ConsultationTracker />} />
+          <Route path="/consultation/questionnaire" element={<PreConsultation />} />
+          <Route path="/consultation/details" element={<ConsultationDetails />} />
         </Routes>
       </HashRouter>
     </RegProvider>
