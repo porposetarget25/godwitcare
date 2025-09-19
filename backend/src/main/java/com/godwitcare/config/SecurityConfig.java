@@ -1,5 +1,6 @@
 package com.godwitcare.config;
 
+import com.godwitcare.entity.Role;
 import com.godwitcare.repo.UserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,12 +38,14 @@ public class SecurityConfig {
     @Bean
     UserDetailsService userDetailsService(UserRepository repo) {
         return username -> repo.findByEmail(username)
-                .map(u -> User.withUsername(u.getEmail())
+                .map(u -> org.springframework.security.core.userdetails.User
+                        .withUsername(u.getEmail())
                         .password(u.getPassword())
-                        .roles("USER")
+                        .roles(u.getRole().name()) // <-- USER or DOCTOR
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
+
 
     @Bean
     DaoAuthenticationProvider authProvider(UserDetailsService uds, PasswordEncoder encoder) {
@@ -73,19 +76,27 @@ public class SecurityConfig {
                 .headers(h -> h.frameOptions(f -> f.disable()))
                 .securityContext(sc -> sc.securityContextRepository(scr))
                 .authorizeHttpRequests(reg -> reg
-                        // Public auth endpoints + H2 console
+                        /* ---------- Public ---------- */
                         .requestMatchers("/api/auth/**", "/h2-console/**").permitAll()
+                        // Preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Public creation endpoints
+                        // Registration creation + document upload (public)
                         .requestMatchers(HttpMethod.POST, "/api/registrations").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/registrations/*/document").permitAll()
 
-                        // ✅ Public, read-only document access (list + view + download)
-                        // Keep ** only at the END of the pattern.
-                        .requestMatchers(HttpMethod.GET, "/api/registrations/{id}/documents").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/registrations/{id}/documents/**").permitAll()
+                        // Read-only document access (list + view + download) — public
+                        // Use single-segment wildcards to avoid Mvc pattern parser errors.
+                        .requestMatchers(HttpMethod.GET,  "/api/registrations/*/documents").permitAll()
+                        .requestMatchers(HttpMethod.GET,  "/api/registrations/*/documents/*").permitAll()
 
-                        // Everything else requires auth
+                        /* ---------- Patients (must be logged in) ---------- */
+                        .requestMatchers("/api/consultations/**").authenticated()
+
+                        /* ---------- Doctors only ---------- */
+                        .requestMatchers("/api/doctor/**").hasRole(Role.DOCTOR.name())
+
+                        /* ---------- Everything else requires auth ---------- */
                         .anyRequest().authenticated()
                 )
                 .formLogin(f -> f.disable())
@@ -93,6 +104,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 
     /* ======= CORS (frontend URLs) ======= */
     @Bean

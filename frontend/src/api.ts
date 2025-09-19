@@ -5,6 +5,7 @@ export type Traveler = {
   fullName: string
   dateOfBirth: string
 }
+
 export type Registration = {
   id?: number
   'First Name': string
@@ -33,12 +34,12 @@ export type Registration = {
   'Travelers'?: Traveler[]
 }
 
-
 export type UserDto = {
   id: number
   firstName: string
   lastName: string
   email: string
+  roles?: string[] 
 }
 
 export type DocSummary = {
@@ -46,6 +47,41 @@ export type DocSummary = {
   fileName: string
   sizeBytes: number
   createdAt: string
+}
+
+// --- Consultations (shared types) ---
+export type ConsultationCreate = {
+  currentLocation: string
+  contactName: string
+  contactPhone: string
+  contactAddress: string
+  answers: Record<string, 'Yes' | 'No'>
+}
+
+export type PatientContact = {
+  fullName: string
+  phone: string
+  email?: string
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  country?: string
+  postalCode?: string
+}
+
+export type ConsultationSummary = {
+  id: number
+  createdAt: string
+  status: 'LOGGED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  registrationId?: number
+  patientName?: string
+  patientPhone?: string
+}
+
+export type ConsultationDetails = ConsultationSummary & {
+  patientContact?: PatientContact
+  questionnaire?: Record<string, 'Yes' | 'No'>
+  notes?: string
 }
 
 // ---------- Model -> Backend payload mapper ----------
@@ -60,10 +96,14 @@ function toBackend(r: Registration | any) {
     primaryWhatsAppNumber: r['Primary WhatsApp Number'],
     carerSecondaryWhatsAppNumber: r['Carer/Secondary WhatsApp Number'],
     emailAddress: r['Email Address'],
-    longTermMedication: r['Are you on any long-term/regular medication that we should be aware of?'],
-    healthCondition: r['Do you have any health condition that can affect your trip?'],
-    allergies: r['Do you have any allergies that can affect your trip?'],
-    fitToFlyCertificate: r['Have you been advised to produce a fit-to-fly certificate?'],
+    longTermMedication:
+      r['Are you on any long-term/regular medication that we should be aware of?'],
+    healthCondition:
+      r['Do you have any health condition that can affect your trip?'],
+    allergies:
+      r['Do you have any allergies that can affect your trip?'],
+    fitToFlyCertificate:
+      r['Have you been advised to produce a fit-to-fly certificate?'],
     travellingFrom: r['Travelling From'],
     travellingTo: r['Travelling To (UK & Europe)'],
     travelStartDate: r['Travel Start Date'],
@@ -73,11 +113,14 @@ function toBackend(r: Registration | any) {
   }
 
   // Accept either draft['Travelers'] or draft.travelers
-  const raw = (r['Travelers'] ?? r.travelers ?? []) as Array<{ fullName?: string; dateOfBirth?: string }>
+  const raw = (r['Travelers'] ?? r.travelers ?? []) as Array<{
+    fullName?: string
+    dateOfBirth?: string
+  }>
 
   const travelers = Array.isArray(raw)
     ? raw
-        .filter(t => t && t.fullName && t.dateOfBirth) // keep only valid rows
+        .filter(t => t && t.fullName && t.dateOfBirth)
         .map(t => ({
           fullName: String(t.fullName).trim(),
           dateOfBirth: String(t.dateOfBirth), // yyyy-MM-dd
@@ -87,12 +130,11 @@ function toBackend(r: Registration | any) {
   return { ...base, travelers }
 }
 
-
 // ---------- API base (auto-detect) ----------
 const isGithubPages =
   typeof window !== 'undefined' &&
   (window.location.hostname.endsWith('github.io') ||
-   window.location.hostname.endsWith('githubusercontent.com'))
+    window.location.hostname.endsWith('githubusercontent.com'))
 
 const DEFAULT_DEV_BASE = '/api'
 const RENDER_BASE = 'https://godwitcare-1.onrender.com/api' // update if Render URL changes
@@ -118,7 +160,11 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
 
   if (!text) return {} as T
   if (contentType.includes('application/json')) return JSON.parse(text) as T
-  try { return JSON.parse(text) as T } catch { return text as unknown as T }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return text as unknown as T
+  }
 }
 
 // ===================================================================
@@ -144,11 +190,14 @@ export async function uploadDocument(id: number, file: File) {
 // Optional helpers if you want to show/download stored docs later
 export async function listDocuments(registrationId: number): Promise<DocSummary[]> {
   return request<DocSummary[]>(`/registrations/${registrationId}/documents`, {
-    method: 'GET'
+    method: 'GET',
   })
 }
 
-export async function downloadDocumentBlob(registrationId: number, docId: number): Promise<Blob> {
+export async function downloadDocumentBlob(
+  registrationId: number,
+  docId: number
+): Promise<Blob> {
   const url = `${API_BASE}/registrations/${registrationId}/documents/${docId}`
   const res = await fetch(url, { method: 'GET' })
   if (!res.ok) throw new Error('Failed to download document')
@@ -170,8 +219,10 @@ export async function login(email: string, password: string): Promise<UserDto> {
     body: JSON.stringify({ email, password }),
   })
   if (!res.ok) throw new Error('Login failed')
-  const user = await res.json() as UserDto
-  try { localStorage.setItem('gc_user', JSON.stringify(user)) } catch {}
+  const user = (await res.json()) as UserDto
+  try {
+    localStorage.setItem('gc_user', JSON.stringify(user))
+  } catch {}
   return user
 }
 
@@ -182,7 +233,9 @@ export async function logout(): Promise<void> {
       credentials: 'include',
     })
   } finally {
-    try { localStorage.removeItem('gc_user') } catch {}
+    try {
+      localStorage.removeItem('gc_user')
+    } catch {}
   }
 }
 
@@ -210,4 +263,51 @@ export async function registerAuthUser(
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<UserDto>
+}
+
+// ---------- Consultations (patient) ----------
+export async function createConsultation(payload: ConsultationCreate) {
+  return request('/consultations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function myLatestConsultation() {
+  const res = await fetch(`${API_BASE}/consultations/mine/latest`, {
+    credentials: 'include',
+  })
+  if (res.status === 204) return null
+  if (!res.ok) throw new Error('Failed to load')
+  return res.json()
+}
+
+// ---------- Doctor-facing (requires DOCTOR role) ----------
+export async function doctorListConsultations(): Promise<ConsultationSummary[]> {
+  return request<ConsultationSummary[]>('/doctor/consultations', {
+    method: 'GET',
+    credentials: 'include',
+  })
+}
+
+export async function doctorGetConsultation(id: number): Promise<ConsultationDetails> {
+  return request<ConsultationDetails>(`/doctor/consultations/${id}`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+}
+
+// Optional: status/notes update for doctors
+export async function doctorUpdateConsultation(
+  id: number,
+  body: Partial<{ status: ConsultationSummary['status']; notes: string }>
+) {
+  return request(`/doctor/consultations/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
 }

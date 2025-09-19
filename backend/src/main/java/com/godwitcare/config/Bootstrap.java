@@ -1,5 +1,6 @@
 package com.godwitcare.config;
 
+import com.godwitcare.entity.Role;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.UserRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -10,16 +11,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 public class Bootstrap {
 
-    @Bean CommandLineRunner seed(UserRepository repo, PasswordEncoder pe) {
+    @Bean
+    CommandLineRunner initUsers(UserRepository repo, PasswordEncoder encoder) {
         return args -> {
-            if (repo.findByEmail("demo@godwit.care").isEmpty()) {
-                User demo = new User();
-                demo.setFirstName("Demo");
-                demo.setLastName("User");
-                demo.setEmail("demo@godwit.care");
-                demo.setPassword(pe.encode("demo123"));
-                repo.save(demo);
+            if (repo.findByEmail("doctor@godwitcare.com").isEmpty()) {
+                User doctor = new User();
+                doctor.setFirstName("Doctor");
+                doctor.setLastName("GodwitCare");
+                doctor.setEmail("doctor@godwitcare.com"); // unique email
+                doctor.setPassword(encoder.encode("demo")); // hashed password
+                doctor.setRole(Role.DOCTOR); // <-- make sure you added role in User entity
+                repo.save(doctor);
 
+                System.out.println("✅ Doctor user created: doctor@godwitcare.com / demo");
             }
         };
     }

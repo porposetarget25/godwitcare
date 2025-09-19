@@ -1,5 +1,7 @@
+// src/screens/PreConsultation.tsx
 import React, { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../api'
 
 type YesNo = 'Yes' | 'No'
 
@@ -40,75 +42,75 @@ function Toggle({
 type Q = { id: string; label: string }
 type Section = { title: string; questions: Q[] }
 
-/** All sections & questions (from the mock) */
+/** All sections & questions with descriptive IDs */
 const FORM: Section[] = [
   {
     title: 'Emergency Symptoms',
     questions: [
-      { id: 'em_pain', label: 'Experiencing severe pain?' },
-      { id: 'em_breath', label: 'Difficulty breathing or shortness of breath?' },
-      { id: 'em_unconscious', label: 'Unconsciousness or altered mental state?' },
-      { id: 'em_bleeding', label: 'Recent injury with heavy bleeding?' },
+      { id: 'emergency_pain', label: 'Experiencing severe pain?' },
+      { id: 'emergency_breath', label: 'Difficulty breathing or shortness of breath?' },
+      { id: 'emergency_unconscious', label: 'Unconsciousness or altered mental state?' },
+      { id: 'emergency_bleeding', label: 'Recent injury with heavy bleeding?' },
     ],
   },
   {
     title: 'Signs of a Stroke (FAST)',
     questions: [
-      { id: 'st_face', label: 'Facial droop?' },
-      { id: 'st_weak', label: 'Weakness on one side?' },
-      { id: 'st_slur', label: 'Slurred speech?' },
+      { id: 'stroke_face', label: 'Facial droop?' },
+      { id: 'stroke_weakness', label: 'Weakness on one side?' },
+      { id: 'stroke_speech', label: 'Slurred speech?' },
     ],
   },
   {
     title: 'Indications of Sepsis',
     questions: [
-      { id: 'sp_confusion', label: 'Slurred speech or confusion?' },
-      { id: 'sp_shiver', label: 'Shivering or muscle pain?' },
-      { id: 'sp_skin', label: 'Skin discoloration or rash?' },
+      { id: 'sepsis_confusion', label: 'Slurred speech or confusion?' },
+      { id: 'sepsis_shiver', label: 'Shivering or muscle pain?' },
+      { id: 'sepsis_skin', label: 'Skin discoloration or rash?' },
     ],
   },
   {
     title: 'Signs of Heart Attack',
     questions: [
-      { id: 'ha_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
+      { id: 'heartattack_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
     ],
   },
   {
     title: 'General Symptoms',
     questions: [
-      { id: 'gs_fever', label: 'Experiencing persistent fever?' },
-      { id: 'gs_fatigue', label: 'Feeling extreme fatigue or weakness?' },
-      { id: 'gs_weight', label: 'Unexplained weight loss?' },
+      { id: 'general_symptoms_fever', label: 'Experiencing persistent fever?' },
+      { id: 'general_symptoms_fatigue', label: 'Feeling extreme fatigue or weakness?' },
+      { id: 'general_symptoms_weightloss', label: 'Unexplained weight loss?' },
     ],
   },
   {
     title: 'Respiratory & ENT Issues',
     questions: [
-      { id: 're_cough', label: 'Persistent cough?' },
-      { id: 're_taste', label: 'Sudden loss of taste or smell?' },
-      { id: 're_throat', label: 'Severe sore throat?' },
+      { id: 'respiratory_ent_cough', label: 'Persistent cough?' },
+      { id: 'respiratory_ent_taste', label: 'Sudden loss of taste or smell?' },
+      { id: 'respiratory_ent_throat', label: 'Severe sore throat?' },
     ],
   },
   {
     title: 'Digestive Issues',
     questions: [
-      { id: 'dg_abd', label: 'Severe abdominal pain?' },
-      { id: 'dg_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
+      { id: 'digestive_abdominal_pain', label: 'Severe abdominal pain?' },
+      { id: 'digestive_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
     ],
   },
   {
     title: 'Neurological Symptoms',
     questions: [
-      { id: 'ne_head', label: 'New or worsening severe headaches?' },
-      { id: 'ne_vision', label: 'Sudden onset of vision changes?' },
-      { id: 'ne_balance', label: 'Difficulty with balance or coordination?' },
+      { id: 'neuro_headache', label: 'New or worsening severe headaches?' },
+      { id: 'neuro_vision', label: 'Sudden onset of vision changes?' },
+      { id: 'neuro_balance', label: 'Difficulty with balance or coordination?' },
     ],
   },
   {
     title: 'Mental Well-being',
     questions: [
-      { id: 'mw_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
-      { id: 'mw_sadness', label: 'Persistent feelings of sadness or self-harm thoughts?' },
+      { id: 'mental_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
+      { id: 'mental_sadness', label: 'Persistent feelings of sadness or self-harm thoughts?' },
     ],
   },
 ]
@@ -116,25 +118,56 @@ const FORM: Section[] = [
 export default function PreConsultation() {
   const nav = useNavigate()
 
-  // location field
   const [location, setLocation] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactAddress, setContactAddress] = useState('')
 
-  // a single state object for all toggles; default all to 'No'
   const defaultAnswers = useMemo(() => {
     const all: Record<string, YesNo> = {}
     for (const s of FORM) for (const q of s.questions) all[q.id] = 'No'
     return all
   }, [])
   const [answers, setAnswers] = useState<Record<string, YesNo>>(defaultAnswers)
+  const [submitting, setSubmitting] = useState(false)
 
   function setAnswer(id: string, v: YesNo) {
     setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    // keep client-side for now; you can POST {location, answers} later if needed
-    nav('/consultation/details')
+    if (submitting) return
+    setSubmitting(true)
+
+    try {
+      const payload = {
+        currentLocation: location,
+        contactName,
+        contactPhone,
+        contactAddress,
+        answers,
+      }
+
+      const res = await fetch(`${API_BASE_URL}/consultations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        throw new Error(`Failed to save consultation: ${res.status} ${t}`)
+      }
+
+      nav('/consultation/tracker?logged=1')
+    } catch (err) {
+      console.error(err)
+      alert('Sorry, we could not log your request. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -160,6 +193,38 @@ export default function PreConsultation() {
           />
         </div>
 
+        {/* Patient Contact & Address */}
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="strong" style={{ marginBottom: 8 }}>Patient Contact &amp; Address</div>
+          <div className="grid two">
+            <div className="field">
+              <label>Contact Name</label>
+              <input
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Full name"
+              />
+            </div>
+            <div className="field">
+              <label>Phone / WhatsApp</label>
+              <input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="+44 7xxx xxx xxx"
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label>Address</label>
+            <textarea
+              value={contactAddress}
+              onChange={(e) => setContactAddress(e.target.value)}
+              placeholder="Street, City, Postal Code, Country"
+              rows={3}
+            />
+          </div>
+        </div>
+
         {/* Emergency banner */}
         <div
           className="card"
@@ -171,7 +236,7 @@ export default function PreConsultation() {
           }}
         >
           <div className="strong" style={{ marginBottom: 4 }}>
-            If you answer “Yes” to any of these emergency questions, please Dial 999 immediately.
+            If you answer “Yes” to any of these emergency questions, please dial 999 immediately.
           </div>
         </div>
 
@@ -193,7 +258,9 @@ export default function PreConsultation() {
         ))}
 
         <div className="actions" style={{ marginTop: 16 }}>
-          <button className="btn">Submit & Continue</button>
+          <button className="btn" disabled={submitting}>
+            {submitting ? 'Submitting…' : 'Submit & Continue'}
+          </button>
         </div>
       </form>
     </section>

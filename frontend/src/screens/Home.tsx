@@ -1,3 +1,4 @@
+// src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { me, logout, type UserDto } from '../api'
@@ -18,7 +19,6 @@ type RegApi = {
   primaryWhatsAppNumber?: string
   travelers?: Traveler[]
 
-  // legacy field names (from earlier steps)
   ['Travelling From']?: string
   ['Travelling To (UK & Europe)']?: string
   ['Travel Start Date']?: string
@@ -55,6 +55,8 @@ export default function Home() {
 
   const navigate = useNavigate()
 
+  const isDoctor = !!user?.roles?.includes?.('DOCTOR')
+
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -63,7 +65,9 @@ export default function Home() {
         if (!alive) return
         setUser(u)
 
-        if (!u?.email) return
+        // For doctors we keep Home as a minimal console landing,
+        // so we skip pulling Registration/Docs entirely.
+        if (!u?.email || u?.roles?.includes?.('DOCTOR')) return
 
         setLoadingReg(true)
         const res = await fetch(
@@ -107,7 +111,9 @@ export default function Home() {
         if (alive) setChecking(false)
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [])
 
   async function onLogout() {
@@ -120,47 +126,107 @@ export default function Home() {
     return [user.firstName, user.lastName].filter(Boolean).join(' ')
   }, [user])
 
+  // ---------- DOCTOR LANDING ----------
+  if (isDoctor) {
+    return (
+      <section className="section home">
+        <div
+          className="page-head"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+        >
+          <h1 className="page-title">Doctor Console</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {!checking && user && (
+              <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
+                {fullName && <div style={{ fontWeight: 700 }}>{fullName}</div>}
+                <div className="muted" style={{ fontSize: 14 }}>
+                  Signed in as <strong>{user.email}</strong>
+                </div>
+              </div>
+            )}
+            <button className="btn secondary" onClick={onLogout}>
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <div className="package-card">
+          <div className="pc-body" style={{ alignItems: 'flex-start' }}>
+            <div className="pc-lines">
+              <div className="muted">Access consultation requests and patient details.</div>
+            </div>
+            <div className="pc-actions">
+              <Link to="/doctor/consultations" className="btn">
+                Open Consultation Requests
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  // ---------- TRAVELER VIEW (unchanged behavior) ----------
   return (
     <section className="section home">
       {/* Header with user + logout */}
-      <div className="page-head" style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+      <div
+        className="page-head"
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+      >
         <h1 className="page-title">My Travel Package</h1>
-        <div style={{display:'flex', alignItems:'center', gap:16}}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {!checking && user && (
-            <div style={{textAlign:'right', lineHeight:1.2}}>
-              {fullName && <div style={{fontWeight:700}}>{fullName}</div>}
-              <div className="muted" style={{fontSize:14}}>
+            <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
+              {fullName && <div style={{ fontWeight: 700 }}>{fullName}</div>}
+              <div className="muted" style={{ fontSize: 14 }}>
                 Signed in as <strong>{user.email}</strong>
               </div>
+
+              {/* Doctor link will never show here now because we returned early for doctors,
+                  but keeping this does no harm if roles change mid-session */}
+              {user.roles?.includes('DOCTOR') && (
+                <Link className="btn" to="/doctor/consultations" style={{ marginTop: 8, display: 'inline-block' }}>
+                  Doctor Console
+                </Link>
+              )}
             </div>
           )}
-          <button className="btn secondary" onClick={onLogout}>Logout</button>
+          <button className="btn secondary" onClick={onLogout}>
+            Logout
+          </button>
         </div>
       </div>
 
       {/* Travel details card */}
       {reg && (
-        <div className="package-card" style={{marginBottom:16}}>
+        <div className="package-card" style={{ marginBottom: 16 }}>
           <div className="pc-body">
             <div className="pc-lines">
-              <div><span className="muted strong">From:</span> <span className="strong">{reg.from || '—'}</span></div>
-              <div><span className="muted strong">To:</span> <span className="strong">{reg.to || '—'}</span></div>
-              <div className="muted"><span className="strong">Travel Dates:</span> {reg.start || '—'} → {reg.end || '—'}</div>
-              <div className="muted"><span className="strong">Primary WhatsApp:</span> {reg.phone || '—'}</div>
+              <div>
+                <span className="muted strong">From:</span> <span className="strong">{reg.from || '—'}</span>
+              </div>
+              <div>
+                <span className="muted strong">To:</span> <span className="strong">{reg.to || '—'}</span>
+              </div>
+              <div className="muted">
+                <span className="strong">Travel Dates:</span> {reg.start || '—'} → {reg.end || '—'}
+              </div>
+              <div className="muted">
+                <span className="strong">Primary WhatsApp:</span> {reg.phone || '—'}
+              </div>
             </div>
 
             {/* Travelers list */}
             {reg.travelers && reg.travelers.length > 0 && (
-              <div style={{marginTop:12}}>
+              <div style={{ marginTop: 12 }}>
                 <h3 className="h3">Travelers</h3>
-                <ul style={{marginTop:6, paddingLeft:18}}>
+                <ul style={{ marginTop: 6, paddingLeft: 18 }}>
                   {reg.travelers.map((t, i) => (
-                    <li key={t.id ?? `${t.fullName}-${i}`} style={{marginBottom:4}}>
+                    <li key={t.id ?? `${t.fullName}-${i}`} style={{ marginBottom: 4 }}>
                       <span className="strong">{t.fullName}</span>{' '}
                       {t.dateOfBirth && (
-                        <span className="muted small">
-                          (DOB: {new Date(t.dateOfBirth).toLocaleDateString()})
-                        </span>
+                        <span className="muted small">(DOB: {new Date(t.dateOfBirth).toLocaleDateString()})</span>
                       )}
                     </li>
                   ))}
@@ -175,12 +241,16 @@ export default function Home() {
       <div className="package-card">
         <div className="pc-body">
           <div className="pc-lines">
-            <div><span className="muted strong">Destination:</span> <span className="strong">Europe</span></div>
+            <div>
+              <span className="muted strong">Destination:</span> <span className="strong">Europe</span>
+            </div>
             <div className="muted">Daily Support: 9:00am - 9:00pm</div>
             <div className="muted">Time Difference: +6 hours from Origin (GMT+2)</div>
           </div>
           <div className="pc-actions">
-            <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">WhatsApp</a>
+            <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">
+              WhatsApp
+            </a>
             <Link
               to="/consultation/tracker"
               className="btn"
@@ -210,41 +280,45 @@ export default function Home() {
               </svg>
               Log a call with GodwitCare
             </Link>
-
-
           </div>
         </div>
       </div>
 
       {(loadingDocs || loadingReg) && (
-        <div className="muted" style={{margin:'10px 0'}}>Loading your travel details…</div>
+        <div className="muted" style={{ margin: '10px 0' }}>
+          Loading your travel details…
+        </div>
       )}
 
       {/* Travel documents */}
       {reg && docs.length > 0 && (
-        <div style={{marginTop:24}}>
-          <h2 className="h2" style={{textAlign:'left'}}>Your Travel Document</h2>
-          {docs.map(d => {
+        <div style={{ marginTop: 24 }}>
+          <h2 className="h2" style={{ textAlign: 'left' }}>
+            Your Travel Document
+          </h2>
+          {docs.map((d) => {
             const viewUrl = `${API_BASE_URL}/registrations/${reg.id}/documents/${d.id}/view`
             const dlUrl = `${API_BASE_URL}/registrations/${reg.id}/documents/${d.id}/download`
             const isPreviewable = /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.fileName || '')
             return (
-              <div key={d.id} className="card" style={{marginTop:12}}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+              <div key={d.id} className="card" style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                   <div>
                     <div className="strong">{d.fileName}</div>
                     <div className="muted small">
-                      {(d.sizeBytes/1024).toFixed(1)} KB
+                      {(d.sizeBytes / 1024).toFixed(1)} KB
                       {d.createdAt ? ` • ${new Date(d.createdAt).toLocaleString()}` : ''}
                     </div>
                   </div>
-                  <a className="btn" href={dlUrl} target="_blank" rel="noreferrer">Download</a>
+                  <a className="btn" href={dlUrl} target="_blank" rel="noreferrer">
+                    Download
+                  </a>
                 </div>
                 {isPreviewable && (
                   <iframe
                     title={d.fileName}
                     src={viewUrl}
-                    style={{width:'100%', height:200, marginTop:10, border:'1px solid var(--line)', borderRadius:12}}
+                    style={{ width: '100%', height: 200, marginTop: 10, border: '1px solid var(--line)', borderRadius: 12 }}
                   />
                 )}
               </div>
@@ -256,18 +330,48 @@ export default function Home() {
       {/* Quick links */}
       <div className="ql-head">Quick Links</div>
       <div className="quick-grid">
-        <Link to="/consultation" className="quick"><span>I Need a Consultation</span></Link>
-        <Link to="/home#cases" className="quick"><span>Case Notes</span></Link>
-        <Link to="/home#appts" className="quick"><span>Appointments</span></Link>
+        <Link to="/consultation" className="quick">
+          <span>I Need a Consultation</span>
+        </Link>
+        <Link to="/home#cases" className="quick">
+          <span>Case Notes</span>
+        </Link>
+        <Link to="/home#appts" className="quick">
+          <span>Appointments</span>
+        </Link>
       </div>
 
       {/* Offers */}
       <div className="offers-head">Featured Offers</div>
       <div className="offers">
-        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1600&auto=format&fit=crop" alt="" /><div className="offer-title">Food & Drink</div></a>
-        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=687&auto=format&fit=crop" alt="" /><div className="offer-title">Taxi & Transport</div></a>
-        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1600&auto=format&fit=crop" alt="" /><div className="offer-title">Entertainment</div></a>
-        <a className="offer-card" href="#"><img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?fm=jpg&q=60&w=3000&auto=format&fit=crop" alt="" /><div className="offer-title">Accommodation</div></a>
+        <a className="offer-card" href="#">
+          <img
+            src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1600&auto=format&fit=crop"
+            alt=""
+          />
+          <div className="offer-title">Food & Drink</div>
+        </a>
+        <a className="offer-card" href="#">
+          <img
+            src="https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=687&auto=format&fit=crop"
+            alt=""
+          />
+          <div className="offer-title">Taxi & Transport</div>
+        </a>
+        <a className="offer-card" href="#">
+          <img
+            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1600&auto=format&fit=crop"
+            alt=""
+          />
+          <div className="offer-title">Entertainment</div>
+        </a>
+        <a className="offer-card" href="#">
+          <img
+            src="https://images.unsplash.com/photo-1566073771259-6a8506099945?fm=jpg&q=60&w=3000&auto=format&fit=crop"
+            alt=""
+          />
+          <div className="offer-title">Accommodation</div>
+        </a>
       </div>
     </section>
   )

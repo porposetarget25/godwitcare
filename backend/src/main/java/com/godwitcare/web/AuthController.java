@@ -1,5 +1,6 @@
 package com.godwitcare.web;
 
+import com.godwitcare.entity.Role;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -36,7 +39,7 @@ public class AuthController {
         this.securityContextRepository = securityContextRepository;
     }
 
-    // DTOs
+    // ---------- DTOs ----------
     public record RegisterReq(
             @NotBlank String firstName,
             @NotBlank String lastName,
@@ -44,7 +47,25 @@ public class AuthController {
             @NotBlank String password) {}
 
     public record LoginReq(@Email String email, @NotBlank String password) {}
-    public record UserDto(Long id, String firstName, String lastName, String email) {}
+
+    // Now includes role(s)
+    public record UserDto(Long id,
+                          String firstName,
+                          String lastName,
+                          String email,
+                          List<String> roles) {}
+
+    private UserDto toDto(User u) {
+        return new UserDto(
+                u.getId(),
+                u.getFirstName(),
+                u.getLastName(),
+                u.getEmail(),
+                List.of(u.getRole().name()) // e.g. ["USER"] or ["DOCTOR"]
+        );
+    }
+
+    // ---------- Endpoints ----------
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterReq req) {
@@ -56,8 +77,9 @@ public class AuthController {
         u.setLastName(req.lastName());
         u.setEmail(req.email());
         u.setPassword(encoder.encode(req.password()));
+        u.setRole(Role.USER); // default
         users.save(u);
-        return ResponseEntity.ok(new UserDto(u.getId(), u.getFirstName(), u.getLastName(), u.getEmail()));
+        return ResponseEntity.ok(toDto(u));
     }
 
     @PostMapping("/login")
@@ -68,7 +90,7 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(req.email(), req.password())
         );
 
-        // Create context and SAVE it to the session (issues JSESSIONID)
+        // Save security context into session (sets JSESSIONID)
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
         SecurityContextHolder.setContext(context);
@@ -78,7 +100,7 @@ public class AuthController {
         UserDetails principal = (UserDetails) auth.getPrincipal();
         User u = users.findByEmail(principal.getUsername()).orElseThrow();
 
-        return ResponseEntity.ok(new UserDto(u.getId(), u.getFirstName(), u.getLastName(), u.getEmail()));
+        return ResponseEntity.ok(toDto(u));
     }
 
     @PostMapping("/logout")
@@ -91,6 +113,21 @@ public class AuthController {
     public ResponseEntity<?> me(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();
         User u = users.findByEmail(auth.getName()).orElseThrow();
-        return ResponseEntity.ok(new UserDto(u.getId(), u.getFirstName(), u.getLastName(), u.getEmail()));
+        return ResponseEntity.ok(toDto(u));
+    }
+
+    @PostMapping("/registerDoctor")
+    public ResponseEntity<UserDto> registerDoctor(@RequestBody RegisterReq dto) {
+        if (users.findByEmail(dto.email()).isPresent()) {
+            return ResponseEntity.status(409).build();
+        }
+        User u = new User();
+        u.setEmail(dto.email());
+        u.setFirstName(dto.firstName());
+        u.setLastName(dto.lastName());
+        u.setPassword(encoder.encode(dto.password()));
+        u.setRole(Role.DOCTOR);
+        users.save(u);
+        return ResponseEntity.ok(toDto(u));
     }
 }

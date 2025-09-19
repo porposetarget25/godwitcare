@@ -14,12 +14,24 @@ import ScrollToHash from './components/ScrollToHash'
 import ConsultationTracker from './screens/ConsultationTracker'
 import PreConsultation from './screens/PreConsultation'
 import ConsultationDetails from './screens/ConsultationDetails'
+import DoctorLogin from './screens/DoctorLogin'
+import DoctorConsultations from './screens/DoctorConsultations'
+import DoctorConsultationDetails from './screens/DoctorConsultationDetails'
+import { RequireRole } from './screens/RequireRole'
+import type { UserDto } from './api'
 
+// read the user placed in localStorage by your login()
+function useCurrentUser(): UserDto | null {
+  try {
+    const raw = localStorage.getItem('gc_user')
+    return raw ? (JSON.parse(raw) as UserDto) : null
+  } catch {
+    return null
+  }
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
-  // Use BASE_URL so assets work both locally and on GitHub Pages (with base=/godwitcare/)
   const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`
-
   return (
     <div className="container">
       <header>
@@ -29,12 +41,12 @@ function Shell({ children }: { children: React.ReactNode }) {
             <strong>GodwitCare</strong>
           </div>
           <div className="navlinks">
-              <Link to="/dashboard#top">Home</Link>
-              <Link to="/dashboard#how">How it Works</Link>
-              <Link to="/dashboard#features">Features</Link>
-              <Link to="/dashboard#testimonials">Testimonials</Link>
-              <Link to="/consultation">Consultation</Link>
-        </div>
+            <Link to="/dashboard#top">Home</Link>
+            <Link to="/dashboard#how">How it Works</Link>
+            <Link to="/dashboard#features">Features</Link>
+            <Link to="/dashboard#testimonials">Testimonials</Link>
+            <Link to="/consultation">Consultation</Link>
+          </div>
         </div>
       </header>
       <main>{children}</main>
@@ -42,25 +54,64 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
+function AppRoutes() {
+  const user = useCurrentUser()
+
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard" element={<Shell><Dashboard /></Shell>} />
+      <Route path="/login" element={<Shell><Login /></Shell>} />
+      <Route path="/register/1" element={<Shell><Step1 /></Shell>} />
+      <Route path="/register/2" element={<Shell><Step2 /></Shell>} />
+      <Route path="/register/3" element={<Shell><Step3 /></Shell>} />
+      <Route path="/home" element={<Shell><Home /></Shell>} />
+      <Route path="/consultation" element={<Shell><Consultation /></Shell>} />
+
+      {/* Consultation flow */}
+      <Route path="/consultation/tracker" element={<Shell><ConsultationTracker /></Shell>} />
+      <Route path="/consultation/questionnaire" element={<Shell><PreConsultation /></Shell>} />
+      <Route path="/consultation/details" element={<Shell><ConsultationDetails /></Shell>} />
+
+
+      {/* Doctor login (public) */}
+      <Route path="/doctor/login" element={<Shell><DoctorLogin /></Shell>} />
+
+      {/* Doctor-only routes */}
+      <Route
+        path="/doctor/consultations"
+        element={
+          <Shell>
+            <RequireRole user={user} role="DOCTOR">
+              <DoctorConsultations />
+            </RequireRole>
+          </Shell>
+        }
+      />
+      <Route
+        path="/doctor/consultations/:id"
+        element={
+          <Shell>
+            <RequireRole user={user} role="DOCTOR">
+              <DoctorConsultationDetails />
+            </RequireRole>
+          </Shell>
+        }
+      />
+
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  )
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <RegProvider>
       <HashRouter>
-        <ScrollToHash /> 
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Shell><Dashboard /></Shell>} />
-          <Route path="/login" element={<Shell><Login /></Shell>} />
-          <Route path="/register/1" element={<Shell><Step1 /></Shell>} />
-          <Route path="/register/2" element={<Shell><Step2 /></Shell>} />
-          <Route path="/register/3" element={<Shell><Step3 /></Shell>} />
-          <Route path="/home" element={<Shell><Home /></Shell>} />
-          <Route path="/consultation" element={<Shell><Consultation /></Shell>} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/consultation/tracker" element={<ConsultationTracker />} />
-          <Route path="/consultation/questionnaire" element={<PreConsultation />} />
-          <Route path="/consultation/details" element={<ConsultationDetails />} />
-        </Routes>
+        <ScrollToHash />
+        <AppRoutes />
       </HashRouter>
     </RegProvider>
   </React.StrictMode>
