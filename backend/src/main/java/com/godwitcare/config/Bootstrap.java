@@ -16,6 +16,7 @@ public class Bootstrap {
         return args -> {
             if (repo.findByEmail("doctor@godwitcare.com").isEmpty()) {
                 User doctor = new User();
+                doctor.setUsername("12345");
                 doctor.setFirstName("Doctor");
                 doctor.setLastName("GodwitCare");
                 doctor.setEmail("doctor@godwitcare.com"); // unique email

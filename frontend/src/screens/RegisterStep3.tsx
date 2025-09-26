@@ -1,3 +1,4 @@
+// src/screens/RegisterStep3.tsx
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useReg } from '../state/registration'
@@ -23,15 +24,15 @@ export default function Step3() {
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
 
-  // NEW: local lists for adults and children
+  // Local lists for adults and children (merged before submit)
   const [adults, setAdults] = useState<Person[]>([])
   const [children, setChildren] = useState<Person[]>([])
 
   const MAX_TRAVELERS = 6
 
   // Helpers to read values safely
-  const from = draft['Travelling From']?.trim() ?? ''
-  const to = draft['Travelling To (UK & Europe)']?.trim() ?? ''
+  const from = (draft['Travelling From'] ?? '').trim()
+  const to = (draft['Travelling To (UK & Europe)'] ?? '').trim()
   const start = draft['Travel Start Date'] ?? ''
   const end = draft['Travel End Date'] ?? ''
   const pkg = draft['Package Days']
@@ -55,13 +56,17 @@ export default function Step3() {
     if (totalTravelers >= MAX_TRAVELERS) return
     setAdults(a => [...a, { fullName: '', dateOfBirth: '' }])
   }
-  function removeAdult(idx: number) { setAdults(a => a.filter((_, i) => i !== idx)) }
+  function removeAdult(idx: number) {
+    setAdults(a => a.filter((_, i) => i !== idx))
+  }
 
   function addChild() {
     if (totalTravelers >= MAX_TRAVELERS) return
     setChildren(c => [...c, { fullName: '', dateOfBirth: '' }])
   }
-  function removeChild(idx: number) { setChildren(c => c.filter((_, i) => i !== idx)) }
+  function removeChild(idx: number) {
+    setChildren(c => c.filter((_, i) => i !== idx))
+  }
 
   function validate(): boolean {
     const next: Errors = {}
@@ -72,15 +77,11 @@ export default function Step3() {
     if (!pkg) next.package = 'Please select a package'
     if (!next.start && !next.end && dateProblem) next.dates = dateProblem
 
-    // NEW: validate travelers (optional but recommended)
+    // Validate travelers lightly (blank rows allowed; dropped on submit)
     const merged = [...adults, ...children]
     const cleaned = merged.filter(t => t.fullName.trim() && t.dateOfBirth)
-    if (cleaned.length !== merged.length) {
-      // Allow blank rows, but they will be dropped silently on submit.
-      // If you want a hard requirement, uncomment the next line:
-      // next.travelers = 'Please fill name and date of birth for each traveler or remove blank rows.'
-    }
     if (cleaned.length > MAX_TRAVELERS) next.travelers = `Maximum ${MAX_TRAVELERS} travelers allowed.`
+
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -92,33 +93,43 @@ export default function Step3() {
     setSubmitting(true)
 
     try {
-      // Merge adults + children -> travelers
+      // 1) Merge adults + children -> travelers (drop blanks)
       const travelers = [...adults, ...children]
-        .filter(t => t.fullName.trim() && t.dateOfBirth)           // keep valid rows
-        .map(t => ({ fullName: t.fullName.trim(), dateOfBirth: t.dateOfBirth })) // yyyy-MM-dd
+        .filter(t => t.fullName.trim() && t.dateOfBirth)
+        .map(t => ({ fullName: t.fullName.trim(), dateOfBirth: t.dateOfBirth }))
 
-      // Put the travelers array on the draft object so api.ts can map it
+      // Put travelers onto the draft so api.ts->toBackend can map them
       const payload = { ...draft, travelers } as any
 
-      // 1) Save registration (now includes travelers)
+      // 2) Save registration (+doc upload)
       const created = await saveRegistration(payload)
 
-      // 2) Optional document upload
       if (file) {
         await uploadDocument(created.id!, file)
       }
 
-      // 3) Create user account using fields captured in Step 1
+      // 3) Create user account (email optional, username required = primary WhatsApp)
       const firstName = draft['First Name'] || ''
       const lastName  = draft['Last Name']  || ''
-      const email     = (draft['Email Address'] || '').trim()
+      const email     = (draft['Email Address'] || '').trim() || null // optional now
       const password  = (draft['Account Password'] || '').trim()
+      const username  = (draft['Username'] || draft['Primary WhatsApp Number'] || '').trim()
 
-      if (email && password) {
-        try { await registerAuthUser(firstName, lastName, email, password) }
-        catch (err) { console.warn('registerAuthUser:', err) }
-        try { await login(email, password) }
-        catch (err) { console.warn('auto-login failed:', err) }
+      // Register only if we have password AND username (primary phone as username)
+      if (password && username) {
+        try {
+          await registerAuthUser(firstName, lastName, email, password, username)
+        } catch (err) {
+          console.warn('registerAuthUser:', err)
+        }
+
+        // Auto-login: identifier can be email OR username
+        const identifier = email ?? username
+        try {
+          await login(identifier, password)
+        } catch (err) {
+          console.warn('auto-login failed:', err)
+        }
       }
 
       // 4) Finish
@@ -197,9 +208,15 @@ export default function Step3() {
           {/* Adults only */}
           <div className="field">
             <label className="h3" style={{display:'block', marginBottom:8}}>Adults only</label>
-            <button type="button" className="btn" onClick={addAdult} disabled={totalTravelers >= MAX_TRAVELERS}>
+            <button
+              type="button"
+              className="btn"
+              onClick={addAdult}
+              disabled={totalTravelers >= MAX_TRAVELERS}
+            >
               + Add Adult
             </button>
+
             {adults.map((a, i) => (
               <div key={`a-${i}`} className="card" style={{marginTop:10, padding:12}}>
                 <div className="grid two">
@@ -233,9 +250,15 @@ export default function Step3() {
           {/* Children */}
           <div className="field" style={{marginTop:16}}>
             <label className="h3" style={{display:'block', marginBottom:8}}>Children</label>
-            <button type="button" className="btn" onClick={addChild} disabled={totalTravelers >= MAX_TRAVELERS}>
+            <button
+              type="button"
+              className="btn"
+              onClick={addChild}
+              disabled={totalTravelers >= MAX_TRAVELERS}
+            >
               + Add Child
             </button>
+
             {children.map((c, i) => (
               <div key={`c-${i}`} className="card" style={{marginTop:10, padding:12}}>
                 <div className="grid two">

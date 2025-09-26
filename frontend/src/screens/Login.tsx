@@ -1,9 +1,10 @@
+// src/screens/Login.tsx
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login } from '../api'   // <-- use your api.ts login
+import { login } from '../api'   // session login
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -14,9 +15,8 @@ export default function Login() {
     setError(null)
     setLoading(true)
     try {
-      // Real session login (sets JSESSIONID cookie)
-      await login(email, password)
-      // On success: go to the app Home
+      // Use WhatsApp number as username
+      await login(username, password)
       navigate('/home')
     } catch (err: any) {
       setError(err?.message || 'Login failed')
@@ -54,13 +54,13 @@ export default function Login() {
 
         <form className="auth-form" onSubmit={onSubmit}>
           <div className="field">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="username">WhatsApp Number</label>
             <input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="username"
+              type="text"
+              placeholder="+91XXXXXXXXXX"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
             />

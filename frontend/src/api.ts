@@ -249,21 +249,30 @@ export async function me(): Promise<UserDto | null> {
   return res.json() as Promise<UserDto>
 }
 
+// api.ts
 export async function registerAuthUser(
   firstName: string,
   lastName: string,
-  email: string,
-  password: string
+  email: string | null,   // email can be null/optional
+  password: string,
+  username: string        // REQUIRED: primary WhatsApp number (with +CC)
 ): Promise<UserDto> {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // harmless; session not needed here
-    body: JSON.stringify({ firstName, lastName, email, password }),
+    credentials: 'include',
+    body: JSON.stringify({
+      firstName,
+      lastName,
+      email,      // may be null
+      password,
+      username,   // <-- NEW
+    }),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<UserDto>
 }
+
 
 // ---------- Consultations (patient) ----------
 export async function createConsultation(payload: ConsultationCreate) {

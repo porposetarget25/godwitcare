@@ -21,9 +21,8 @@ public class Registration {
     private String primaryWhatsAppNumber;
     private String carerSecondaryWhatsAppNumber;
 
-    @NotBlank
     @Email
-    @Column(name = "email_address", nullable = false)
+    @Column(name = "email_address", nullable = true)
     private String emailAddress;
 
     private Boolean longTermMedication;

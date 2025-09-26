@@ -25,7 +25,6 @@ public class ConsultationController {
         this.users = users;
     }
 
-    // ---------- Patient: create ----------
     @PostMapping("/consultations")
     public ResponseEntity<Map<String, Object>> create(
             Authentication auth,
@@ -33,8 +32,10 @@ public class ConsultationController {
     ) throws Exception {
         if (auth == null) return ResponseEntity.status(401).build();
 
-        String email = auth.getName();
-        User u = users.findByEmail(email).orElse(null);
+        String principal = auth.getName();
+        User u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
         Consultation c = new Consultation();
@@ -43,25 +44,28 @@ public class ConsultationController {
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
-        c.setAnswersJson(om.writeValueAsString(body.getOrDefault("answers", Map.of())));
+        c.setAnswersJson(new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(body.getOrDefault("answers", java.util.Map.of())));
         c = consultations.save(c);
 
-        return ResponseEntity.ok(Map.of(
-                "id", c.getId(),
-                "status", c.getStatus().name()
-        ));
+        return ResponseEntity.ok(java.util.Map.of("id", c.getId(), "status", c.getStatus().name()));
     }
 
-    // ---------- Patient: latest for me (to show “call logged”) ----------
     @GetMapping("/consultations/mine/latest")
     public ResponseEntity<Map<String, Object>> myLatest(Authentication auth) throws Exception {
         if (auth == null) return ResponseEntity.status(401).build();
-        String email = auth.getName();
-        var list = consultations.findByUserEmailOrderByIdDesc(email);
+
+        String principal = auth.getName();
+        User u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        var list = consultations.findByUserEmailOrderByIdDesc(u.getEmail());
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
-        Consultation c = list.get(0);
-        Map<String, Object> res = new HashMap<>();
+        var c = list.get(0);
+        var res = new java.util.HashMap<String, Object>();
         res.put("id", c.getId());
         res.put("createdAt", c.getCreatedAt());
         res.put("status", c.getStatus().name());
