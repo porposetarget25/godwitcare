@@ -248,14 +248,14 @@ export default function Home() {
             <div className="muted">Time Difference: +6 hours from Origin (GMT+2)</div>
           </div>
           <div className="pc-actions">
-            <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">
+            {/* <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">
               WhatsApp
-            </a>
+            </a> */}
             <Link
               to="/consultation/tracker"
               className="btn"
               style={{
-                backgroundColor: '#B94A48',
+                backgroundColor: '#75b948ff',
                 color: 'white',
                 fontWeight: 600,
                 display: 'flex',
@@ -278,7 +278,7 @@ export default function Home() {
                   d="M6.6 10.8c1.2 2.4 3.2 4.4 5.6 5.6l2-2c.3-.3.7-.4 1.1-.3 1.2.4 2.6.6 4 .6.6 0 1 .4 1 1v3.5c0 .6-.4 1-1 1C11.3 20 4 12.7 4 4.5c0-.6.4-1 1-1H8.5c.6 0 1 .4 1 1 0 1.4.2 2.8.6 4 .1.4 0 .8-.3 1.1l-2.2 2.2Z"
                 />
               </svg>
-              Log a call with GodwitCare
+              I need a Consultation
             </Link>
           </div>
         </div>
