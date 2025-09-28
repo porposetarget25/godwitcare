@@ -45,7 +45,6 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link to="/dashboard#how">How it Works</Link>
             <Link to="/dashboard#features">Features</Link>
             <Link to="/dashboard#testimonials">Testimonials</Link>
-            <Link to="/consultation">Consultation</Link>
           </div>
         </div>
       </header>

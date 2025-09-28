@@ -330,7 +330,7 @@ export default function Home() {
       {/* Quick links */}
       <div className="ql-head">Quick Links</div>
       <div className="quick-grid">
-        <Link to="/consultation" className="quick">
+        <Link to="/consultation/tracker" className="quick">
           <span>I Need a Consultation</span>
         </Link>
         <Link to="/home#cases" className="quick">
