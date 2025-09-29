@@ -1,9 +1,10 @@
 // src/screens/PreConsultation.tsx
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../api'
 
 type YesNo = 'Yes' | 'No'
+type Ans = YesNo | undefined
 
 function Toggle({
   label,
@@ -11,9 +12,10 @@ function Toggle({
   onChange,
 }: {
   label: string
-  value: YesNo
+  value: Ans
   onChange: (v: YesNo) => void
 }) {
+  const isUnset = value === undefined
   return (
     <div className="field" style={{ marginBottom: 12 }}>
       <label className="strong">{label}</label>
@@ -34,6 +36,11 @@ function Toggle({
         >
           Yes
         </button>
+        {isUnset && (
+          <span className="muted small" style={{ alignSelf: 'center' }}>
+            ← please choose
+          </span>
+        )}
       </div>
     </div>
   )
@@ -118,35 +125,91 @@ const FORM: Section[] = [
 export default function PreConsultation() {
   const nav = useNavigate()
 
+  // Contact fields (prefilled from /auth/me if available)
   const [location, setLocation] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactAddress, setContactAddress] = useState('')
 
+  // Answers start UNSET (must be chosen)
   const defaultAnswers = useMemo(() => {
-    const all: Record<string, YesNo> = {}
-    for (const s of FORM) for (const q of s.questions) all[q.id] = 'No'
+    const all: Record<string, Ans> = {}
+    for (const s of FORM) for (const q of s.questions) all[q.id] = undefined
     return all
   }, [])
-  const [answers, setAnswers] = useState<Record<string, YesNo>>(defaultAnswers)
+  const [answers, setAnswers] = useState<Record<string, Ans>>(defaultAnswers)
+
+  // Optional free-text details per question when “Yes”
+  const [detailsByQ, setDetailsByQ] = useState<Record<string, string>>({})
+
   const [submitting, setSubmitting] = useState(false)
+
+  // Prefill name/phone from current user (if logged in)
+  useEffect(() => {
+    let ignore = false
+    async function loadMe() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+          credentials: 'include',
+        })
+        if (!res.ok) return
+        const me = await res.json()
+        if (ignore) return
+        const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
+        const username = me?.username || me?.phone || ''
+        if (!contactName && fullName) setContactName(fullName)
+        if (!contactPhone && username) setContactPhone(username)
+      } catch {
+        // ignore if unauthenticated
+      }
+    }
+    loadMe()
+    return () => { ignore = true }
+  }, []) // run once
 
   function setAnswer(id: string, v: YesNo) {
     setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
   }
 
+  function setDetail(id: string, v: string) {
+    setDetailsByQ(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
+
+    // (2) Validate every question is answered
+    const unanswered = Object.entries(answers).filter(([, v]) => v === undefined)
+    if (unanswered.length > 0) {
+      alert('Please answer all questions (Yes/No) before submitting.')
+      return
+    }
+
     setSubmitting(true)
 
     try {
+      // Cast answers to Yes/No (safe now after validation)
+      const castAnswers: Record<string, YesNo> = {}
+      for (const k of Object.keys(answers)) {
+        castAnswers[k] = (answers[k] as YesNo)
+      }
+
+      // Include only non-empty details
+      const details: Record<string, string> = {}
+      for (const [k, v] of Object.entries(detailsByQ)) {
+        const trimmed = (v || '').trim()
+        if (trimmed) details[k] = trimmed
+      }
+
       const payload = {
         currentLocation: location,
         contactName,
         contactPhone,
         contactAddress,
-        answers,
+        answers: castAnswers,
+        // (3) NEW: optional details per question when user provided them
+        detailsByQuestion: details,
       }
 
       const res = await fetch(`${API_BASE_URL}/consultations`, {
@@ -176,7 +239,7 @@ export default function PreConsultation() {
         className="page-head"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
       >
-        <h1 className="page-title">Pre-Consultation Questionnaire</h1>
+        <h1 className="page-title">Pre-Consultation Checklist</h1>
         <Link to="/consultation/tracker" className="btn secondary">
           Back
         </Link>
@@ -246,14 +309,29 @@ export default function PreConsultation() {
             <div className="strong" style={{ marginBottom: 8 }}>
               {section.title}
             </div>
-            {section.questions.map((q) => (
-              <Toggle
-                key={q.id}
-                label={q.label}
-                value={answers[q.id]}
-                onChange={(v) => setAnswer(q.id, v)}
-              />
-            ))}
+            {section.questions.map((q) => {
+              const val = answers[q.id]
+              return (
+                <div key={q.id} style={{ marginBottom: 10 }}>
+                  <Toggle
+                    label={q.label}
+                    value={val}
+                    onChange={(v) => setAnswer(q.id, v)}
+                  />
+                  {/* (3) Optional textbox appears only when "Yes" */}
+                  {val === 'Yes' && (
+                    <div className="field" style={{ marginTop: 6 }}>
+                      <label className="small">Add details (optional)</label>
+                      <input
+                        value={detailsByQ[q.id] || ''}
+                        onChange={(e) => setDetail(q.id, e.target.value)}
+                        placeholder="Describe briefly (optional)"
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         ))}
 

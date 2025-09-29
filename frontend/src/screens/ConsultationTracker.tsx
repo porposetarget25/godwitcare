@@ -1,41 +1,84 @@
+// src/screens/ConsultationTracker.tsx
 import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
   const isLogged = params.get('logged') === '1'
-
   const [showToast, setShowToast] = useState(isLogged)
 
   useEffect(() => {
     if (isLogged) {
       setShowToast(true)
-      const timer = setTimeout(() => setShowToast(false), 4000) // auto-hide in 4s
+      const timer = setTimeout(() => setShowToast(false), 4000)
       return () => clearTimeout(timer)
     }
   }, [isLogged])
 
+  // WhatsApp deep-link (digits only)
+  const WA_NUMBER = '640211899955'
+  const waHref = `https://wa.me/${WA_NUMBER}`
+
+  // 🔹 Shared card style
+  const cardStyle: React.CSSProperties = {
+    marginTop: 16,
+    padding: 20,
+    borderRadius: 12,
+    background:
+      'linear-gradient(135deg, rgba(219,234,254,1) 0%, rgba(236,253,245,1) 100%)',
+    border: '1px solid #dbeafe',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+  }
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: 18,
+    fontWeight: 600,
+    marginBottom: 6,
+  }
+
+  const textStyle: React.CSSProperties = {
+    marginTop: 4,
+    maxWidth: 900,
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 1.4,
+  }
+
   return (
     <section className="section">
-      <div className="page-head" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <h1 className="page-title">Your Consultation Journey</h1>
-        <Link to="/home" className="btn secondary">Back to Home</Link>
+      {/* Header */}
+      <div
+        className="page-head"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <h1 className="page-title" style={{ marginBottom: 0 }}>
+          Your Consultation Journey
+        </h1>
+        <Link to="/home" className="btn secondary">
+          Back to Home
+        </Link>
       </div>
 
-      {/* ✅ Floating toast */}
+      {/* Toast */}
       {showToast && (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             position: 'fixed',
             top: 20,
             right: 20,
-            background: '#16a34a',
+            background:
+              'linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)',
             color: 'white',
             padding: '12px 16px',
-            borderRadius: 8,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+            borderRadius: 10,
+            boxShadow: '0 8px 20px rgba(16,185,129,.35)',
             zIndex: 1000,
-            transition: 'opacity 0.5s ease-in-out',
           }}
         >
           ✅ Your call has been logged. A doctor will contact you shortly.
@@ -43,63 +86,103 @@ export default function ConsultationTracker() {
       )}
 
       {/* Step 1 */}
-      <div className="card" style={{marginTop:12}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="strong">Call GodwitCare</div>
-            <div className="muted small">
-              Initiate your consultation by logging a call to connect with a healthcare professional.
+            <div style={titleStyle}>
+              Step 1: Complete Pre-Consultation Checklist
+            </div>
+            <div style={textStyle}>
+              Fill out the necessary health questionnaire and consent forms before
+              your session. This ensures a smooth and efficient experience.
             </div>
           </div>
-          {isLogged ? (
-            <button className="btn" type="button" disabled>Logged</button>
-          ) : (
-            <Link to="/consultation/questionnaire" className="btn secondary">In progress</Link>
-          )}
+          <Link to="/consultation/questionnaire" className="btn">
+            Submit Details
+          </Link>
         </div>
       </div>
 
       {/* Step 2 */}
-      <div className="card" style={{marginTop:12}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="strong">Complete Pre-Consultation Checklist</div>
-            <div className="muted small">Fill out the necessary health questionnaire and consent forms.</div>
+            <div style={titleStyle}>Step 2: Notify GodwitCare</div>
+            <div style={textStyle}>
+              Initiate your consultation by notifying our team so a clinician can
+              connect with you. This opens a WhatsApp chat with our helpline.
+            </div>
           </div>
-          <Link to="/consultation/questionnaire" className="btn">Complete Checklist</Link>
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noreferrer"
+            className="btn"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
+            {/* phone icon */}
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.58 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.09a2 2 0 0 1 2.11-.45c.84.26 1.71.46 2.61.58A2 2 0 0 1 22 16.92z" />
+            </svg>
+            Notify Clinician
+          </a>
         </div>
       </div>
 
       {/* Step 3 */}
-      <div className="card" style={{marginTop:12}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="strong">Doctor Calling within an hour</div>
-            <div className="muted small">A doctor will contact you via WhatsApp to discuss your concerns.</div>
+            <div style={titleStyle}>Step 3: Receive a call from Clinician</div>
+            <div style={textStyle}>
+              A clinician will contact you shortly via WhatsApp call to discuss your
+              health concerns and provide expert medical advice.
+            </div>
           </div>
-          <Link to="/consultation/details" className="btn secondary">Upcoming</Link>
+          <Link to="/consultation/details" className="btn secondary">
+            Upcoming
+          </Link>
         </div>
       </div>
 
       {/* Step 4 */}
-      <div className="card" style={{marginTop:12}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="strong">Prescription Issued</div>
-            <div className="muted small">Receive your digital prescription via WhatsApp.</div>
+            <div style={titleStyle}>Step 4: Prescription Issued</div>
+            <div style={textStyle}>
+              Receive your digital prescription in the app with dosage instructions
+              and medication details.
+            </div>
           </div>
-          <button className="btn secondary" type="button" disabled>Upcoming</button>
+          <button className="btn secondary" type="button" disabled>
+            Upcoming
+          </button>
         </div>
       </div>
 
       {/* Step 5 */}
-      <div className="card" style={{marginTop:12}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div className="strong">Locate Pharmacy</div>
-            <div className="muted small">Find the nearest pharmacy to pick up your medicines.</div>
+            <div style={titleStyle}>Step 5: Locate Pharmacy</div>
+            <div style={textStyle}>
+              Find the nearest pharmacy to pick up your prescribed medication.
+            </div>
           </div>
-          <button className="btn secondary" type="button" disabled>Upcoming</button>
+          <button className="btn secondary" type="button" disabled>
+            Upcoming
+          </button>
         </div>
       </div>
     </section>
