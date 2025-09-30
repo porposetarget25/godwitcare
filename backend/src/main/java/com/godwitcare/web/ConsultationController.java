@@ -44,6 +44,9 @@ public class ConsultationController {
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
+        // Generate unique 9-digit patientId
+        String patientId = "PV-" + String.format("%09d", (int)(Math.random() * 1_000_000_000));
+        c.setPatientId(patientId);
 
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
@@ -117,6 +120,7 @@ public class ConsultationController {
                     var u = c.getUser();
                     Map<String, Object> d = new HashMap<>();
                     d.put("id", c.getId());
+                    d.put("patientId", c.getPatientId());
                     d.put("createdAt", c.getCreatedAt());
                     d.put("status", c.getStatus().name());
                     d.put("patient", Map.of(

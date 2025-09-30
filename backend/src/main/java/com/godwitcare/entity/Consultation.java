@@ -58,6 +58,10 @@ public class Consultation {
 
     public enum Status { PENDING, IN_PROGRESS, DONE }
 
+    // Patient ID (e.g., PV-123456789)
+    @Column(unique = true, length = 20)
+    private String patientId;
+
     // ----- getters/setters (existing) -----
     public Long getId() { return id; }
     public User getUser() { return user; }
@@ -101,4 +105,12 @@ public class Consultation {
     public Instant getCreatedAt() { return createdAt; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
+
+    public String getPatientId() {
+        return patientId;
+    }
+
+    public void setPatientId(String patientId) {
+        this.patientId = patientId;
+    }
 }
