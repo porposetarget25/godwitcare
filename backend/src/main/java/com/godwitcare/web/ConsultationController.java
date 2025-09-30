@@ -59,7 +59,10 @@ public class ConsultationController {
         c.setDetailsByQuestionJson(mapper.writeValueAsString(
                 body.getOrDefault("detailsByQuestion", java.util.Map.of())
         ));
-
+        Object dobVal = body.get("dob");
+        if (dobVal instanceof String dobStr && !dobStr.isBlank()) {
+            try { c.setDob(java.time.LocalDate.parse(dobStr)); } catch (Exception ignored) {}
+        }
         c = consultations.save(c);
 
         return ResponseEntity.ok(java.util.Map.of(
@@ -126,13 +129,13 @@ public class ConsultationController {
                     d.put("patient", Map.of(
                             "email", u.getEmail(),
                             "firstName", u.getFirstName(),
-                            "lastName", u.getLastName()
+                            "lastName", u.getLastName(),
+                            "dob", c.getDob() != null ? c.getDob().toString():""
                     ));
                     d.put("currentLocation", c.getCurrentLocation());
                     d.put("contactName", c.getContactName());
                     d.put("contactPhone", c.getContactPhone());
                     d.put("contactAddress", c.getContactAddress());
-
                     ObjectMapper mapper = new ObjectMapper();
 
                     // Existing: answers (qid -> "Yes"/"No")

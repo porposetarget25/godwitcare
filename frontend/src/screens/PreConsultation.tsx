@@ -51,85 +51,85 @@ type Section = { title: string; questions: Q[] }
 
 /** All sections & questions with descriptive IDs */
 const FORM: Section[] = [
-  {
-    title: 'Emergency Symptoms',
-    questions: [
-      { id: 'emergency_pain', label: 'Experiencing severe pain?' },
-      { id: 'emergency_breath', label: 'Difficulty breathing or shortness of breath?' },
-      { id: 'emergency_unconscious', label: 'Unconsciousness or altered mental state?' },
-      { id: 'emergency_bleeding', label: 'Recent injury with heavy bleeding?' },
-    ],
-  },
-  {
-    title: 'Signs of a Stroke (FAST)',
-    questions: [
-      { id: 'stroke_face', label: 'Facial droop?' },
-      { id: 'stroke_weakness', label: 'Weakness on one side?' },
-      { id: 'stroke_speech', label: 'Slurred speech?' },
-    ],
-  },
-  {
-    title: 'Indications of Sepsis',
-    questions: [
-      { id: 'sepsis_confusion', label: 'Slurred speech or confusion?' },
-      { id: 'sepsis_shiver', label: 'Shivering or muscle pain?' },
-      { id: 'sepsis_skin', label: 'Skin discoloration or rash?' },
-    ],
-  },
-  {
-    title: 'Signs of Heart Attack',
-    questions: [
-      { id: 'heartattack_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
-    ],
-  },
-  {
-    title: 'General Symptoms',
-    questions: [
-      { id: 'general_symptoms_fever', label: 'Experiencing persistent fever?' },
-      { id: 'general_symptoms_fatigue', label: 'Feeling extreme fatigue or weakness?' },
-      { id: 'general_symptoms_weightloss', label: 'Unexplained weight loss?' },
-    ],
-  },
-  {
-    title: 'Respiratory & ENT Issues',
-    questions: [
-      { id: 'respiratory_ent_cough', label: 'Persistent cough?' },
-      { id: 'respiratory_ent_taste', label: 'Sudden loss of taste or smell?' },
-      { id: 'respiratory_ent_throat', label: 'Severe sore throat?' },
-    ],
-  },
-  {
-    title: 'Digestive Issues',
-    questions: [
-      { id: 'digestive_abdominal_pain', label: 'Severe abdominal pain?' },
-      { id: 'digestive_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
-    ],
-  },
-  {
-    title: 'Neurological Symptoms',
-    questions: [
-      { id: 'neuro_headache', label: 'New or worsening severe headaches?' },
-      { id: 'neuro_vision', label: 'Sudden onset of vision changes?' },
-      { id: 'neuro_balance', label: 'Difficulty with balance or coordination?' },
-    ],
-  },
-  {
-    title: 'Mental Well-being',
-    questions: [
-      { id: 'mental_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
-      { id: 'mental_sadness', label: 'Persistent feelings of sadness or self-harm thoughts?' },
-    ],
-  },
+  { title: 'Emergency Symptoms', questions: [
+    { id: 'emergency_pain', label: 'Experiencing severe pain?' },
+    { id: 'emergency_breath', label: 'Difficulty breathing or shortness of breath?' },
+    { id: 'emergency_unconscious', label: 'Unconsciousness or altered mental state?' },
+    { id: 'emergency_bleeding', label: 'Recent injury with heavy bleeding?' },
+  ]},
+  { title: 'Signs of a Stroke (FAST)', questions: [
+    { id: 'stroke_face', label: 'Facial droop?' },
+    { id: 'stroke_weakness', label: 'Weakness on one side?' },
+    { id: 'stroke_speech', label: 'Slurred speech?' },
+  ]},
+  { title: 'Indications of Sepsis', questions: [
+    { id: 'sepsis_confusion', label: 'Slurred speech or confusion?' },
+    { id: 'sepsis_shiver', label: 'Shivering or muscle pain?' },
+    { id: 'sepsis_skin', label: 'Skin discoloration or rash?' },
+  ]},
+  { title: 'Signs of Heart Attack', questions: [
+    { id: 'heartattack_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
+  ]},
+  { title: 'General Symptoms', questions: [
+    { id: 'general_symptoms_fever', label: 'Experiencing persistent fever?' },
+    { id: 'general_symptoms_fatigue', label: 'Feeling extreme fatigue or weakness?' },
+    { id: 'general_symptoms_weightloss', label: 'Unexplained weight loss?' },
+  ]},
+  { title: 'Respiratory & ENT Issues', questions: [
+    { id: 'respiratory_ent_cough', label: 'Persistent cough?' },
+    { id: 'respiratory_ent_taste', label: 'Sudden loss of taste or smell?' },
+    { id: 'respiratory_ent_throat', label: 'Severe sore throat?' },
+  ]},
+  { title: 'Digestive Issues', questions: [
+    { id: 'digestive_abdominal_pain', label: 'Severe abdominal pain?' },
+    { id: 'digestive_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
+  ]},
+  { title: 'Neurological Symptoms', questions: [
+    { id: 'neuro_headache', label: 'New or worsening severe headaches?' },
+    { id: 'neuro_vision', label: 'Sudden onset of vision changes?' },
+    { id: 'neuro_balance', label: 'Difficulty with balance or coordination?' },
+  ]},
+  { title: 'Mental Well-being', questions: [
+    { id: 'mental_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
+    { id: 'mental_sadness', label: 'Persistent feelings of sadness or self-harm thoughts?' },
+  ]},
 ]
+
+// Helper: normalize many input formats to yyyy-MM-dd
+const toYMD = (d?: string) => {
+  if (!d) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+  try {
+    const dt = new Date(d)
+    if (isNaN(dt.getTime())) return ''
+    const yyyy = dt.getFullYear()
+    const mm = String(dt.getMonth() + 1).padStart(2, '0')
+    const dd = String(dt.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  } catch { return '' }
+}
+
+// Hit a list of URLs; return the first JSON that succeeds (or null)
+const tryFetchJson = async (urls: string[]) => {
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { credentials: 'include' })
+      if (r.ok) return await r.json()
+    } catch {/* ignore and try next */}
+  }
+  return null
+}
+
 
 export default function PreConsultation() {
   const nav = useNavigate()
 
-  // Contact fields (prefilled from /auth/me if available)
+  // Contact fields (prefilled)
   const [location, setLocation] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactAddress, setContactAddress] = useState('')
+  const [dob, setDob] = useState('') // yyyy-MM-dd
 
   // Answers start UNSET (must be chosen)
   const defaultAnswers = useMemo(() => {
@@ -144,33 +144,57 @@ export default function PreConsultation() {
 
   const [submitting, setSubmitting] = useState(false)
 
-  // Prefill name/phone from current user (if logged in)
+  // Prefill from latest registration (if available) then /auth/me as fallback
   useEffect(() => {
-    let ignore = false
-    async function loadMe() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/auth/me`, {
-          credentials: 'include',
-        })
-        if (!res.ok) return
-        const me = await res.json()
-        if (ignore) return
-        const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
-        const username = me?.username || me?.phone || ''
+  let ignore = false
+
+  async function prefill() {
+    // 1) Prefer latest registration (DOB lives there)
+    try {
+      const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, {
+        credentials: 'include'
+      })
+      if (r.ok && !ignore) {
+        const reg = await r.json()
+        const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
+        const phone = reg?.primaryWhatsApp || ''
+
         if (!contactName && fullName) setContactName(fullName)
-        if (!contactPhone && username) setContactPhone(username)
-      } catch {
-        // ignore if unauthenticated
+        if (!contactPhone && phone) setContactPhone(String(phone))
+
+        const ymd = toYMD(reg?.dateOfBirth)
+        if (!dob && ymd) setDob(ymd)
       }
-    }
-    loadMe()
-    return () => { ignore = true }
-  }, []) // run once
+    } catch { /* ignore; fall back to /auth/me */ }
+
+    // 2) Fallback: /auth/me (in case reg endpoint not available or missing fields)
+    try {
+      const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
+      if (r.ok && !ignore) {
+        const me = await r.json()
+        const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
+        const phone = me?.username || me?.phone || ''
+
+        if (!contactName && fullName) setContactName(fullName)
+        if (!contactPhone && phone) setContactPhone(String(phone))
+
+        const rawDob: string | undefined =
+          me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
+        const ymd = toYMD(rawDob)
+        if (!dob && ymd) setDob(ymd)
+      }
+    } catch { /* ignore */ }
+  }
+
+  prefill()
+  return () => { ignore = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [])
+
 
   function setAnswer(id: string, v: YesNo) {
     setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
   }
-
   function setDetail(id: string, v: string) {
     setDetailsByQ(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
   }
@@ -179,7 +203,7 @@ export default function PreConsultation() {
     e.preventDefault()
     if (submitting) return
 
-    // (2) Validate every question is answered
+    // Validate every question is answered
     const unanswered = Object.entries(answers).filter(([, v]) => v === undefined)
     if (unanswered.length > 0) {
       alert('Please answer all questions (Yes/No) before submitting.')
@@ -187,13 +211,10 @@ export default function PreConsultation() {
     }
 
     setSubmitting(true)
-
     try {
       // Cast answers to Yes/No (safe now after validation)
       const castAnswers: Record<string, YesNo> = {}
-      for (const k of Object.keys(answers)) {
-        castAnswers[k] = (answers[k] as YesNo)
-      }
+      for (const k of Object.keys(answers)) castAnswers[k] = answers[k] as YesNo
 
       // Include only non-empty details
       const details: Record<string, string> = {}
@@ -208,8 +229,8 @@ export default function PreConsultation() {
         contactPhone,
         contactAddress,
         answers: castAnswers,
-        // (3) NEW: optional details per question when user provided them
         detailsByQuestion: details,
+        dob: dob || null, // safe even if backend ignores it
       }
 
       const res = await fetch(`${API_BASE_URL}/consultations`, {
@@ -223,7 +244,6 @@ export default function PreConsultation() {
         const t = await res.text().catch(() => '')
         throw new Error(`Failed to save consultation: ${res.status} ${t}`)
       }
-
       nav('/consultation/tracker?logged=1')
     } catch (err) {
       console.error(err)
@@ -235,14 +255,9 @@ export default function PreConsultation() {
 
   return (
     <section className="section">
-      <div
-        className="page-head"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-      >
+      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Pre-Consultation Checklist</h1>
-        <Link to="/consultation/tracker" className="btn secondary">
-          Back
-        </Link>
+        <Link to="/consultation/tracker" className="btn secondary">Back</Link>
       </div>
 
       <form className="form" onSubmit={submit}>
@@ -277,6 +292,18 @@ export default function PreConsultation() {
               />
             </div>
           </div>
+
+          {/* DOB field (prepopulated if available) */}
+          <div className="field">
+            <label>Date of Birth</label>
+            <input
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              placeholder="yyyy-mm-dd"
+            />
+          </div>
+
           <div className="field">
             <label>Address</label>
             <textarea
@@ -291,12 +318,7 @@ export default function PreConsultation() {
         {/* Emergency banner */}
         <div
           className="card"
-          style={{
-            background: '#B94A48',
-            color: 'white',
-            borderColor: 'transparent',
-            marginTop: 8,
-          }}
+          style={{ background: '#B94A48', color: 'white', borderColor: 'transparent', marginTop: 8 }}
         >
           <div className="strong" style={{ marginBottom: 4 }}>
             If you answer “Yes” to any of these emergency questions, please dial 999 immediately.
@@ -306,9 +328,7 @@ export default function PreConsultation() {
         {/* Sections */}
         {FORM.map((section) => (
           <div key={section.title} className="card" style={{ marginTop: 12 }}>
-            <div className="strong" style={{ marginBottom: 8 }}>
-              {section.title}
-            </div>
+            <div className="strong" style={{ marginBottom: 8 }}>{section.title}</div>
             {section.questions.map((q) => {
               const val = answers[q.id]
               return (
@@ -318,7 +338,6 @@ export default function PreConsultation() {
                     value={val}
                     onChange={(v) => setAnswer(q.id, v)}
                   />
-                  {/* (3) Optional textbox appears only when "Yes" */}
                   {val === 'Yes' && (
                     <div className="field" style={{ marginTop: 6 }}>
                       <label className="small">Add details (optional)</label>

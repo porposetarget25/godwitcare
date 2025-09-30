@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -62,6 +63,8 @@ public class Consultation {
     @Column(unique = true, length = 20)
     private String patientId;
 
+    private LocalDate dob;
+
     // ----- getters/setters (existing) -----
     public Long getId() { return id; }
     public User getUser() { return user; }
@@ -112,5 +115,13 @@ public class Consultation {
 
     public void setPatientId(String patientId) {
         this.patientId = patientId;
+    }
+
+    public LocalDate getDob() {
+        return dob;
+    }
+
+    public void setDob(LocalDate dob) {
+        this.dob = dob;
     }
 }
