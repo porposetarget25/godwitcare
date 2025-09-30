@@ -37,13 +37,38 @@ export default function DoctorConsultationDetails(){
       </div>
 
       <div className="card" style={{marginTop:12}}>
-        <div className="strong">Questionnaire</div>
+        <div className="strong" style={{marginBottom:8}}>Questionnaire</div>
         {data.answers && Object.keys(data.answers).length>0 ? (
-          <ul style={{marginTop:6}}>
-            {Object.entries(data.answers).map(([k,v])=>(
-              <li key={k}><span className="strong">{k}</span>: <span className="muted">{String(v)}</span></li>
-            ))}
-          </ul>
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'#f3f4f6', textAlign:'left'}}>
+                <th style={{padding:'6px 8px'}}>Question ID</th>
+                <th style={{padding:'6px 8px'}}>Answer</th>
+                <th style={{padding:'6px 8px'}}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(data.answers).map(([qid, ans])=>{
+                const note = (data.detailsByQuestion || {})[qid]
+                const isYes = String(ans).toLowerCase() === 'yes'
+                return (
+                  <tr
+                    key={qid}
+                    style={{
+                      borderTop:'1px solid #e5e7eb',
+                      background: isYes ? '#fef3c7' : 'transparent' // orange-100 for Yes
+                    }}
+                  >
+                    <td style={{padding:'6px 8px', fontSize:13, fontWeight:500}}>{qid}</td>
+                    <td style={{padding:'6px 8px'}}>{String(ans)}</td>
+                    <td style={{padding:'6px 8px', color: note ? '#374151' : '#9ca3af'}}>
+                      {note ? note : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         ) : <div className="muted">No answers</div>}
       </div>
     </section>

@@ -44,12 +44,27 @@ public class ConsultationController {
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
-        c.setAnswersJson(new com.fasterxml.jackson.databind.ObjectMapper()
-                .writeValueAsString(body.getOrDefault("answers", java.util.Map.of())));
+
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        // Save answers (qid -> "Yes"/"No")
+        c.setAnswersJson(mapper.writeValueAsString(
+                body.getOrDefault("answers", java.util.Map.of())
+        ));
+
+        // NEW: save optional free-text notes per question (qid -> note)
+        c.setDetailsByQuestionJson(mapper.writeValueAsString(
+                body.getOrDefault("detailsByQuestion", java.util.Map.of())
+        ));
+
         c = consultations.save(c);
 
-        return ResponseEntity.ok(java.util.Map.of("id", c.getId(), "status", c.getStatus().name()));
+        return ResponseEntity.ok(java.util.Map.of(
+                "id", c.getId(),
+                "status", c.getStatus().name()
+        ));
     }
+
 
     @GetMapping("/consultations/mine/latest")
     public ResponseEntity<Map<String, Object>> myLatest(Authentication auth) throws Exception {
@@ -96,7 +111,7 @@ public class ConsultationController {
     // ---------- Doctor: details ----------
     @GetMapping("/doctor/consultations/{id}")
     @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<Map<String, Object>> details(@PathVariable Long id) throws Exception {
+    public ResponseEntity<Map<String, Object>> details(@PathVariable Long id) {
         return consultations.findById(id)
                 .map(c -> {
                     var u = c.getUser();
@@ -113,13 +128,35 @@ public class ConsultationController {
                     d.put("contactName", c.getContactName());
                     d.put("contactPhone", c.getContactPhone());
                     d.put("contactAddress", c.getContactAddress());
+
+                    ObjectMapper mapper = new ObjectMapper();
+
+                    // Existing: answers (qid -> "Yes"/"No")
                     try {
-                        d.put("answers", new ObjectMapper().readValue(c.getAnswersJson(), Map.class));
+                        @SuppressWarnings("unchecked")
+                        Map<String, String> answers =
+                                mapper.readValue(c.getAnswersJson(), Map.class);
+                        d.put("answers", answers != null ? answers : Map.of());
                     } catch (Exception ex) {
                         d.put("answers", Map.of());
                     }
+
+                    // NEW: free-text notes per question (qid -> note)
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, String> detailsByQuestion =
+                                mapper.readValue(
+                                        c.getDetailsByQuestionJson() == null ? "{}" : c.getDetailsByQuestionJson(),
+                                        Map.class
+                                );
+                        d.put("detailsByQuestion", detailsByQuestion != null ? detailsByQuestion : Map.of());
+                    } catch (Exception ex) {
+                        d.put("detailsByQuestion", Map.of());
+                    }
+
                     return ResponseEntity.ok(d);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
 }
