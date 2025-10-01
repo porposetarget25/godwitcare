@@ -320,3 +320,27 @@ export async function doctorUpdateConsultation(
     body: JSON.stringify(body),
   })
 }
+
+export async function doctorCreatePrescription(consultationId: number, payload: {
+  history: string;
+  diagnosis: string;
+  medicines: string[]; // send as array; backend will join lines
+}) {
+  return request('POST', `/doctor/consultations/${consultationId}/prescriptions`, payload);
+}
+
+export async function doctorDownloadPrescriptionPdf(prescriptionId: number): Promise<Blob> {
+  const r = await fetch(`${API_BASE_URL}/doctor/prescriptions/${prescriptionId}/pdf`, {
+    credentials: 'include'
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.blob();
+}
+
+export async function patientDownloadLatestPrescription(): Promise<Blob | null> {
+  const r = await fetch(`${API_BASE_URL}/prescriptions/latest/pdf`, { credentials: 'include' });
+  if (r.status === 204) return null;
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.blob();
+}
+

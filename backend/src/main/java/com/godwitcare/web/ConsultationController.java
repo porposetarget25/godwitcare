@@ -2,13 +2,18 @@ package com.godwitcare.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.godwitcare.entity.Consultation;
+import com.godwitcare.entity.Prescription;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.ConsultationRepository;
+import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.UserRepository;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.godwitcare.util.PdfMaker;
 
 import java.util.*;
 
@@ -19,10 +24,14 @@ public class ConsultationController {
     private final ConsultationRepository consultations;
     private final UserRepository users;
     private final ObjectMapper om = new ObjectMapper();
+    private final PrescriptionRepository prescriptions;
 
-    public ConsultationController(ConsultationRepository consultations, UserRepository users) {
+
+
+    public ConsultationController(ConsultationRepository consultations, PrescriptionRepository prescriptions,UserRepository users) {
         this.consultations = consultations;
         this.users = users;
+        this.prescriptions= prescriptions;
     }
 
     @PostMapping("/consultations")
@@ -166,4 +175,81 @@ public class ConsultationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // ---------- Doctor creates a prescription for a consultation ----------
+    @PostMapping("/doctor/consultations/{id}/prescriptions")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<Map<String,Object>> createPrescription(
+            @PathVariable Long id,
+            @RequestBody Map<String,Object> body
+    ) throws Exception {
+        Consultation c = consultations.findById(id).orElse(null);
+        if (c == null) return ResponseEntity.notFound().build();
+
+        String history = (String) body.getOrDefault("history", "");
+        String diagnosis = (String) body.getOrDefault("diagnosis", "");
+        @SuppressWarnings("unchecked")
+        List<String> meds = (List<String>) body.getOrDefault("medicines", java.util.List.of());
+
+        String patientName = (c.getUser().getFirstName() + " " + c.getUser().getLastName()).trim();
+        String patientDob   = c.getDob() != null ? c.getDob().toString() : null;
+        String patientPhone = c.getContactPhone();
+        String patientId    = c.getPatientId(); // you already set this when first created
+
+        byte[] pdf = PdfMaker.makePrescriptionPdf(
+                "GodwitCare", patientName, patientDob, patientPhone, patientId,
+                diagnosis, history, meds
+        );
+
+        Prescription p = new Prescription();
+        p.setConsultation(c);
+        p.setPatientId(patientId);
+        p.setPatientName(patientName);
+        p.setPatientDob(patientDob);
+        p.setPatientPhone(patientPhone);
+        p.setHistoryOfPresentingComplaint(history);
+        p.setDiagnosis(diagnosis);
+        p.setMedicines(String.join("\n", meds));
+        p.setPdfBytes(pdf);
+        p.setSize(pdf.length);
+        // fileName/contentType defaults OK
+
+        p = prescriptions.save(p);
+
+        return ResponseEntity.ok(Map.of("id", p.getId()));
+    }
+
+    // ---------- Doctor download any prescription by id ----------
+    @GetMapping("/doctor/prescriptions/{pid}/pdf")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<byte[]> downloadPrescriptionDoctor(@PathVariable Long pid) {
+        return prescriptions.findById(pid)
+                .map(p -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(p.getContentType()))
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "inline; filename=\"" + p.getFileName() + "\"")
+                        .body(p.getPdfBytes()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /*// ---------- Patient download latest prescription (by patientId) ----------
+    @GetMapping("/prescriptions/latest/pdf")
+    public ResponseEntity<byte[]> downloadLatestForPatient(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).build();
+        String principal = auth.getName();
+        User u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        String patientId = u.getPatientId();
+        if (patientId == null || patientId.isBlank()) return ResponseEntity.noContent().build();
+
+        return prescriptions.findFirstByPatientIdOrderByIdDesc(patientId)
+                .map(p -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(p.getContentType()))
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "inline; filename=\"" + p.getFileName() + "\"")
+                        .body(p.getPdfBytes()))
+                .orElse(ResponseEntity.noContent().build());
+    }*/
 }

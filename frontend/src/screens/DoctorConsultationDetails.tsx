@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
+import { doctorCreatePrescription, doctorDownloadPrescriptionPdf } from '../api';
 
 export default function DoctorConsultationDetails() {
   const { id } = useParams()
@@ -16,6 +17,14 @@ export default function DoctorConsultationDetails() {
   const [rxErr, setRxErr] = useState<string | null>(null)
   const [rxId, setRxId] = useState<number | null>(null)
   const [rxPdfUrl, setRxPdfUrl] = useState<string | null>(null)
+
+  // cleanup any object URL we created
+  const rxUrlRef = useRef<string | null>(null)
+  useEffect(() => {
+    return () => {
+      if (rxUrlRef.current) URL.revokeObjectURL(rxUrlRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     (async () => {
@@ -35,7 +44,7 @@ export default function DoctorConsultationDetails() {
   const phoneDigits = (data.contactPhone || '').replace(/[^\d+]/g, '')
   const waUrl = phoneDigits ? `https://wa.me/${phoneDigits.replace(/^0+/, '')}` : ''
 
-  // ---- NEW: helpers for medicine rows
+  // ---- helpers for medicine rows
   function setMed(idx: number, val: string) {
     setMedicines(list => list.map((m, i) => i === idx ? val : m))
   }
@@ -46,24 +55,26 @@ export default function DoctorConsultationDetails() {
     setMedicines(list => list.filter((_, i) => i !== idx))
   }
 
-  // ---- NEW: create prescription
+  // ---- create prescription via API helpers
   async function createPrescription() {
-    setRxErr(null)
+  setRxErr(null);
 
-    // Basic client validation
-    const meds = medicines.map(m => (m || '').trim()).filter(Boolean)
-    if (!diagnosis.trim()) {
-      setRxErr('Please enter a diagnosis.')
-      return
-    }
-    if (meds.length === 0) {
-      setRxErr('Please add at least one medicine.')
-      return
-    }
+  const meds = medicines.map(m => (m || '').trim()).filter(Boolean);
+  if (!diagnosis.trim()) {
+    setRxErr('Please enter a diagnosis.');
+    return;
+  }
+  if (meds.length === 0) {
+    setRxErr('Please add at least one medicine.');
+    return;
+  }
 
-    setCreatingRx(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/prescriptions`, {
+  setCreatingRx(true);
+  try {
+    // 1. Create prescription on backend
+    const res = await fetch(
+      `${API_BASE_URL}/doctor/consultations/${data.id}/prescriptions`,
+      {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -73,20 +84,34 @@ export default function DoctorConsultationDetails() {
           medicines: meds,
           recommendations: recommendations.trim(),
         }),
-      })
-      if (!res.ok) {
-        const t = await res.text().catch(() => '')
-        throw new Error(t || `HTTP ${res.status}`)
       }
-      const j = await res.json().catch(() => ({}))
-      setRxId(typeof j.id === 'number' ? j.id : null)
-      setRxPdfUrl(j.pdfUrl ? `${API_BASE_URL}${j.pdfUrl}` : (j.id ? `${API_BASE_URL}/doctor/prescriptions/${j.id}/pdf` : null))
-    } catch (err: any) {
-      setRxErr(err?.message || 'Failed to create prescription')
-    } finally {
-      setCreatingRx(false)
+    );
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(t || `HTTP ${res.status}`);
     }
+
+    const j = await res.json().catch(() => ({}));
+    setRxId(typeof j.id === 'number' ? j.id : null);
+
+    // 2. Download PDF
+    const pdfRes = await fetch(`${API_BASE_URL}/doctor/prescriptions/${j.id}/pdf`, {
+      credentials: 'include',
+    });
+    if (!pdfRes.ok) throw new Error('Failed to download prescription PDF');
+
+    const blob = await pdfRes.blob();
+    const url = URL.createObjectURL(blob);
+    setRxPdfUrl(url);
+
+  } catch (err: any) {
+    setRxErr(err?.message || 'Failed to create prescription');
+  } finally {
+    setCreatingRx(false);
   }
+}
+
 
   return (
     <section className="section">
