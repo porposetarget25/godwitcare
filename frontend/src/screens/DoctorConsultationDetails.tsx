@@ -9,7 +9,7 @@ export default function DoctorConsultationDetails() {
   const [data, setData] = useState<any>(null)
 
   // ---- NEW: prescription state
-  const [complaint, setComplaint] = useState('')
+  const [history, setHistory] = useState('')
   const [diagnosis, setDiagnosis] = useState('')
   const [medicines, setMedicines] = useState<string[]>([''])
   const [recommendations, setRecommendations] = useState('')
@@ -79,7 +79,7 @@ export default function DoctorConsultationDetails() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          complaint: complaint.trim(),
+          history: history.trim(),
           diagnosis: diagnosis.trim(),
           medicines: meds,
           recommendations: recommendations.trim(),
@@ -217,8 +217,8 @@ export default function DoctorConsultationDetails() {
       <div className="card" style={{marginTop:12}}>
         <div className="strong" style={{marginBottom:8}}>History of Presenting Complaint</div>
         <textarea
-          value={complaint}
-          onChange={(e)=>setComplaint(e.target.value)}
+          value={history}
+          onChange={(e)=>setHistory(e.target.value)}
           placeholder="Detail patient's complaint history here..."
           rows={4}
           style={{width:'100%'}}
