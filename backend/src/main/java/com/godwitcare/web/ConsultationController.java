@@ -6,6 +6,7 @@ import com.godwitcare.entity.Prescription;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
+import com.godwitcare.repo.RegistrationRepository;
 import com.godwitcare.repo.UserRepository;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,13 +26,18 @@ public class ConsultationController {
     private final UserRepository users;
     private final ObjectMapper om = new ObjectMapper();
     private final PrescriptionRepository prescriptions;
+    private RegistrationRepository registrations;
 
 
 
-    public ConsultationController(ConsultationRepository consultations, PrescriptionRepository prescriptions,UserRepository users) {
-        this.consultations = consultations;
+    public ConsultationController(UserRepository users,
+                                  ConsultationRepository consultations,
+                                  RegistrationRepository registrations,
+                                  PrescriptionRepository prescriptions) {
         this.users = users;
-        this.prescriptions= prescriptions;
+        this.consultations = consultations;
+        this.registrations = registrations;
+        this.prescriptions = prescriptions;
     }
 
     @PostMapping("/consultations")
@@ -230,26 +236,75 @@ public class ConsultationController {
                         .body(p.getPdfBytes()))
                 .orElse(ResponseEntity.notFound().build());
     }
+    @GetMapping("/doctor/consultations/{id}/prescriptions/latest")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<?> doctorLatestPrescription(@PathVariable Long id) {
+        return prescriptions.findTopByConsultationIdOrderByIdDesc(id)
+                .<ResponseEntity<?>>map(p -> {
+                    var body = new java.util.HashMap<String, Object>();
+                    body.put("id", p.getId());
+                    body.put("createdAt", p.getCreatedAt());
+                    body.put("fileName", p.getFileName());
+                    body.put("size", p.getSize());
+                    // existing doctor PDF route you already have:
+                    body.put("pdfUrl", "/api/doctor/prescriptions/" + p.getId() + "/pdf");
+                    return ResponseEntity.ok(body);
+                })
+                .orElse(ResponseEntity.noContent().build());
+    }
 
-    /*// ---------- Patient download latest prescription (by patientId) ----------
-    @GetMapping("/prescriptions/latest/pdf")
-    public ResponseEntity<byte[]> downloadLatestForPatient(Authentication auth) {
+    @GetMapping("/prescriptions/latest")
+    public ResponseEntity<?> patientLatestPrescription(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();
+
         String principal = auth.getName();
-        User u = users.findByUsername(principal)
+        var u = users.findByUsername(principal)
                 .or(() -> users.findByEmail(principal))
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        String patientId = u.getPatientId();
-        if (patientId == null || patientId.isBlank()) return ResponseEntity.noContent().build();
-
-        return prescriptions.findFirstByPatientIdOrderByIdDesc(patientId)
-                .map(p -> ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType(p.getContentType()))
-                        .header(HttpHeaders.CONTENT_DISPOSITION,
-                                "inline; filename=\"" + p.getFileName() + "\"")
-                        .body(p.getPdfBytes()))
+        return prescriptions.findTopByConsultation_User_IdOrderByIdDesc(u.getId())
+                .<ResponseEntity<?>>map(p -> {
+                    var body = new java.util.HashMap<String, Object>();
+                    body.put("id", p.getId());
+                    body.put("createdAt", p.getCreatedAt());
+                    body.put("fileName", p.getFileName());
+                    body.put("size", p.getSize());
+                    // patient-safe PDF route (ownership checked below)
+                    body.put("pdfUrl", "/api/prescriptions/" + p.getId() + "/pdf");
+                    return ResponseEntity.ok(body);
+                })
                 .orElse(ResponseEntity.noContent().build());
-    }*/
+    }
+
+    @GetMapping("/prescriptions/{rxId}/pdf")
+    public ResponseEntity<byte[]> patientDownloadPrescription(
+            @PathVariable Long rxId,
+            Authentication auth
+    ) {
+        if (auth == null) return ResponseEntity.status(401).build();
+
+        String principal = auth.getName();
+        var u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        var p = prescriptions.findById(rxId).orElse(null);
+        if (p == null) return ResponseEntity.notFound().build();
+
+        // enforce ownership
+        var owner = p.getConsultation().getUser();
+        if (owner == null || !owner.getId().equals(u.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        var bytes = p.getPdfBytes();
+        if (bytes == null || bytes.length == 0) return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok()
+                .header("Content-Type", p.getContentType() != null ? p.getContentType() : "application/pdf")
+                .header("Content-Disposition", "inline; filename=\"" + (p.getFileName() != null ? p.getFileName() : ("prescription-" + rxId + ".pdf")) + "\"")
+                .body(bytes);
+    }
 }

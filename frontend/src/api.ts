@@ -321,13 +321,24 @@ export async function doctorUpdateConsultation(
   })
 }
 
-export async function doctorCreatePrescription(consultationId: number, payload: {
-  history: string;
-  diagnosis: string;
-  medicines: string[]; // send as array; backend will join lines
-}) {
-  return request('POST', `/doctor/consultations/${consultationId}/prescriptions`, payload);
+// Create a prescription for a consultation (DOCTOR role)
+export async function doctorCreatePrescription(
+  consultationId: number,
+  payload: {
+    complaint: string;               // history of presenting complaint
+    diagnosis: string;
+    medicines: string[];             // array of lines; backend can join/format
+    recommendations?: string;
+  }
+) {
+  return request(`/doctor/consultations/${consultationId}/prescriptions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
 }
+
 
 export async function doctorDownloadPrescriptionPdf(prescriptionId: number): Promise<Blob> {
   const r = await fetch(`${API_BASE_URL}/doctor/prescriptions/${prescriptionId}/pdf`, {
@@ -337,10 +348,47 @@ export async function doctorDownloadPrescriptionPdf(prescriptionId: number): Pro
   return r.blob();
 }
 
+// ---- Doctor: latest prescription for a consultation (metadata)
+export async function doctorLatestPrescriptionMeta(consultationId: number) {
+  return request(`/doctor/consultations/${consultationId}/prescriptions/latest`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+}
+
 export async function patientDownloadLatestPrescription(): Promise<Blob | null> {
   const r = await fetch(`${API_BASE_URL}/prescriptions/latest/pdf`, { credentials: 'include' });
   if (r.status === 204) return null;
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.blob();
+}
+
+// ---- Patient: latest prescription metadata
+export async function patientLatestPrescriptionMeta() {
+  return request('/prescriptions/latest', {
+    method: 'GET',
+    credentials: 'include',
+  })
+}
+
+// utils/url.ts
+export function resolveApiUrl(base: string, path: string) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path; // already absolute
+
+  // normalize
+  const cleanBase = base.replace(/\/+$/, '');
+  const cleanPath = path.replace(/^\/+/, '');
+
+  const baseEndsWithApi = /\/api$/i.test(cleanBase);
+  const pathStartsWithApi = /^api\//i.test(cleanPath);
+
+  // If both have "api", drop one from the path
+  const effectivePath =
+    baseEndsWithApi && pathStartsWithApi
+      ? cleanPath.replace(/^api\//i, '')
+      : cleanPath;
+
+  return `${cleanBase}/${effectivePath}`;
 }
 

@@ -1,6 +1,8 @@
 // src/screens/ConsultationTracker.tsx
 import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { API_BASE_URL } from '../api'
+import { resolveApiUrl } from '../api';
 
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
@@ -18,6 +20,37 @@ export default function ConsultationTracker() {
   // WhatsApp deep-link (digits only)
   const WA_NUMBER = '640211899955'
   const waHref = `https://wa.me/${WA_NUMBER}`
+
+  // 🔹 NEW: latest prescription URL for the patient (if exists)
+  const [rxUrl, setRxUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let ignore = false
+      ; (async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
+            credentials: 'include',
+          })
+          if (ignore) return
+          if (res.status === 204) {
+            setRxUrl(null)
+            return
+          }
+          if (!res.ok) {
+            setRxUrl(null)
+            return
+          }
+          const j = await res.json().catch(() => null)
+          if (j && j.pdfUrl) {
+            setRxUrl(resolveApiUrl(API_BASE_URL, j.pdfUrl));
+          } else {
+            setRxUrl(null);
+          }
+        } catch {
+          if (!ignore) setRxUrl(null)
+        }
+      })()
+    return () => { ignore = true }
+  }, [])
 
   // 🔹 Shared card style
   const cardStyle: React.CSSProperties = {
@@ -155,7 +188,7 @@ export default function ConsultationTracker() {
         </div>
       </div>
 
-      {/* Step 4 */}
+      {/* Step 4 — now dynamic based on rxUrl */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -165,9 +198,15 @@ export default function ConsultationTracker() {
               and medication details.
             </div>
           </div>
-          <button className="btn secondary" type="button" disabled>
-            Upcoming
-          </button>
+          {rxUrl ? (
+            <a className="btn" href={rxUrl} target="_blank" rel="noreferrer">
+              View Prescription
+            </a>
+          ) : (
+            <button className="btn secondary" type="button" disabled>
+              Upcoming
+            </button>
+          )}
         </div>
       </div>
 

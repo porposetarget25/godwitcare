@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
-import { doctorCreatePrescription, doctorDownloadPrescriptionPdf } from '../api';
+import { doctorCreatePrescription, doctorDownloadPrescriptionPdf,doctorLatestPrescriptionMeta} from '../api'
+import { resolveApiUrl } from '../api'
 
 export default function DoctorConsultationDetails() {
   const { id } = useParams()
@@ -27,13 +28,29 @@ export default function DoctorConsultationDetails() {
   }, [])
 
   useEffect(() => {
-    (async () => {
+  (async () => {
+    try {
+      const d = await doctorGetConsultation(Number(id))
+      setData(d)
+
+      // fetch latest RX for this consultation (if any)
       try {
-        const d = await doctorGetConsultation(Number(id))
-        setData(d)
-      } catch { /* already handled by UI */ }
-    })()
-  }, [id])
+        const meta = await doctorLatestPrescriptionMeta(Number(id))
+        if (meta && meta.id) {
+          setRxId(meta.id)
+          setRxPdfUrl(meta.pdfUrl ? resolveApiUrl(API_BASE_URL, meta.pdfUrl) : null)
+        } else {
+          setRxId(null)
+          setRxPdfUrl(null)
+        }
+      } catch {
+        // no content or not found is fine
+        setRxId(null)
+        setRxPdfUrl(null)
+      }
+    } catch { /* handled */ }
+  })()
+}, [id])
 
   if (!data) return (
     <section className="section">
