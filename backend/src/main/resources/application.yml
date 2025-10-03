@@ -22,3 +22,9 @@ spring:
   logging:
     level:
       org.hibernate.SQL: INFO
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+
