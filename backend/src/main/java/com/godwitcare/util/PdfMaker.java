@@ -1,87 +1,230 @@
-// src/main/java/com/godwitcare/util/PdfMaker.java
 package com.godwitcare.util;
 
 import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 public class PdfMaker {
+
+    // ====== public API (kept) =====================================================
+
+    /** Legacy API (kept). Generates the previous simple layout. */
     public static byte[] makePrescriptionPdf(
             String logoText, String patientName, String patientDob, String patientPhone,
             String patientId, String diagnosis, String history, List<String> meds
+    ) throws Exception {
+        // For backward compatibility, call the V2 method with no images and minimal doctor block.
+        return makePrescriptionPdfV2(
+                null, null,
+                patientName, patientDob, patientPhone, patientId,
+                diagnosis, history, meds,
+                "Attending Clinician", "", "", "", ""
+        );
+    }
+
+    /**
+     * New beautiful layout (logo + patient panel + “card” meds + signature block).
+     * Pass null for images if not available.
+     */
+    public static byte[] makePrescriptionPdfV2(
+            byte[] logoPng,
+            byte[] doctorSignaturePng,
+            String patientName, String patientDob, String patientPhone, String patientId,
+            String diagnosis, String history, List<String> meds,
+            String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
 
         try (PDDocument doc = new PDDocument()) {
             PDPage page = new PDPage(PDRectangle.A4);
             doc.addPage(page);
 
-            PDPageContentStream cs = new PDPageContentStream(doc, page);
-            float margin = 50;
+            float margin = 42f;
+            float contentWidth = page.getMediaBox().getWidth() - (margin * 2);
             float y = page.getMediaBox().getHeight() - margin;
 
-            // Header
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 18);
-            cs.beginText(); cs.newLineAtOffset(margin, y);
-            cs.showText("Prescription"); cs.endText();
+            // Colors
+            final Color TEAL = new Color(16, 185, 129);      // banner + accents
+            final Color TEAL_DARK = new Color(14, 165, 233); // title accent alternative
+            final Color GRAY_100 = new Color(243, 244, 246);
+            final Color GRAY_200 = new Color(229, 231, 235);
+            final Color GRAY_500 = new Color(107, 114, 128);
+            final Color TEXT = new Color(17, 24, 39);
 
-            y -= 24;
+            // Fonts
+            final PDType1Font H_BOLD = PDType1Font.HELVETICA_BOLD;
+            final PDType1Font H_REG = PDType1Font.HELVETICA;
+            final PDType1Font H_OBL = PDType1Font.HELVETICA_OBLIQUE;
 
-            // Logo / brand
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-            cs.beginText(); cs.newLineAtOffset(margin, y);
-            cs.showText(logoText != null ? logoText : "GodwitCare • Care Beyond Borders");
-            cs.endText();
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                cs.setStrokingColor(Color.BLACK);
+                cs.setNonStrokingColor(Color.WHITE);
 
-            // Patient panel (right)
-            cs.setFont(PDType1Font.HELVETICA, 10);
-            float rightColX = page.getMediaBox().getWidth() - margin - 220;
-            y = page.getMediaBox().getHeight() - margin - 8;
-            cs.beginText(); cs.newLineAtOffset(rightColX, y);
-            cs.showText("Patient Information"); cs.endText();
-            y -= 14;
+                // 0) top success banner
+                float bannerH = 20f;
+                fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(209,250,229)); // light green
+                text(cs, H_REG, 10, TEXT, margin + 10, y - bannerH + 6, "Signed and all signatures are valid.");
+                y -= (bannerH + 16);
 
-            writePair(cs, rightColX, y, "Name: ", patientName); y -= 12;
-            writePair(cs, rightColX, y, "DOB: ", safe(patientDob)); y -= 12;
-            writePair(cs, rightColX, y, "Contact: ", safe(patientPhone)); y -= 12;
-            writePair(cs, rightColX, y, "Patient ID: ", safe(patientId)); y -= 20;
+                // 1) Title
+                centeredText(cs, H_BOLD, 22, new Color(6, 95, 70), page, "Prescription", y);
+                y -= 28;
 
-            // Diagnosis
-            y -= 10;
-            drawHeading(cs, margin, y, "Diagnosis"); y -= 14;
-            drawParagraph(cs, margin, y, 490, diagnosis); y -= measureTextHeight(diagnosis, 490) + 10;
+                // separator line
+                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                y -= 16;
 
-            // History
-            drawHeading(cs, margin, y, "History of Presenting Complaint"); y -= 14;
-            drawParagraph(cs, margin, y, 490, history); y -= measureTextHeight(history, 490) + 10;
+                // 2) brand + patient panel row
+                float leftW = contentWidth * 0.44f;
+                float rightW = contentWidth - leftW - 10;
+                float rowTop = y;
 
-            // Medicines
-            drawHeading(cs, margin, y, "Medication Prescribed"); y -= 14;
-            if (meds != null && !meds.isEmpty()) {
-                cs.setFont(PDType1Font.HELVETICA, 11);
-                for (int i = 0; i < meds.size(); i++) {
-                    String line = (i + 1) + ". " + meds.get(i);
-                    cs.beginText(); cs.newLineAtOffset(margin, y); cs.showText(line); cs.endText();
-                    y -= 14;
+                // Left: brand block
+                float brandBoxH = 64f;
+                // logo
+                if (logoPng != null) {
+                    PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
+                    float logoH = 36f;
+                    float logoAspect = (float) logo.getWidth() / (float) logo.getHeight();
+                    float logoW = logoH * logoAspect;
+                    cs.drawImage(logo, margin, y - logoH, logoW, logoH);
                 }
-            } else {
-                cs.setFont(PDType1Font.HELVETICA_OBLIQUE, 10);
-                cs.beginText(); cs.newLineAtOffset(margin, y); cs.showText("—"); cs.endText();
+                // brand text
+                text(cs, H_BOLD, 16, TEXT, margin + 56, y - 8, "GodwitCare");
+                text(cs, H_REG, 10, GRAY_500, margin + 56, y - 26, "Care Beyond Borders");
+                y -= brandBoxH;
+
+                // Right: patient panel box
+                float panelX = margin + leftW + 10;
+                float panelY = rowTop;
+                float panelH = 88f;
+                strokeRect(cs, panelX, panelY - panelH, rightW, panelH, GRAY_200, 0.8f);
+                text(cs, H_BOLD, 11, TEXT, panelX + 10, panelY - 16, "Patient Information");
+
+                float ty = panelY - 32;
+                smallPair(cs, panelX + 10, ty, "Name:", nz(patientName)); ty -= 14;
+                smallPair(cs, panelX + 10, ty, "DOB:", nz(patientDob)); ty -= 14;
+                smallPair(cs, panelX + 10, ty, "Contact:", nz(patientPhone)); ty -= 14;
+                smallPair(cs, panelX + 10, ty, "Patient ID:", nz(patientId));
+                y -= 8;
+
+                // 3) DIAGNOSIS
+                y = y - 6;
+                sectionTitle(cs, margin, y, "Diagnosis");
+                y -= 16;
+                roundedField(cs, doc, H_REG, 11, nz(diagnosis), margin, y, contentWidth, 48, GRAY_100, GRAY_200);
+                y -= 58;
+
+                // 4) HISTORY
+                sectionTitle(cs, margin, y, "History of Presenting Complaint");
+                y -= 16;
+                float paraH = drawParagraphBox(cs, H_REG, 11, nz(history), margin, y, contentWidth, GRAY_100, GRAY_200, 14);
+                y -= (paraH + 14);
+
+                // 5) MEDICATIONS
+                sectionTitle(cs, margin, y, "Medication Prescribed");
                 y -= 14;
+
+                if (meds != null && !meds.isEmpty()) {
+                    int idx = 1;
+                    for (String m : meds) {
+                        float boxH = 0f;
+                        float cardTop = y;
+
+                        // card background
+                        float cardPad = 10f;
+                        float maxTextW = contentWidth - (cardPad * 2);
+                        // compute height from wrapped lines + meta
+                        List<String> lines = wrap(m, H_REG, 11, maxTextW);
+                        float lineH = 14f;
+                        boxH = 14 + (lines.size() * lineH) + 36; // title + body + meta
+
+                        // draw card
+                        fillRect(cs, margin, y - boxH, contentWidth, boxH, Color.WHITE);
+                        strokeRect(cs, margin, y - boxH, contentWidth, boxH, GRAY_200, 0.9f);
+
+                        // title (number + first line as statement)
+                        text(cs, H_BOLD, 12, TEXT, margin + cardPad, y - 14, idx + ". " + firstLine(lines));
+                        float ly = y - 14 - 6 - lineH;
+                        // body (remaining wrapped lines)
+                        if (lines.size() > 1) {
+                            for (int i = 1; i < lines.size(); i++) {
+                                text(cs, H_REG, 11, TEXT, margin + cardPad, ly, lines.get(i));
+                                ly -= lineH;
+                            }
+                        }
+
+                        // meta lines (digitally signed …)
+                        ly -= 2;
+                        String signedBy = "Digitally signed by " + (doctorName == null ? "Attending Clinician" : doctorName);
+                        String signedDate = "Date: " + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'GMT'")
+                                .withZone(ZoneId.of("UTC")).format(Instant.now());
+                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedBy); ly -= 12;
+                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedDate); ly -= 12;
+                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, "Reason: Symptomatic Relief"); ly -= 12;
+                        // green “Signature is valid”
+                        text(cs, H_REG, 10, TEAL, margin + cardPad, ly, "Signature is valid");
+
+                        y = cardTop - (boxH + 10);
+                        idx++;
+                    }
+                } else {
+                    text(cs, H_OBL, 11, GRAY_500, margin, y - 2, "—");
+                    y -= 18;
+                }
+
+                // 6) Notes / More medication
+                sectionTitle(cs, margin, y, "Additional Notes");
+                y -= 16;
+                float notesH = 48f;
+                roundedField(cs, doc, H_REG, 11, "More medication as mentioned in the Consultation slide", margin, y, contentWidth, notesH, Color.WHITE, GRAY_200);
+                y -= (notesH + 18);
+
+                // 7) Signature row
+                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                y -= 12;
+
+                float sigLeftW = contentWidth * 0.45f;
+                // left: image + label
+                text(cs, H_BOLD, 11, TEXT, margin, y - 2, "Prescribing Doctor’s Signature");
+                text(cs, H_REG, 9, GRAY_500, margin, y - 16, "Date of Prescription: " +
+                        DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.of("UTC")).format(Instant.now()));
+                float sigBoxH = 46f;
+                // signature image (if available)
+                if (doctorSignaturePng != null) {
+                    PDImageXObject sign = PDImageXObject.createFromByteArray(doc, doctorSignaturePng, "sign");
+                    float h = 28f;
+                    float r = (float) sign.getWidth() / (float) sign.getHeight();
+                    float w = h * r;
+                    cs.drawImage(sign, margin, y - 52, w, h);
+                } else {
+                    text(cs, H_OBL, 10, GRAY_500, margin, y - 36, "(Signature)");
+                }
+
+                // right: doctor info column
+                float rx = margin + sigLeftW + 18;
+                text(cs, H_BOLD, 12, TEXT, rx, y - 2, nz(doctorName));
+                float dyy = y - 18;
+                text(cs, H_REG, 10, TEXT, rx, dyy, nz(doctorReg)); dyy -= 14;
+                if (!nz(doctorAddress).equals("—")) { text(cs, H_REG, 10, TEXT, rx, dyy, doctorAddress); dyy -= 14; }
+                if (!nz(doctorPhone).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone); dyy -= 14; }
+                if (!nz(doctorEmail).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail); }
+
+                y -= 72;
+
+                // 8) Footer
+                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                y -= 10;
+                text(cs, H_REG, 9, GRAY_500, margin, y, "Company   •   Support   •   Legal");
             }
-
-            // Footer
-            y = 60;
-            cs.setFont(PDType1Font.HELVETICA, 9);
-            cs.beginText(); cs.newLineAtOffset(margin, y);
-            cs.showText("Digitally generated by GodwitCare • " +
-                    DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.now()));
-            cs.endText();
-
-            cs.close();
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -89,51 +232,117 @@ public class PdfMaker {
         }
     }
 
-    private static void drawHeading(PDPageContentStream cs, float x, float y, String text) throws Exception {
-        cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-        cs.beginText(); cs.newLineAtOffset(x, y); cs.showText(text); cs.endText();
+    // ====== drawing helpers ========================================================
+
+    private static void text(PDPageContentStream cs, PDType1Font font, float size, Color color,
+                             float x, float y, String s) throws Exception {
+        cs.setNonStrokingColor(color);
+        cs.setFont(font, size);
+        cs.beginText();
+        cs.newLineAtOffset(x, y);
+        cs.showText(safe(s));
+        cs.endText();
     }
 
-    private static void drawParagraph(PDPageContentStream cs, float x, float y, float width, String text) throws Exception {
+    private static void centeredText(PDPageContentStream cs, PDType1Font font, float size, Color color,
+                                     PDPage page, String s, float y) throws Exception {
+        float width = page.getMediaBox().getWidth();
+        float textW = font.getStringWidth(safe(s)) / 1000f * size;
+        float x = (width - textW) / 2f;
+        text(cs, font, size, color, x, y, s);
+    }
+
+    private static void sectionTitle(PDPageContentStream cs, float x, float y, String title) throws Exception {
+        text(cs, PDType1Font.HELVETICA_BOLD, 12, new Color(31,41,55), x, y, title);
+    }
+
+    private static void smallPair(PDPageContentStream cs, float x, float y, String k, String v) throws Exception {
+        text(cs, PDType1Font.HELVETICA_BOLD, 10, new Color(55,65,81), x, y, k);
+        float off = x + 56;
+        text(cs, PDType1Font.HELVETICA, 10, new Color(31,41,55), off, y, v);
+    }
+
+    private static void strokeLine(PDPageContentStream cs, float x1, float y1, float x2, float y2, Color c, float w) throws Exception {
+        cs.setStrokingColor(c);
+        cs.setLineWidth(w);
+        cs.moveTo(x1, y1);
+        cs.lineTo(x2, y2);
+        cs.stroke();
+    }
+
+    private static void strokeRect(PDPageContentStream cs, float x, float y, float w, float h, Color stroke, float lw) throws Exception {
+        cs.setStrokingColor(stroke);
+        cs.setLineWidth(lw);
+        cs.addRect(x, y, w, h);
+        cs.stroke();
+    }
+
+    private static void fillRect(PDPageContentStream cs, float x, float y, float w, float h, Color fill) throws Exception {
+        cs.setNonStrokingColor(fill);
+        cs.addRect(x, y, w, h);
+        cs.fill();
+    }
+
+    private static void roundedField(PDPageContentStream cs, PDDocument doc, PDType1Font font, float size,
+                                     String text, float x, float y, float w, float h, Color bg, Color border) throws Exception {
+        fillRect(cs, x, y - h, w, h, bg);
+        strokeRect(cs, x, y - h, w, h, border, 0.8f);
+        // text inside
+        float pad = 8;
+        List<String> lines = wrap(text, font, size, w - (pad * 2));
+        float lh = 14f, ty = y - pad - 12;
+        for (String line : lines) {
+            text(cs, font, size, new Color(31,41,55), x + pad, ty, line);
+            ty -= lh;
+        }
+    }
+
+    /** Draw paragraph in a light box and return the resulting height used. */
+    private static float drawParagraphBox(PDPageContentStream cs, PDType1Font font, float size,
+                                          String text, float x, float y, float w,
+                                          Color bg, Color border, float lineH) throws Exception {
+        List<String> lines = wrap(text, font, size, w - 16);
+        float h = Math.max(lineH, (lines.size() * lineH) + 16);
+        fillRect(cs, x, y - h, w, h, bg);
+        strokeRect(cs, x, y - h, w, h, border, 0.8f);
+        float ty = y - 12;
+        for (String line : lines) {
+            text(cs, font, size, new Color(31,41,55), x + 8, ty, line);
+            ty -= lineH;
+        }
+        return h;
+    }
+
+    // ====== text helpers ===========================================================
+
+    private static List<String> wrap(String text, PDType1Font font, float fontSize, float maxWidth) throws Exception {
+        List<String> lines = new ArrayList<>();
         String t = safe(text);
-        cs.setFont(PDType1Font.HELVETICA, 11);
-        float lineHeight = 14f;
-        for (String line : wrap(t, width)) {
-            cs.beginText(); cs.newLineAtOffset(x, y); cs.showText(line); cs.endText();
-            y -= lineHeight;
-        }
-    }
+        if (t.isBlank()) { lines.add("—"); return lines; }
 
-    private static float measureTextHeight(String text, float width) {
-        float lineHeight = 14f;
-        return wrap(safe(text), width).size() * lineHeight;
-    }
-
-    // super-light wrapper; replace with a more robust wrapper if needed
-    private static java.util.List<String> wrap(String text, float width) {
-        int maxChars = 90; // heuristic for Helvetica, ~width 490
-        java.util.List<String> lines = new java.util.ArrayList<>();
-        if (text == null || text.isBlank()) return lines;
-        String[] words = text.split("\\s+");
-        StringBuilder cur = new StringBuilder();
+        String[] words = t.split("\\s+");
+        StringBuilder line = new StringBuilder();
         for (String w : words) {
-            if (cur.length() + w.length() + 1 > maxChars) {
-                lines.add(cur.toString()); cur.setLength(0);
+            String candidate = (line.length()==0) ? w : line + " " + w;
+            float width = font.getStringWidth(candidate) / 1000f * fontSize;
+            if (width > maxWidth) {
+                if (line.length() > 0) { lines.add(line.toString()); line.setLength(0); }
+                line.append(w);
+            } else {
+                line.setLength(0); line.append(candidate);
             }
-            if (cur.length() > 0) cur.append(' ');
-            cur.append(w);
         }
-        if (cur.length() > 0) lines.add(cur.toString());
+        if (line.length() > 0) lines.add(line.toString());
         return lines;
     }
 
-    private static void writePair(PDPageContentStream cs, float x, float y, String k, String v) throws Exception {
-        cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
-        cs.beginText(); cs.newLineAtOffset(x, y); cs.showText(k); cs.endText();
-        float off = x + 42;
-        cs.setFont(PDType1Font.HELVETICA, 10);
-        cs.beginText(); cs.newLineAtOffset(off, y); cs.showText(v); cs.endText();
+    private static String firstLine(List<String> lines) {
+        return lines.isEmpty() ? "" : lines.get(0);
     }
 
-    private static String safe(String s){ return (s==null || s.isBlank()) ? "—" : s; }
+    private static String safe(String s) {
+        return (s == null || s.isBlank()) ? "—" : s;
+    }
+
+    private static String nz(String s) { return safe(s); }
 }
