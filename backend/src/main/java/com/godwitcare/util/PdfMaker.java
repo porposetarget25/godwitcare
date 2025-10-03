@@ -20,12 +20,12 @@ public class PdfMaker {
     /** Legacy API (kept). Generates the previous simple layout. */
     public static byte[] makePrescriptionPdf(
             String logoText, String patientName, String patientDob, String patientPhone,
-            String patientId, String diagnosis, String history, List<String> meds
+            String patientId, String patientAddress ,String diagnosis, String history, List<String> meds
     ) throws Exception {
         // For backward compatibility, call the V2 method with no images and minimal doctor block.
         return makePrescriptionPdfV2(
                 null, null,
-                patientName, patientDob, patientPhone, patientId,
+                patientName, patientDob, patientPhone, patientId,patientAddress ,
                 diagnosis, history, meds,
                 "Attending Clinician", "", "", "", ""
         );
@@ -38,8 +38,8 @@ public class PdfMaker {
     public static byte[] makePrescriptionPdfV2(
             byte[] logoPng,
             byte[] doctorSignaturePng,
-            String patientName, String patientDob, String patientPhone, String patientId,
-            String diagnosis, String history, List<String> meds,
+            String patientName, String patientDob, String patientPhone, String patientId, String patientAddress,
+            String diagnosis, String history, java.util.List<String> meds,
             String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
 
@@ -52,8 +52,7 @@ public class PdfMaker {
             float y = page.getMediaBox().getHeight() - margin;
 
             // Colors
-            final Color TEAL = new Color(16, 185, 129);      // banner + accents
-            final Color TEAL_DARK = new Color(14, 165, 233); // title accent alternative
+            final Color TEAL = new Color(16, 185, 129);
             final Color GRAY_100 = new Color(243, 244, 246);
             final Color GRAY_200 = new Color(229, 231, 235);
             final Color GRAY_500 = new Color(107, 114, 128);
@@ -61,119 +60,163 @@ public class PdfMaker {
 
             // Fonts
             final PDType1Font H_BOLD = PDType1Font.HELVETICA_BOLD;
-            final PDType1Font H_REG = PDType1Font.HELVETICA;
-            final PDType1Font H_OBL = PDType1Font.HELVETICA_OBLIQUE;
+            final PDType1Font H_REG  = PDType1Font.HELVETICA;
+            final PDType1Font H_OBL  = PDType1Font.HELVETICA_OBLIQUE;
 
             try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
                 cs.setStrokingColor(Color.BLACK);
                 cs.setNonStrokingColor(Color.WHITE);
 
-                // 0) top success banner
+                // 0) Success banner
                 float bannerH = 20f;
-                fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(209,250,229)); // light green
+                fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(209, 250, 229));
                 text(cs, H_REG, 10, TEXT, margin + 10, y - bannerH + 6, "Signed and all signatures are valid.");
-                y -= (bannerH + 16);
+                y -= (bannerH + 20); // breathing room
 
                 // 1) Title
                 centeredText(cs, H_BOLD, 22, new Color(6, 95, 70), page, "Prescription", y);
                 y -= 28;
 
-                // separator line
+                // Separator
                 strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
                 y -= 16;
 
-                // 2) brand + patient panel row
-                float leftW = contentWidth * 0.44f;
+                // 2) Brand + Patient panel (no-overlap)
+                float leftW  = contentWidth * 0.44f;
                 float rightW = contentWidth - leftW - 10;
                 float rowTop = y;
 
-                // Left: brand block
+                // Left: brand (logo + tagline) anchored to rowTop
                 float brandBoxH = 64f;
-                // logo
                 if (logoPng != null) {
                     PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
                     float logoH = 36f;
                     float logoAspect = (float) logo.getWidth() / (float) logo.getHeight();
                     float logoW = logoH * logoAspect;
-                    cs.drawImage(logo, margin, y - logoH, logoW, logoH);
+                    cs.drawImage(logo, margin, rowTop - logoH, logoW, logoH);
                 }
-                // brand text
-                text(cs, H_BOLD, 16, TEXT, margin + 56, y - 8, "GodwitCare");
-                text(cs, H_REG, 10, GRAY_500, margin + 56, y - 26, "Care Beyond Borders");
-                y -= brandBoxH;
+                text(cs, H_BOLD, 16, TEXT,     margin + 56, rowTop - 8,  "GodwitCare");
+                text(cs, H_REG,  10, GRAY_500, margin + 56, rowTop - 26, "Care Beyond Borders");
 
-                // Right: patient panel box
-                float panelX = margin + leftW + 10;
-                float panelY = rowTop;
-                float panelH = 88f;
-                strokeRect(cs, panelX, panelY - panelH, rightW, panelH, GRAY_200, 0.8f);
-                text(cs, H_BOLD, 11, TEXT, panelX + 10, panelY - 16, "Patient Information");
+                // Right: patient info panel (dynamic height incl. address)
+                float panelX   = margin + leftW + 10;
+                float panelPad = 10f;
+                float lineH    = 12f;
+                float panelTitleH = 16f;
 
-                float ty = panelY - 32;
-                smallPair(cs, panelX + 10, ty, "Name:", nz(patientName)); ty -= 14;
-                smallPair(cs, panelX + 10, ty, "DOB:", nz(patientDob)); ty -= 14;
-                smallPair(cs, panelX + 10, ty, "Contact:", nz(patientPhone)); ty -= 14;
-                smallPair(cs, panelX + 10, ty, "Patient ID:", nz(patientId));
-                y -= 8;
+                java.util.List<String> addrLines =
+                        (patientAddress == null || patientAddress.isBlank())
+                                ? java.util.List.of()
+                                : wrap(patientAddress, H_REG, 10, rightW - (panelPad * 2));
 
-                // 3) DIAGNOSIS
-                y = y - 6;
+                float addressBlockH = addrLines.size() * lineH + (addrLines.isEmpty() ? 0 : 6);
+
+                float computedH = panelPad         // top padding
+                        + panelTitleH             // "Patient Information"
+                        + 6
+                        + 14f                     // patient name (bold)
+                        + 6
+                        + lineH                   // DOB
+                        + addressBlockH           // wrapped address
+                        + lineH                   // Contact
+                        + lineH                   // Patient ID
+                        + panelPad;               // bottom padding
+
+                float panelH = Math.max(88f, computedH);
+
+                // box
+                strokeRect(cs, panelX, rowTop - panelH, rightW, panelH, GRAY_200, 0.8f);
+
+                // content
+                text(cs, H_BOLD, 11, TEXT, panelX + panelPad, rowTop - 16, "Patient Information");
+                text(cs, H_BOLD, 12, TEXT, panelX + panelPad, rowTop - 32, nz(patientName));
+
+                float ty = rowTop - 32 - 6 - lineH;
+                smallPair(cs, panelX + panelPad, ty, "DOB:", nz(patientDob)); ty -= lineH;
+
+                // Address (wrapped WITH label)
+                if (addrLines.isEmpty()) {
+                    smallPair(cs, panelX + panelPad, ty, "Address:", "—");
+                    ty -= lineH;
+                } else {
+                    // first line with label
+                    smallPair(cs, panelX + panelPad, ty, "Address:", addrLines.get(0));
+                    ty -= lineH;
+
+                    // remaining lines aligned to the value column (same offset smallPair uses)
+                    float valueX = panelX + panelPad + 56f;
+                    for (int i = 1; i < addrLines.size(); i++) {
+                        text(cs, H_REG, 10, TEXT, valueX, ty, addrLines.get(i));
+                        ty -= lineH;
+                    }
+                }
+
+                smallPair(cs, panelX + panelPad, ty, "Contact:", nz(patientPhone)); ty -= lineH;
+                smallPair(cs, panelX + panelPad, ty, "Patient ID:", nz(patientId));
+
+                // Move below tallest column
+                float tallest = Math.max(brandBoxH, panelH);
+                y = rowTop - tallest - 20;
+
+                // 3) Diagnosis (dynamic)
                 sectionTitle(cs, margin, y, "Diagnosis");
                 y -= 16;
-                roundedField(cs, doc, H_REG, 11, nz(diagnosis), margin, y, contentWidth, 48, GRAY_100, GRAY_200);
-                y -= 58;
+                float diagH = drawParagraphBox(cs, H_REG, 11, nz(diagnosis), margin, y, contentWidth, GRAY_100, GRAY_200, 14);
+                y -= (diagH + 14);
 
-                // 4) HISTORY
+                // 4) History (dynamic)
                 sectionTitle(cs, margin, y, "History of Presenting Complaint");
                 y -= 16;
-                float paraH = drawParagraphBox(cs, H_REG, 11, nz(history), margin, y, contentWidth, GRAY_100, GRAY_200, 14);
-                y -= (paraH + 14);
+                float histH = drawParagraphBox(cs, H_REG, 11, nz(history), margin, y, contentWidth, GRAY_100, GRAY_200, 14);
+                y -= (histH + 14);
 
-                // 5) MEDICATIONS
+                // 5) Medication cards (roomier)
                 sectionTitle(cs, margin, y, "Medication Prescribed");
                 y -= 14;
 
                 if (meds != null && !meds.isEmpty()) {
                     int idx = 1;
                     for (String m : meds) {
-                        float boxH = 0f;
-                        float cardTop = y;
+                        float cardPad   = 10f;
+                        float topPad    = 12f;
+                        float bottomPad = 12f;
+                        float textW     = contentWidth - (cardPad * 2);
+                        float lineHt    = 14f;
 
-                        // card background
-                        float cardPad = 10f;
-                        float maxTextW = contentWidth - (cardPad * 2);
-                        // compute height from wrapped lines + meta
-                        List<String> lines = wrap(m, H_REG, 11, maxTextW);
-                        float lineH = 14f;
-                        boxH = 14 + (lines.size() * lineH) + 36; // title + body + meta
+                        java.util.List<String> lines = wrap(nz(m), H_REG, 11, textW);
+                        float titleH = 14f;
+                        float bodyH  = Math.max(0, (lines.size() - 1)) * lineHt;
+                        float metaH  = 12f * 4; // signedBy, date, reason, "Signature is valid"
+                        float boxH   = topPad + titleH + 6 + bodyH + 8 + metaH + bottomPad;
 
-                        // draw card
+                        // card
                         fillRect(cs, margin, y - boxH, contentWidth, boxH, Color.WHITE);
                         strokeRect(cs, margin, y - boxH, contentWidth, boxH, GRAY_200, 0.9f);
 
-                        // title (number + first line as statement)
-                        text(cs, H_BOLD, 12, TEXT, margin + cardPad, y - 14, idx + ". " + firstLine(lines));
-                        float ly = y - 14 - 6 - lineH;
-                        // body (remaining wrapped lines)
+                        // title (first line)
+                        text(cs, H_BOLD, 12, TEXT, margin + cardPad, y - topPad, idx + ". " + firstLine(lines));
+
+                        // body (remaining lines)
+                        float ly = y - topPad - 6 - lineHt;
                         if (lines.size() > 1) {
                             for (int i = 1; i < lines.size(); i++) {
                                 text(cs, H_REG, 11, TEXT, margin + cardPad, ly, lines.get(i));
-                                ly -= lineH;
+                                ly -= lineHt;
                             }
                         }
 
-                        // meta lines (digitally signed …)
-                        ly -= 2;
+                        // meta
                         String signedBy = "Digitally signed by " + (doctorName == null ? "Attending Clinician" : doctorName);
-                        String signedDate = "Date: " + DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'GMT'")
-                                .withZone(ZoneId.of("UTC")).format(Instant.now());
-                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedBy); ly -= 12;
+                        String signedDate = "Date: " + java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'GMT'")
+                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now());
+
+                        ly -= 2;
+                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedBy);  ly -= 12;
                         text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedDate); ly -= 12;
                         text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, "Reason: Symptomatic Relief"); ly -= 12;
-                        // green “Signature is valid”
-                        text(cs, H_REG, 10, TEAL, margin + cardPad, ly, "Signature is valid");
+                        text(cs, H_REG, 10, TEAL,     margin + cardPad, ly, "Signature is valid");
 
-                        y = cardTop - (boxH + 10);
+                        y -= (boxH + 12); // gap
                         idx++;
                     }
                 } else {
@@ -181,11 +224,13 @@ public class PdfMaker {
                     y -= 18;
                 }
 
-                // 6) Notes / More medication
+                // 6) Additional notes
                 sectionTitle(cs, margin, y, "Additional Notes");
                 y -= 16;
                 float notesH = 48f;
-                roundedField(cs, doc, H_REG, 11, "More medication as mentioned in the Consultation slide", margin, y, contentWidth, notesH, Color.WHITE, GRAY_200);
+                roundedField(cs, doc, H_REG, 11,
+                        "More medication as mentioned in the Consultation slide",
+                        margin, y, contentWidth, notesH, Color.WHITE, GRAY_200);
                 y -= (notesH + 18);
 
                 // 7) Signature row
@@ -193,12 +238,11 @@ public class PdfMaker {
                 y -= 12;
 
                 float sigLeftW = contentWidth * 0.45f;
-                // left: image + label
                 text(cs, H_BOLD, 11, TEXT, margin, y - 2, "Prescribing Doctor’s Signature");
-                text(cs, H_REG, 9, GRAY_500, margin, y - 16, "Date of Prescription: " +
-                        DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.of("UTC")).format(Instant.now()));
-                float sigBoxH = 46f;
-                // signature image (if available)
+                text(cs, H_REG,   9, GRAY_500, margin, y - 16,
+                        "Date of Prescription: " + java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now()));
+
                 if (doctorSignaturePng != null) {
                     PDImageXObject sign = PDImageXObject.createFromByteArray(doc, doctorSignaturePng, "sign");
                     float h = 28f;
@@ -209,7 +253,7 @@ public class PdfMaker {
                     text(cs, H_OBL, 10, GRAY_500, margin, y - 36, "(Signature)");
                 }
 
-                // right: doctor info column
+                // Right column (doctor info)
                 float rx = margin + sigLeftW + 18;
                 text(cs, H_BOLD, 12, TEXT, rx, y - 2, nz(doctorName));
                 float dyy = y - 18;
@@ -226,11 +270,12 @@ public class PdfMaker {
                 text(cs, H_REG, 9, GRAY_500, margin, y, "Company   •   Support   •   Legal");
             }
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             doc.save(out);
             return out.toByteArray();
         }
     }
+
 
     // ====== drawing helpers ========================================================
 

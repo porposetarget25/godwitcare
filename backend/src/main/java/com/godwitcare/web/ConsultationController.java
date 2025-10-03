@@ -8,6 +8,7 @@ import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.RegistrationRepository;
 import com.godwitcare.repo.UserRepository;
+import com.godwitcare.service.PrescriptionPdfService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import com.godwitcare.util.PdfMaker;
-
 import java.util.*;
 
 @RestController
@@ -27,17 +27,21 @@ public class ConsultationController {
     private final ObjectMapper om = new ObjectMapper();
     private final PrescriptionRepository prescriptions;
     private RegistrationRepository registrations;
+    private final PrescriptionPdfService pdfs;
+
 
 
 
     public ConsultationController(UserRepository users,
                                   ConsultationRepository consultations,
                                   RegistrationRepository registrations,
-                                  PrescriptionRepository prescriptions) {
+                                  PrescriptionRepository prescriptions,
+                                  PrescriptionPdfService pdfs) {
         this.users = users;
         this.consultations = consultations;
         this.registrations = registrations;
         this.prescriptions = prescriptions;
+        this.pdfs = pdfs;
     }
 
     @PostMapping("/consultations")
@@ -201,9 +205,22 @@ public class ConsultationController {
         String patientPhone = c.getContactPhone();
         String patientId    = c.getPatientId(); // you already set this when first created
 
-        byte[] pdf = PdfMaker.makePrescriptionPdf(
-                "GodwitCare", patientName, patientDob, patientPhone, patientId,
-                diagnosis, history, meds
+        // Build the beautiful PDF (logo + signature) via the service
+        byte[] pdf = pdfs.buildPrescriptionPdf(
+                /* patient */ patientName,
+                c.getDob(),                 // LocalDate
+                patientPhone,
+                patientId,
+                c.getContactAddress(),
+                /* consult */ diagnosis,
+                history,
+                meds,
+                /* doctor block (put your real values / pull from auth doctor profile) */
+                "Dr. Dimitris–Christos Zachariades",
+                "GMC Registration: 6164496",
+                "15 Regent’s Park Rd, London NW1 8XL, UK",
+                "+44 20 7123 4567",
+                "dzachariades@nhs.net"
         );
 
         Prescription p = new Prescription();
