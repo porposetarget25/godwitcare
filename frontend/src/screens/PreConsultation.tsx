@@ -51,48 +51,66 @@ type Section = { title: string; questions: Q[] }
 
 /** All sections & questions with descriptive IDs */
 const FORM: Section[] = [
-  { title: 'Emergency Symptoms', questions: [
-    { id: 'emergency_pain', label: 'Experiencing severe pain?' },
-    { id: 'emergency_breath', label: 'Difficulty breathing or shortness of breath?' },
-    { id: 'emergency_unconscious', label: 'Unconsciousness or altered mental state?' },
-    { id: 'emergency_bleeding', label: 'Recent injury with heavy bleeding?' },
-  ]},
-  { title: 'Signs of a Stroke (FAST)', questions: [
-    { id: 'stroke_face', label: 'Facial droop?' },
-    { id: 'stroke_weakness', label: 'Weakness on one side?' },
-    { id: 'stroke_speech', label: 'Slurred speech?' },
-  ]},
-  { title: 'Indications of Sepsis', questions: [
-    { id: 'sepsis_confusion', label: 'Slurred speech or confusion?' },
-    { id: 'sepsis_shiver', label: 'Shivering or muscle pain?' },
-    { id: 'sepsis_skin', label: 'Skin discoloration or rash?' },
-  ]},
-  { title: 'Signs of Heart Attack', questions: [
-    { id: 'heartattack_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
-  ]},
-  { title: 'General Symptoms', questions: [
-    { id: 'general_symptoms_fever', label: 'Experiencing persistent fever?' },
-    { id: 'general_symptoms_fatigue', label: 'Feeling extreme fatigue or weakness?' },
-    { id: 'general_symptoms_weightloss', label: 'Unexplained weight loss?' },
-  ]},
-  { title: 'Respiratory & ENT Issues', questions: [
-    { id: 'respiratory_ent_cough', label: 'Persistent cough?' },
-    { id: 'respiratory_ent_taste', label: 'Sudden loss of taste or smell?' },
-    { id: 'respiratory_ent_throat', label: 'Severe sore throat?' },
-  ]},
-  { title: 'Digestive Issues', questions: [
-    { id: 'digestive_abdominal_pain', label: 'Severe abdominal pain?' },
-    { id: 'digestive_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
-  ]},
-  { title: 'Neurological Symptoms', questions: [
-    { id: 'neuro_headache', label: 'New or worsening severe headaches?' },
-    { id: 'neuro_vision', label: 'Sudden onset of vision changes?' },
-    { id: 'neuro_balance', label: 'Difficulty with balance or coordination?' },
-  ]},
-  { title: 'Mental Well-being', questions: [
-    { id: 'mental_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
-    { id: 'mental_sadness', label: 'Persistent feelings of sadness or self-harm thoughts?' },
-  ]},
+  {
+    title: 'Emergency Symptoms', questions: [
+      { id: 'emergency_pain', label: 'Experiencing severe pain?' },
+      { id: 'emergency_breath', label: 'Difficulty breathing or shortness of breath?' },
+      { id: 'emergency_unconscious', label: 'Unconsciousness or altered mental state?' },
+      { id: 'emergency_bleeding', label: 'Recent injury with heavy bleeding?' },
+    ]
+  },
+  {
+    title: 'Signs of a Stroke (FAST)', questions: [
+      { id: 'stroke_face', label: 'Facial droop?' },
+      { id: 'stroke_weakness', label: 'Weakness on one side?' },
+      { id: 'stroke_speech', label: 'Slurred speech?' },
+    ]
+  },
+  {
+    title: 'Indications of Sepsis', questions: [
+      { id: 'sepsis_confusion', label: 'Slurred speech or confusion?' },
+      { id: 'sepsis_shiver', label: 'Shivering or muscle pain?' },
+      { id: 'sepsis_skin', label: 'Skin discoloration or rash?' },
+    ]
+  },
+  {
+    title: 'Signs of Heart Attack', questions: [
+      { id: 'heartattack_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
+    ]
+  },
+  {
+    title: 'General Symptoms', questions: [
+      { id: 'general_symptoms_fever', label: 'Experiencing persistent fever?' },
+      { id: 'general_symptoms_fatigue', label: 'Feeling extreme fatigue or weakness?' },
+      { id: 'general_symptoms_weightloss', label: 'Unexplained weight loss?' },
+    ]
+  },
+  {
+    title: 'Respiratory & ENT Issues', questions: [
+      { id: 'respiratory_ent_cough', label: 'Persistent cough?' },
+      { id: 'respiratory_ent_taste', label: 'Sudden loss of taste or smell?' },
+      { id: 'respiratory_ent_throat', label: 'Severe sore throat?' },
+    ]
+  },
+  {
+    title: 'Digestive Issues', questions: [
+      { id: 'digestive_abdominal_pain', label: 'Severe abdominal pain?' },
+      { id: 'digestive_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
+    ]
+  },
+  {
+    title: 'Neurological Symptoms', questions: [
+      { id: 'neuro_headache', label: 'New or worsening severe headaches?' },
+      { id: 'neuro_vision', label: 'Sudden onset of vision changes?' },
+      { id: 'neuro_balance', label: 'Difficulty with balance or coordination?' },
+    ]
+  },
+  {
+    title: 'Mental Well-being', questions: [
+      { id: 'mental_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
+      { id: 'mental_sadness', label: 'Persistent feelings of sadness or self-harm thoughts?' },
+    ]
+  },
 ]
 
 // Helper: normalize many input formats to yyyy-MM-dd
@@ -115,7 +133,7 @@ const tryFetchJson = async (urls: string[]) => {
     try {
       const r = await fetch(u, { credentials: 'include' })
       if (r.ok) return await r.json()
-    } catch {/* ignore and try next */}
+    } catch {/* ignore and try next */ }
   }
   return null
 }
@@ -146,50 +164,50 @@ export default function PreConsultation() {
 
   // Prefill from latest registration (if available) then /auth/me as fallback
   useEffect(() => {
-  let ignore = false
+    let ignore = false
 
-  async function prefill() {
-    // 1) Prefer latest registration (DOB lives there)
-    try {
-      const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, {
-        credentials: 'include'
-      })
-      if (r.ok && !ignore) {
-        const reg = await r.json()
-        const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
-        const phone = reg?.primaryWhatsApp || ''
+    async function prefill() {
+      // 1) Prefer latest registration (DOB lives there)
+      try {
+        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, {
+          credentials: 'include'
+        })
+        if (r.ok && !ignore) {
+          const reg = await r.json()
+          const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
+          const phone = reg?.primaryWhatsApp || ''
 
-        if (!contactName && fullName) setContactName(fullName)
-        if (!contactPhone && phone) setContactPhone(String(phone))
+          if (!contactName && fullName) setContactName(fullName)
+          if (!contactPhone && phone) setContactPhone(String(phone))
 
-        const ymd = toYMD(reg?.dateOfBirth)
-        if (!dob && ymd) setDob(ymd)
-      }
-    } catch { /* ignore; fall back to /auth/me */ }
+          const ymd = toYMD(reg?.dateOfBirth)
+          if (!dob && ymd) setDob(ymd)
+        }
+      } catch { /* ignore; fall back to /auth/me */ }
 
-    // 2) Fallback: /auth/me (in case reg endpoint not available or missing fields)
-    try {
-      const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
-      if (r.ok && !ignore) {
-        const me = await r.json()
-        const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
-        const phone = me?.username || me?.phone || ''
+      // 2) Fallback: /auth/me (in case reg endpoint not available or missing fields)
+      try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
+        if (r.ok && !ignore) {
+          const me = await r.json()
+          const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
+          const phone = me?.username || me?.phone || ''
 
-        if (!contactName && fullName) setContactName(fullName)
-        if (!contactPhone && phone) setContactPhone(String(phone))
+          if (!contactName && fullName) setContactName(fullName)
+          if (!contactPhone && phone) setContactPhone(String(phone))
 
-        const rawDob: string | undefined =
-          me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
-        const ymd = toYMD(rawDob)
-        if (!dob && ymd) setDob(ymd)
-      }
-    } catch { /* ignore */ }
-  }
+          const rawDob: string | undefined =
+            me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
+          const ymd = toYMD(rawDob)
+          if (!dob && ymd) setDob(ymd)
+        }
+      } catch { /* ignore */ }
+    }
 
-  prefill()
-  return () => { ignore = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [])
+    prefill()
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
 
   function setAnswer(id: string, v: YesNo) {
@@ -253,6 +271,50 @@ export default function PreConsultation() {
     }
   }
 
+  // Inside your Questionnaire component
+  //const [location, setLocation] = React.useState("");
+  const [coords, setCoords] = React.useState<{ lat: number; lon: number } | null>(null);
+  const [locLoading, setLocLoading] = React.useState(false);
+  const [locErr, setLocErr] = React.useState<string | null>(null);
+
+  async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+    try {
+      // Free OSM Nominatim (ok for low volume; see note below)
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+      const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+      if (!res.ok) return null;
+      const j = await res.json();
+      return j?.display_name || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function useMyLocation() {
+    setLocErr(null);
+    if (!("geolocation" in navigator)) {
+      setLocErr("Geolocation is not available in this browser.");
+      return;
+    }
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setCoords({ lat: latitude, lon: longitude });
+        const addr = await reverseGeocode(latitude, longitude);
+        setLocation(addr ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        setLocLoading(false);
+      },
+      (err) => {
+        setLocLoading(false);
+        // Common codes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+        setLocErr(err.message || "Unable to fetch location.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+
   return (
     <section className="section">
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -264,12 +326,29 @@ export default function PreConsultation() {
         {/* Current location */}
         <div className="field">
           <label>Current Location</label>
-          <input
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="123 Main St, Anytown"
-          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="123 Main St, Anytown"
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="btn" onClick={useMyLocation} disabled={locLoading}>
+              {locLoading ? "Getting…" : "Use my location"}
+            </button>
+          </div>
+          {coords && (
+            <div className="muted small" style={{ marginTop: 6 }}>
+              ({coords.lat.toFixed(5)}, {coords.lon.toFixed(5)})
+            </div>
+          )}
+          {locErr && (
+            <div className="muted small" style={{ marginTop: 6, color: "#b91c1c" }}>
+              {locErr}
+            </div>
+          )}
         </div>
+
 
         {/* Patient Contact & Address */}
         <div className="card" style={{ marginTop: 12 }}>
