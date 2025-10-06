@@ -57,7 +57,7 @@ public class Consultation {
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 
-    public enum Status { PENDING, IN_PROGRESS, DONE }
+        public enum Status { PENDING, IN_PROGRESS, COMPLETED }
 
     // Patient ID (e.g., PV-123456789)
     @Column(unique = true, length = 20)

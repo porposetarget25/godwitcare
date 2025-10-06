@@ -112,26 +112,49 @@ public class ConsultationController {
         return ResponseEntity.ok(res);
     }
 
-    // ---------- Doctor: list ----------
+    // ---------- Doctor: list (with optional status filter) ----------
     @GetMapping("/doctor/consultations")
     @PreAuthorize("hasRole('DOCTOR')")
-    public List<Map<String, Object>> listAll() {
+    public List<Map<String, Object>> listAll(
+            @RequestParam(name = "status", required = false, defaultValue = "ALL") String statusParam
+    ) {
         List<Consultation> all = consultations.findAll();
         all.sort(Comparator.comparingLong(Consultation::getId).reversed());
+
+        // must be final/effectively final to use inside lambda
+        final Consultation.Status filterStatus = parseFilterStatus(statusParam);
+
+        if (filterStatus != null) {
+            all = all.stream()
+                    .filter(c -> c.getStatus() == filterStatus)
+                    .collect(java.util.stream.Collectors.toList()); // use .toList() if on Java 16+
+        }
+
         List<Map<String, Object>> out = new ArrayList<>();
         for (Consultation c : all) {
             var u = c.getUser();
             out.add(Map.of(
                     "id", c.getId(),
                     "patientEmail", u.getEmail(),
-                    "patientName", (u.getFirstName() == null ? "" : u.getFirstName()) +
-                            (u.getLastName() == null ? "" : " " + u.getLastName()),
+                    "patientName",
+                    ((u.getFirstName()==null?"":u.getFirstName()) +
+                            (u.getLastName()==null?"":" "+u.getLastName())).trim(),
                     "createdAt", c.getCreatedAt(),
                     "status", c.getStatus().name()
             ));
         }
         return out;
     }
+
+    private static Consultation.Status parseFilterStatus(String statusParam) {
+        if (statusParam == null || "ALL".equalsIgnoreCase(statusParam)) return null;
+        try {
+            return Consultation.Status.valueOf(statusParam.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null; // unknown value -> treat as ALL
+        }
+    }
+
 
     // ---------- Doctor: details ----------
     @GetMapping("/doctor/consultations/{id}")
@@ -234,9 +257,15 @@ public class ConsultationController {
         p.setMedicines(String.join("\n", meds));
         p.setPdfBytes(pdf);
         p.setSize(pdf.length);
-        // fileName/contentType defaults OK
+        p.setContentType("application/pdf");
+        if (p.getFileName() == null || p.getFileName().isBlank()) {
+            p.setFileName("prescription-" + System.currentTimeMillis() + ".pdf");
+        }
 
         p = prescriptions.save(p);
+        // ✅ mark consultation completed
+        c.setStatus(Consultation.Status.COMPLETED);
+        consultations.save(c);
 
         return ResponseEntity.ok(Map.of("id", p.getId()));
     }
