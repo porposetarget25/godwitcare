@@ -324,4 +324,88 @@ public class ConsultationController {
                 .header("Content-Disposition", "inline; filename=\"" + (p.getFileName() != null ? p.getFileName() : ("prescription-" + rxId + ".pdf")) + "\"")
                 .body(bytes);
     }
+
+    // In ConsultationController
+
+    // Patient fetch own consultation to prefill the form
+    @GetMapping("/consultations/{id}/mine")
+    public ResponseEntity<Map<String,Object>> getMine(
+            @PathVariable Long id, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).build();
+        String principal = auth.getName();
+        var u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal)).orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        Consultation c = consultations.findById(id).orElse(null);
+        if (c == null) return ResponseEntity.notFound().build();
+        if (!Objects.equals(c.getUser().getId(), u.getId()))
+            return ResponseEntity.status(403).build();
+
+        Map<String,Object> d = new HashMap<>();
+        d.put("id", c.getId());
+        d.put("createdAt", c.getCreatedAt());
+        d.put("currentLocation", c.getCurrentLocation());
+        d.put("contactName", c.getContactName());
+        d.put("contactPhone", c.getContactPhone());
+        d.put("contactAddress", c.getContactAddress());
+        d.put("patientId", c.getPatientId());
+        d.put("dob", c.getDob()!=null ? c.getDob().toString() : "");
+
+        try {
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            @SuppressWarnings("unchecked")
+            Map<String,String> answers = mapper.readValue(
+                    c.getAnswersJson()==null?"{}":c.getAnswersJson(), Map.class);
+            d.put("answers", answers!=null?answers:Map.of());
+            @SuppressWarnings("unchecked")
+            Map<String,String> detailsByQuestion = mapper.readValue(
+                    c.getDetailsByQuestionJson()==null?"{}":c.getDetailsByQuestionJson(), Map.class);
+            d.put("detailsByQuestion", detailsByQuestion!=null?detailsByQuestion:Map.of());
+        } catch(Exception e){
+            d.put("answers", Map.of());
+            d.put("detailsByQuestion", Map.of());
+        }
+        return ResponseEntity.ok(d);
+    }
+
+    // Patient updates (overwrites) their own consultation
+    @PutMapping("/consultations/{id}")
+    public ResponseEntity<?> updateMine(
+            @PathVariable Long id,
+            @RequestBody Map<String,Object> body,
+            Authentication auth) throws Exception {
+        if (auth == null) return ResponseEntity.status(401).build();
+        String principal = auth.getName();
+        var u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal)).orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        Consultation c = consultations.findById(id).orElse(null);
+        if (c == null) return ResponseEntity.notFound().build();
+        if (!Objects.equals(c.getUser().getId(), u.getId()))
+            return ResponseEntity.status(403).build();
+
+        c.setCurrentLocation((String) body.getOrDefault("currentLocation", c.getCurrentLocation()));
+        c.setContactName((String) body.getOrDefault("contactName", c.getContactName()));
+        c.setContactPhone((String) body.getOrDefault("contactPhone", c.getContactPhone()));
+        c.setContactAddress((String) body.getOrDefault("contactAddress", c.getContactAddress()));
+
+        Object dobVal = body.get("dob");
+        if (dobVal instanceof String s && !s.isBlank()) {
+            try { c.setDob(java.time.LocalDate.parse(s)); } catch (Exception ignored) {}
+        }
+
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        c.setAnswersJson(mapper.writeValueAsString(
+                body.getOrDefault("answers", Map.of())
+        ));
+        c.setDetailsByQuestionJson(mapper.writeValueAsString(
+                body.getOrDefault("detailsByQuestion", Map.of())
+        ));
+
+        consultations.save(c);
+        return ResponseEntity.ok(Map.of("id", c.getId(), "updated", true));
+    }
+
 }

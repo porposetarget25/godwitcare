@@ -1,6 +1,6 @@
 // src/screens/PreConsultation.tsx
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { API_BASE_URL } from '../api'
 
 type YesNo = 'Yes' | 'No'
@@ -113,7 +113,7 @@ const FORM: Section[] = [
   },
 ]
 
-// Helper: normalize many input formats to yyyy-MM-dd
+// Normalize many input formats to yyyy-MM-dd
 const toYMD = (d?: string) => {
   if (!d) return ''
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d
@@ -127,22 +127,13 @@ const toYMD = (d?: string) => {
   } catch { return '' }
 }
 
-// Hit a list of URLs; return the first JSON that succeeds (or null)
-const tryFetchJson = async (urls: string[]) => {
-  for (const u of urls) {
-    try {
-      const r = await fetch(u, { credentials: 'include' })
-      if (r.ok) return await r.json()
-    } catch {/* ignore and try next */ }
-  }
-  return null
-}
-
-
 export default function PreConsultation() {
   const nav = useNavigate()
+  const [params] = useSearchParams()
+  const cid = params.get('cid') // if present => edit mode
+  const isEdit = !!cid
 
-  // Contact fields (prefilled)
+  // Contact fields
   const [location, setLocation] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
@@ -162,53 +153,68 @@ export default function PreConsultation() {
 
   const [submitting, setSubmitting] = useState(false)
 
-  // Prefill from latest registration (if available) then /auth/me as fallback
+  // Prefill from latest registration or /auth/me (for NEW)
   useEffect(() => {
+    if (isEdit) return // edit mode handled below
     let ignore = false
-
-    async function prefill() {
-      // 1) Prefer latest registration (DOB lives there)
+    ;(async () => {
       try {
-        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, {
-          credentials: 'include'
-        })
-        if (r.ok && !ignore) {
+        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
+        if (!ignore && r.ok) {
           const reg = await r.json()
           const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
           const phone = reg?.primaryWhatsApp || ''
-
           if (!contactName && fullName) setContactName(fullName)
           if (!contactPhone && phone) setContactPhone(String(phone))
-
           const ymd = toYMD(reg?.dateOfBirth)
           if (!dob && ymd) setDob(ymd)
         }
-      } catch { /* ignore; fall back to /auth/me */ }
-
-      // 2) Fallback: /auth/me (in case reg endpoint not available or missing fields)
+      } catch {}
       try {
         const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
-        if (r.ok && !ignore) {
+        if (!ignore && r.ok) {
           const me = await r.json()
           const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
           const phone = me?.username || me?.phone || ''
-
           if (!contactName && fullName) setContactName(fullName)
           if (!contactPhone && phone) setContactPhone(String(phone))
-
-          const rawDob: string | undefined =
-            me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
+          const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
           const ymd = toYMD(rawDob)
           if (!dob && ymd) setDob(ymd)
         }
-      } catch { /* ignore */ }
-    }
-
-    prefill()
+      } catch {}
+    })()
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isEdit])
 
+  // Prefill existing consultation (for EDIT)
+  useEffect(() => {
+    if (!isEdit) return
+    let ignore = false
+    ;(async () => {
+      try {
+        const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' })
+        if (!ignore && r.ok) {
+          const j = await r.json()
+          setLocation(j.currentLocation || '')
+          setContactName(j.contactName || '')
+          setContactPhone(j.contactPhone || '')
+          setContactAddress(j.contactAddress || '')
+          setDob(toYMD(j.dob || ''))
+          // Merge answers into default keys
+          const merged: Record<string, Ans> = { ...defaultAnswers }
+          const incoming = j.answers || {}
+          Object.entries(incoming).forEach(([k, v]) => {
+            if (v === 'Yes' || v === 'No') merged[k] = v
+          })
+          setAnswers(merged)
+          setDetailsByQ(j.detailsByQuestion || {})
+        }
+      } catch {}
+    })()
+    return () => { ignore = true }
+  }, [isEdit, cid, defaultAnswers])
 
   function setAnswer(id: string, v: YesNo) {
     setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
@@ -230,7 +236,7 @@ export default function PreConsultation() {
 
     setSubmitting(true)
     try {
-      // Cast answers to Yes/No (safe now after validation)
+      // Cast answers to Yes/No (safe after validation)
       const castAnswers: Record<string, YesNo> = {}
       for (const k of Object.keys(answers)) castAnswers[k] = answers[k] as YesNo
 
@@ -248,11 +254,16 @@ export default function PreConsultation() {
         contactAddress,
         answers: castAnswers,
         detailsByQuestion: details,
-        dob: dob || null, // safe even if backend ignores it
+        dob: dob || null,
       }
 
-      const res = await fetch(`${API_BASE_URL}/consultations`, {
-        method: 'POST',
+      const url = isEdit
+        ? `${API_BASE_URL}/consultations/${cid}`
+        : `${API_BASE_URL}/consultations`
+      const method = isEdit ? 'PUT' : 'POST'
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload),
@@ -262,58 +273,55 @@ export default function PreConsultation() {
         const t = await res.text().catch(() => '')
         throw new Error(`Failed to save consultation: ${res.status} ${t}`)
       }
+
       nav('/consultation/tracker?logged=1')
     } catch (err) {
       console.error(err)
-      alert('Sorry, we could not log your request. Please try again.')
+      alert('Sorry, we could not save your details. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  // Inside your Questionnaire component
-  //const [location, setLocation] = React.useState("");
-  const [coords, setCoords] = React.useState<{ lat: number; lon: number } | null>(null);
-  const [locLoading, setLocLoading] = React.useState(false);
-  const [locErr, setLocErr] = React.useState<string | null>(null);
+  // Geolocation helpers
+  const [coords, setCoords] = React.useState<{ lat: number; lon: number } | null>(null)
+  const [locLoading, setLocLoading] = React.useState(false)
+  const [locErr, setLocErr] = React.useState<string | null>(null)
 
   async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
     try {
-      // Free OSM Nominatim (ok for low volume; see note below)
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-      const res = await fetch(url, { headers: { "Accept-Language": "en" } });
-      if (!res.ok) return null;
-      const j = await res.json();
-      return j?.display_name || null;
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+      if (!res.ok) return null
+      const j = await res.json()
+      return j?.display_name || null
     } catch {
-      return null;
+      return null
     }
   }
 
   async function useMyLocation() {
-    setLocErr(null);
-    if (!("geolocation" in navigator)) {
-      setLocErr("Geolocation is not available in this browser.");
-      return;
+    setLocErr(null)
+    if (!('geolocation' in navigator)) {
+      setLocErr('Geolocation is not available in this browser.')
+      return
     }
-    setLocLoading(true);
+    setLocLoading(true)
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setCoords({ lat: latitude, lon: longitude });
-        const addr = await reverseGeocode(latitude, longitude);
-        setLocation(addr ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        setLocLoading(false);
+        const { latitude, longitude } = pos.coords
+        setCoords({ lat: latitude, lon: longitude })
+        const addr = await reverseGeocode(latitude, longitude)
+        setLocation(addr ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+        setLocLoading(false)
       },
       (err) => {
-        setLocLoading(false);
-        // Common codes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
-        setLocErr(err.message || "Unable to fetch location.");
+        setLocLoading(false)
+        setLocErr(err.message || 'Unable to fetch location.')
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    )
   }
-
 
   return (
     <section className="section">
@@ -326,7 +334,7 @@ export default function PreConsultation() {
         {/* Current location */}
         <div className="field">
           <label>Current Location</label>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -334,7 +342,7 @@ export default function PreConsultation() {
               style={{ flex: 1 }}
             />
             <button type="button" className="btn" onClick={useMyLocation} disabled={locLoading}>
-              {locLoading ? "Getting…" : "Use my location"}
+              {locLoading ? 'Getting…' : 'Use my location'}
             </button>
           </div>
           {coords && (
@@ -343,12 +351,11 @@ export default function PreConsultation() {
             </div>
           )}
           {locErr && (
-            <div className="muted small" style={{ marginTop: 6, color: "#b91c1c" }}>
+            <div className="muted small" style={{ marginTop: 6, color: '#b91c1c' }}>
               {locErr}
             </div>
           )}
         </div>
-
 
         {/* Patient Contact & Address */}
         <div className="card" style={{ marginTop: 12 }}>
@@ -372,7 +379,7 @@ export default function PreConsultation() {
             </div>
           </div>
 
-          {/* DOB field (prepopulated if available) */}
+          {/* DOB field */}
           <div className="field">
             <label>Date of Birth</label>
             <input
@@ -435,7 +442,7 @@ export default function PreConsultation() {
 
         <div className="actions" style={{ marginTop: 16 }}>
           <button className="btn" disabled={submitting}>
-            {submitting ? 'Submitting…' : 'Submit & Continue'}
+            {submitting ? (isEdit ? 'Updating…' : 'Submitting…') : (isEdit ? 'Update & Continue' : 'Submit & Continue')}
           </button>
         </div>
       </form>
