@@ -16,13 +16,13 @@ export default function ConsultationTracker() {
   useEffect(() => {
     if (!isLogged) return
     setShowToast(true)
-    const timer = setTimeout(() => setShowToast(false), 4000)
+    const timer = setTimeout(() => setShowToast(false), 60000)
     return () => clearTimeout(timer)
   }, [isLogged])
 
   // Load latest consultation (if any)
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/consultations/mine/latest`, {
           credentials: 'include',
@@ -50,26 +50,26 @@ export default function ConsultationTracker() {
   const [rxUrl, setRxUrl] = useState<string | null>(null)
   useEffect(() => {
     let ignore = false
-    ;(async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
-          credentials: 'include',
-        })
-        if (ignore) return
-        if (res.status === 204 || !res.ok) {
-          setRxUrl(null)
-          return
+      ; (async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
+            credentials: 'include',
+          })
+          if (ignore) return
+          if (res.status === 204 || !res.ok) {
+            setRxUrl(null)
+            return
+          }
+          const j = await res.json().catch(() => null)
+          if (j && j.pdfUrl) {
+            setRxUrl(resolveApiUrl(API_BASE_URL, j.pdfUrl))
+          } else {
+            setRxUrl(null)
+          }
+        } catch {
+          if (!ignore) setRxUrl(null)
         }
-        const j = await res.json().catch(() => null)
-        if (j && j.pdfUrl) {
-          setRxUrl(resolveApiUrl(API_BASE_URL, j.pdfUrl))
-        } else {
-          setRxUrl(null)
-        }
-      } catch {
-        if (!ignore) setRxUrl(null)
-      }
-    })()
+      })()
     return () => {
       ignore = true
     }
@@ -163,18 +163,35 @@ export default function ConsultationTracker() {
             position: 'fixed',
             top: 20,
             right: 20,
-            background:
-              'linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)',
+            background: 'linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)',
             color: 'white',
             padding: '12px 16px',
             borderRadius: 10,
             boxShadow: '0 8px 20px rgba(16,185,129,.35)',
             zIndex: 1000,
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
           }}
         >
-          ✅ Your call has been logged. A doctor will contact you shortly.
+          <span>✅ Your call has been logged. A doctor will contact you shortly.</span>
+          <button
+            onClick={() => setShowToast(false)}
+            aria-label="Dismiss notification"
+            style={{
+              background: 'transparent',
+              color: 'white',
+              border: 'none',
+              fontSize: 18,
+              lineHeight: 1,
+              cursor: 'pointer'
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
+
 
       {/* Step 1 */}
       <div style={step1CardStyle}>

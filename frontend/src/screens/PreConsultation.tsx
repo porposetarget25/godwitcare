@@ -153,40 +153,78 @@ export default function PreConsultation() {
 
   const [submitting, setSubmitting] = useState(false)
 
-  // Prefill from latest registration or /auth/me (for NEW)
+  // Prefill order: Registration → Latest Consultation → /auth/me (NEW mode only)
   useEffect(() => {
-    if (isEdit) return // edit mode handled below
-    let ignore = false
-      ; (async () => {
-        try {
-          const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
-          if (!ignore && r.ok) {
-            const reg = await r.json()
-            const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
-            const phone = reg?.primaryWhatsApp || ''
-            if (!contactName && fullName) setContactName(fullName)
-            if (!contactPhone && phone) setContactPhone(String(phone))
-            const ymd = toYMD(reg?.dateOfBirth)
-            if (!dob && ymd) setDob(ymd)
+    if (isEdit) return; // edit mode handled elsewhere
+    let ignore = false;
+
+    (async () => {
+      // 1) Try latest Registration (DOB lives here)
+      try {
+        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' });
+        if (!ignore && r.ok) {
+          const reg = await r.json().catch(() => null);
+          if (reg) {
+            const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim();
+            const phone = reg?.primaryWhatsApp || '';
+
+            if (!contactName && fullName) setContactName(fullName);
+            if (!contactPhone && phone) setContactPhone(String(phone));
+
+            const ymd = toYMD(reg?.dateOfBirth);
+            if (!dob && ymd) setDob(ymd);
+
+            // We already have the best source for DOB; we can still continue to fill address/location
+            // from latest consultation, but if you prefer to stop here, just `return;`
           }
-        } catch { }
-        try {
-          const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
-          if (!ignore && r.ok) {
-            const me = await r.json()
-            const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
-            const phone = me?.username || me?.phone || ''
-            if (!contactName && fullName) setContactName(fullName)
-            if (!contactPhone && phone) setContactPhone(String(phone))
-            const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
-            const ymd = toYMD(rawDob)
-            if (!dob && ymd) setDob(ymd)
+        }
+      } catch { /* ignore */ }
+
+      // 2) Try latest consultation details (fills address/location; also has dob if you stored it)
+      try {
+        const r0 = await fetch(`${API_BASE_URL}/consultations/mine/latest`, { credentials: 'include' });
+        if (!ignore && r0.ok) {
+          const latest = await r0.json().catch(() => null);
+          if (latest?.id) {
+            const r1 = await fetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, { credentials: 'include' });
+            if (!ignore && r1.ok) {
+              const j = await r1.json();
+              if (!location && j?.currentLocation) setLocation(j.currentLocation);
+              if (!contactAddress && j?.contactAddress) setContactAddress(j.contactAddress);
+
+              const ymd = toYMD(j?.dob || j?.patient?.dob);
+              if (!dob && ymd) setDob(ymd);
+            }
           }
-        } catch { }
-      })()
-    return () => { ignore = true }
+        }
+      } catch { /* ignore */ }
+
+      // 3) Fallback: /auth/me (great for name/phone, often no DOB)
+      try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
+        if (!ignore && r.ok) {
+          const me = await r.json();
+          const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim();
+          const phone = me?.username || me?.phone || '';
+
+          if (!contactName && fullName) setContactName(fullName);
+          if (!contactPhone && phone) setContactPhone(String(phone));
+
+          const rawDob: string | undefined =
+            me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate;
+          const ymd = toYMD(rawDob);
+          if (!dob && ymd) setDob(ymd);
+        }
+      } catch { /* ignore */ }
+    })();
+
+    return () => { ignore = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit])
+  }, [isEdit]);
+
+
+
+
 
   // Prefill existing consultation (for EDIT)
   useEffect(() => {

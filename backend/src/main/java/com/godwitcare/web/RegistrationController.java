@@ -8,6 +8,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.core.Authentication;
+import com.godwitcare.entity.User;
+import com.godwitcare.repo.UserRepository;
+
 
 import java.util.*;
 
@@ -17,10 +21,15 @@ public class RegistrationController {
 
     private final RegistrationRepository repo;
     private final RegistrationDocumentRepository docs;
+    private final UserRepository users;
 
-    public RegistrationController(RegistrationRepository repo, RegistrationDocumentRepository docs) {
+
+    public RegistrationController(RegistrationRepository repo,
+                                  RegistrationDocumentRepository docs,
+                                  UserRepository users) {
         this.repo = repo;
         this.docs = docs;
+        this.users = users;
     }
 
     /* ---------------- Registrations ---------------- */
@@ -161,4 +170,31 @@ public class RegistrationController {
                         .body(d.getData()))
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @GetMapping("/registrations/mine/latest")
+    public ResponseEntity<?> myLatestRegistration(Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).build();
+
+        String principal = auth.getName();
+        User u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        return repo.findTopByEmailAddressOrderByIdDesc(u.getEmail())
+                .<ResponseEntity<?>>map(reg -> {
+                    var body = new java.util.HashMap<String, Object>();
+                    body.put("id", reg.getId());
+                    body.put("firstName", reg.getFirstName());
+                    body.put("lastName", reg.getLastName());
+                    body.put("primaryWhatsApp", u.getUsername());
+                    // LocalDate -> yyyy-MM-dd (perfect for <input type="date">)
+                    body.put("dateOfBirth",
+                            reg.getDateOfBirth() != null ? reg.getDateOfBirth().toString() : "");
+                    return ResponseEntity.ok(body);
+                })
+                .orElse(ResponseEntity.noContent().build());
+    }
+
+
 }
