@@ -8,8 +8,10 @@ export default function ConsultationTracker() {
   const isLogged = params.get('logged') === '1'
   const [showToast, setShowToast] = useState(isLogged)
 
-  // Latest consultation id (to know if Step 1 is done)
+  // Latest consultation id (to know if Step 1 is done) + status
   const [latestCid, setLatestCid] = useState<number | null>(null)
+  const [latestStatus, setLatestStatus] =
+    useState<'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null>(null)
 
   useEffect(() => {
     if (!isLogged) return
@@ -27,12 +29,15 @@ export default function ConsultationTracker() {
         })
         if (res.status === 204 || !res.ok) {
           setLatestCid(null)
+          setLatestStatus(null)
           return
         }
         const j = await res.json()
         setLatestCid(typeof j?.id === 'number' ? j.id : null)
+        setLatestStatus(typeof j?.status === 'string' ? j.status : null)
       } catch {
         setLatestCid(null)
+        setLatestStatus(null)
       }
     })()
   }, [])
@@ -71,6 +76,7 @@ export default function ConsultationTracker() {
   }, [])
 
   const isStep1Done = !!latestCid
+  const hasRxOrCompleted = !!rxUrl || latestStatus === 'COMPLETED'
 
   // Shared styles
   const cardStyle: React.CSSProperties = {
@@ -98,6 +104,39 @@ export default function ConsultationTracker() {
     color: '#374151',
     fontSize: 14,
     lineHeight: 1.4,
+  }
+
+  // Locate Pharmacy
+  const [findingPharmacy, setFindingPharmacy] = useState(false)
+
+  function openNearbyPharmacies() {
+    setFindingPharmacy(true)
+
+    const open = (url: string) =>
+      window.open(url, '_blank', 'noopener,noreferrer')
+
+    const fallback = 'https://www.google.com/maps/search/pharmacy'
+
+    // Geolocation works on HTTPS or http://localhost
+    if (!('geolocation' in navigator)) {
+      open(fallback)
+      setFindingPharmacy(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        const url = `https://www.google.com/maps/search/pharmacy/@${latitude},${longitude},14z`
+        open(url)
+        setFindingPharmacy(false)
+      },
+      () => {
+        open(fallback)
+        setFindingPharmacy(false)
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    )
   }
 
   return (
@@ -246,11 +285,25 @@ export default function ConsultationTracker() {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div style={titleStyle}>Step 5: Locate Pharmacy</div>
-            <div style={textStyle}>Find the nearest pharmacy to pick up your prescribed medication.</div>
+            <div style={textStyle}>
+              Find the nearest pharmacy to pick up your prescribed medication.
+            </div>
           </div>
-          <button className="btn secondary" type="button" disabled>
-            Upcoming
-          </button>
+
+          {hasRxOrCompleted ? (
+            <button
+              className="btn"
+              type="button"
+              onClick={openNearbyPharmacies}
+              disabled={findingPharmacy}
+            >
+              {findingPharmacy ? 'Finding…' : 'Find Nearby Pharmacies'}
+            </button>
+          ) : (
+            <button className="btn secondary" type="button" disabled>
+              Upcoming
+            </button>
+          )}
         </div>
       </div>
     </section>
