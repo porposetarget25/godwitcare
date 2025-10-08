@@ -157,33 +157,33 @@ export default function PreConsultation() {
   useEffect(() => {
     if (isEdit) return // edit mode handled below
     let ignore = false
-    ;(async () => {
-      try {
-        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
-        if (!ignore && r.ok) {
-          const reg = await r.json()
-          const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
-          const phone = reg?.primaryWhatsApp || ''
-          if (!contactName && fullName) setContactName(fullName)
-          if (!contactPhone && phone) setContactPhone(String(phone))
-          const ymd = toYMD(reg?.dateOfBirth)
-          if (!dob && ymd) setDob(ymd)
-        }
-      } catch {}
-      try {
-        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
-        if (!ignore && r.ok) {
-          const me = await r.json()
-          const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
-          const phone = me?.username || me?.phone || ''
-          if (!contactName && fullName) setContactName(fullName)
-          if (!contactPhone && phone) setContactPhone(String(phone))
-          const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
-          const ymd = toYMD(rawDob)
-          if (!dob && ymd) setDob(ymd)
-        }
-      } catch {}
-    })()
+      ; (async () => {
+        try {
+          const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
+          if (!ignore && r.ok) {
+            const reg = await r.json()
+            const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
+            const phone = reg?.primaryWhatsApp || ''
+            if (!contactName && fullName) setContactName(fullName)
+            if (!contactPhone && phone) setContactPhone(String(phone))
+            const ymd = toYMD(reg?.dateOfBirth)
+            if (!dob && ymd) setDob(ymd)
+          }
+        } catch { }
+        try {
+          const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
+          if (!ignore && r.ok) {
+            const me = await r.json()
+            const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim()
+            const phone = me?.username || me?.phone || ''
+            if (!contactName && fullName) setContactName(fullName)
+            if (!contactPhone && phone) setContactPhone(String(phone))
+            const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
+            const ymd = toYMD(rawDob)
+            if (!dob && ymd) setDob(ymd)
+          }
+        } catch { }
+      })()
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit])
@@ -192,27 +192,27 @@ export default function PreConsultation() {
   useEffect(() => {
     if (!isEdit) return
     let ignore = false
-    ;(async () => {
-      try {
-        const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' })
-        if (!ignore && r.ok) {
-          const j = await r.json()
-          setLocation(j.currentLocation || '')
-          setContactName(j.contactName || '')
-          setContactPhone(j.contactPhone || '')
-          setContactAddress(j.contactAddress || '')
-          setDob(toYMD(j.dob || ''))
-          // Merge answers into default keys
-          const merged: Record<string, Ans> = { ...defaultAnswers }
-          const incoming = j.answers || {}
-          Object.entries(incoming).forEach(([k, v]) => {
-            if (v === 'Yes' || v === 'No') merged[k] = v
-          })
-          setAnswers(merged)
-          setDetailsByQ(j.detailsByQuestion || {})
-        }
-      } catch {}
-    })()
+      ; (async () => {
+        try {
+          const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' })
+          if (!ignore && r.ok) {
+            const j = await r.json()
+            setLocation(j.currentLocation || '')
+            setContactName(j.contactName || '')
+            setContactPhone(j.contactPhone || '')
+            setContactAddress(j.contactAddress || '')
+            setDob(toYMD(j.dob || ''))
+            // Merge answers into default keys
+            const merged: Record<string, Ans> = { ...defaultAnswers }
+            const incoming = j.answers || {}
+            Object.entries(incoming).forEach(([k, v]) => {
+              if (v === 'Yes' || v === 'No') merged[k] = v
+            })
+            setAnswers(merged)
+            setDetailsByQ(j.detailsByQuestion || {})
+          }
+        } catch { }
+      })()
     return () => { ignore = true }
   }, [isEdit, cid, defaultAnswers])
 
@@ -323,6 +323,26 @@ export default function PreConsultation() {
     )
   }
 
+  // how far from the top the sticky banner should sit (header height + a little gap)
+  const [stickyTop, setStickyTop] = React.useState(64);
+
+  React.useEffect(() => {
+    const calc = () => {
+      // try a few common header selectors; change if your header has a specific id/class
+      const header =
+        (document.querySelector('header') ||
+          document.querySelector('.site-header') ||
+          document.querySelector('.topnav')) as HTMLElement | null;
+
+      const h = header?.offsetHeight ?? 56; // fallback if not found
+      setStickyTop(h - 1); // add small gap under header
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
+
+
   return (
     <section className="section">
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -401,44 +421,85 @@ export default function PreConsultation() {
           </div>
         </div>
 
-        {/* Emergency banner */}
+        {/* Emergency banner (sticky below header) */}
         <div
           className="card"
-          style={{ background: '#B94A48', color: 'white', borderColor: 'transparent', marginTop: 8 }}
+          role="note"
+          aria-live="polite"
+          style={{
+            position: 'sticky',
+            top: stickyTop,     // 👈 sits just below the header
+            zIndex: 50,         // under the header if header has higher z-index
+            background: '#B94A48',
+            color: 'white',
+            borderColor: 'transparent',
+            marginTop: 0,
+            borderRadius: 12,
+            padding: 16,
+            boxShadow: '0 8px 20px rgba(185,74,72,.25)',
+          }}
         >
-          <div className="strong" style={{ marginBottom: 4 }}>
+          <div className="strong" style={{ marginBottom: 0 }}>
             If you answer “Yes” to any of these emergency questions, please dial 999 immediately.
           </div>
         </div>
 
+
+
         {/* Sections */}
-        {FORM.map((section) => (
-          <div key={section.title} className="card" style={{ marginTop: 12 }}>
-            <div className="strong" style={{ marginBottom: 8 }}>{section.title}</div>
-            {section.questions.map((q) => {
-              const val = answers[q.id]
-              return (
-                <div key={q.id} style={{ marginBottom: 10 }}>
-                  <Toggle
-                    label={q.label}
-                    value={val}
-                    onChange={(v) => setAnswer(q.id, v)}
-                  />
-                  {val === 'Yes' && (
-                    <div className="field" style={{ marginTop: 6 }}>
-                      <label className="small">Add details (optional)</label>
-                      <input
-                        value={detailsByQ[q.id] || ''}
-                        onChange={(e) => setDetail(q.id, e.target.value)}
-                        placeholder="Describe briefly (optional)"
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ))}
+        {FORM.map((section) => {
+          const isCritical =
+            section.title === 'Emergency Symptoms' ||
+            section.title === 'General Symptoms';
+
+          return (
+            <div
+              key={section.title}
+              className="card"
+              style={{
+                marginTop: 12,
+                // 🔴 thick red border only for Emergency & General
+                border: isCritical ? '4px solid #dc2626' : undefined,
+                borderRadius: 12,
+              }}
+            >
+              <div
+                className="strong"
+                style={{
+                  marginBottom: 8,
+                  // darker red title for emphasis
+                  color: isCritical ? '#991b1b' : undefined,
+                }}
+              >
+                {section.title}
+              </div>
+
+              {section.questions.map((q) => {
+                const val = answers[q.id]
+                return (
+                  <div key={q.id} style={{ marginBottom: 10 }}>
+                    <Toggle
+                      label={q.label}
+                      value={val}
+                      onChange={(v) => setAnswer(q.id, v)}
+                    />
+                    {val === 'Yes' && (
+                      <div className="field" style={{ marginTop: 6 }}>
+                        <label className="small">Add details (optional)</label>
+                        <input
+                          value={detailsByQ[q.id] || ''}
+                          onChange={(e) => setDetail(q.id, e.target.value)}
+                          placeholder="Describe briefly (optional)"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+
 
         <div className="actions" style={{ marginTop: 16 }}>
           <button className="btn" disabled={submitting}>
