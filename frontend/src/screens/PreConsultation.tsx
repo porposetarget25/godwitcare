@@ -49,7 +49,6 @@ function Toggle({
 type Q = { id: string; label: string }
 type Section = { title: string; questions: Q[] }
 
-/** All sections & questions with descriptive IDs */
 const FORM: Section[] = [
   {
     title: 'Emergency Symptoms', questions: [
@@ -127,6 +126,67 @@ const toYMD = (d?: string) => {
   } catch { return '' }
 }
 
+// Dropdown person item (Primary + Travellers)
+type PersonOption = { key: string; label: string; name: string; dob: string }
+// For the select used in this screen
+type PatientOpt = { key: string; label: string; dob: string }
+
+/** Build Patient options with SAFE unique keys (`trav-<id>` or `trav-idx-<n>`). */
+function buildPatientOptionsFromRegistration(reg: any): PatientOpt[] {
+  const opts: PatientOpt[] = []
+  const seen = new Set<string>()
+
+  const push = (key: string, label: string, dob: string) => {
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    opts.push({ key, label, dob })
+  }
+
+  const primaryName =
+    [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim() ||
+    reg?.fullName || 'Primary Member'
+  push('primary', `${primaryName} (Primary)`, toYMD(reg?.dateOfBirth))
+
+  if (Array.isArray(reg?.travelers)) {
+    reg.travelers.forEach((t: any, idx: number) => {
+      const idPart = t?.id != null ? String(t.id) : `idx-${idx}`
+      const key = `trav-${idPart}`  // ✅ always defined & unique
+      const label = (t?.fullName || `Traveller ${idx + 1}`).trim()
+      push(key, label, toYMD(t?.dateOfBirth))
+    })
+  }
+  return opts
+}
+
+/** (Also keep your old builder, but use id when available for stability.) */
+function buildPeopleFromRegistration(reg: any): PersonOption[] {
+  const out: PersonOption[] = []
+  const primaryName =
+    [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
+    || reg?.fullName
+    || 'Primary Member'
+  const primaryDob = toYMD(reg?.dateOfBirth)
+  out.push({
+    key: 'primary',
+    label: `${primaryName} (Primary)`,
+    name: primaryName,
+    dob: primaryDob,
+  })
+  if (Array.isArray(reg?.travelers)) {
+    reg.travelers.forEach((t: any, i: number) => {
+      const nm = (t?.fullName || `Traveller ${i + 1}`).trim()
+      const idPart = t?.id != null ? String(t.id) : `idx-${i}`
+      out.push({
+        key: `trav-${idPart}`,
+        label: nm,
+        name: nm,
+        dob: toYMD(t?.dateOfBirth),
+      })
+    })
+  }
+  return out
+}
+
 export default function PreConsultation() {
   const nav = useNavigate()
   const [params] = useSearchParams()
@@ -140,119 +200,194 @@ export default function PreConsultation() {
   const [contactAddress, setContactAddress] = useState('')
   const [dob, setDob] = useState('') // yyyy-MM-dd
 
-  // Answers start UNSET (must be chosen)
+  // Patient dropdown
+  const [people, setPeople] = useState<PersonOption[]>([])
+  const [selectedPersonKey, setSelectedPersonKey] = useState<string>('primary')
+
+  // Patients list for the main select (this is what the UI uses)
+  const [patientOptions, setPatientOptions] = useState<PatientOpt[]>([])
+  const [selectedPatientKey, setSelectedPatientKey] = useState<string>('')
+
+  // Answers, details
   const defaultAnswers = useMemo(() => {
     const all: Record<string, Ans> = {}
     for (const s of FORM) for (const q of s.questions) all[q.id] = undefined
     return all
   }, [])
   const [answers, setAnswers] = useState<Record<string, Ans>>(defaultAnswers)
-
-  // Optional free-text details per question when “Yes”
   const [detailsByQ, setDetailsByQ] = useState<Record<string, string>>({})
-
   const [submitting, setSubmitting] = useState(false)
 
-  // Prefill order: Registration → Latest Consultation → /auth/me (NEW mode only)
-  useEffect(() => {
-    if (isEdit) return; // edit mode handled elsewhere
-    let ignore = false;
+  // Sticky banner offset below header
+  const [stickyTop, setStickyTop] = React.useState(64)
+  React.useEffect(() => {
+    const calc = () => {
+      const header =
+        (document.querySelector('header') ||
+          document.querySelector('.site-header') ||
+          document.querySelector('.topnav')) as HTMLElement | null
+      const h = header?.offsetHeight ?? 56
+      setStickyTop(h - 1)
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [])
 
-    (async () => {
+  /* ---------- Prefill (NEW mode): Registration → Latest Consultation → /auth/me ---------- */
+  useEffect(() => {
+    if (isEdit) return
+    let ignore = false
+    ;(async () => {
       // 1) Try latest Registration (DOB lives here)
       try {
-        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' });
+        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
         if (!ignore && r.ok) {
-          const reg = await r.json().catch(() => null);
+          const reg = await r.json().catch(() => null)
           if (reg) {
-            const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim();
-            const phone = reg?.primaryWhatsApp || '';
+            const fullName = [reg?.firstName, reg?.lastName].filter(Boolean).join(' ').trim()
+            const phone = reg?.primaryWhatsApp || ''
 
-            if (!contactName && fullName) setContactName(fullName);
-            if (!contactPhone && phone) setContactPhone(String(phone));
+            if (!contactName && fullName) setContactName(fullName)
+            if (!contactPhone && phone) setContactPhone(String(phone))
 
-            const ymd = toYMD(reg?.dateOfBirth);
-            if (!dob && ymd) setDob(ymd);
+            const ymd = toYMD(reg?.dateOfBirth)
+            if (!dob && ymd) setDob(ymd)
 
-            // We already have the best source for DOB; we can still continue to fill address/location
-            // from latest consultation, but if you prefer to stop here, just `return;`
-          }
-        }
-      } catch { /* ignore */ }
-
-      // 2) Try latest consultation details (fills address/location; also has dob if you stored it)
-      try {
-        const r0 = await fetch(`${API_BASE_URL}/consultations/mine/latest`, { credentials: 'include' });
-        if (!ignore && r0.ok) {
-          const latest = await r0.json().catch(() => null);
-          if (latest?.id) {
-            const r1 = await fetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, { credentials: 'include' });
-            if (!ignore && r1.ok) {
-              const j = await r1.json();
-              if (!location && j?.currentLocation) setLocation(j.currentLocation);
-              if (!contactAddress && j?.contactAddress) setContactAddress(j.contactAddress);
-
-              const ymd = toYMD(j?.dob || j?.patient?.dob);
-              if (!dob && ymd) setDob(ymd);
+            // ✅ Build options with unique keys
+            const opts = buildPatientOptionsFromRegistration(reg)
+            if (opts.length > 0) {
+              setPatientOptions(opts)
+              setSelectedPatientKey(opts[0].key) // default to primary
+              // also sync name/dob with the selected option
+              const sel = opts[0]
+              const nameOnly = sel.label.replace(/\s*\(Primary\)\s*$/, '')
+              setContactName(nameOnly)
+              if (sel.dob) setDob(sel.dob)
             }
           }
         }
       } catch { /* ignore */ }
 
-      // 3) Fallback: /auth/me (great for name/phone, often no DOB)
+      // 2) Latest consultation details (address/location; fallback dob)
       try {
-        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
-        if (!ignore && r.ok) {
-          const me = await r.json();
-          const fullName = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim();
-          const phone = me?.username || me?.phone || '';
-
-          if (!contactName && fullName) setContactName(fullName);
-          if (!contactPhone && phone) setContactPhone(String(phone));
-
-          const rawDob: string | undefined =
-            me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate;
-          const ymd = toYMD(rawDob);
-          if (!dob && ymd) setDob(ymd);
+        const r0 = await fetch(`${API_BASE_URL}/consultations/mine/latest`, { credentials: 'include' })
+        if (!ignore && r0.ok) {
+          const latest = await r0.json().catch(() => null)
+          if (latest?.id) {
+            const r1 = await fetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, { credentials: 'include' })
+            if (!ignore && r1.ok) {
+              const j = await r1.json()
+              if (!location && j?.currentLocation) setLocation(j.currentLocation)
+              if (!contactAddress && j?.contactAddress) setContactAddress(j.contactAddress)
+              const ymd = toYMD(j?.dob || j?.patient?.dob)
+              if (!dob && ymd) setDob(ymd)
+            }
+          }
         }
       } catch { /* ignore */ }
-    })();
 
-    return () => { ignore = true; };
+      // 3) Fallback /auth/me for phone/name if needed
+      try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
+        if (!ignore && r.ok) {
+          const me = await r.json()
+          if (people.length === 0) {
+            const nm = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim() || 'Primary Member'
+            const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
+            const ymd = toYMD(rawDob)
+            const list: PersonOption[] = [{
+              key: 'primary',
+              label: `${nm} (Primary)`,
+              name: nm,
+              dob: ymd,
+            }]
+            setPeople(list)
+            setSelectedPersonKey('primary')
+            setContactName(nm)
+            if (ymd) setDob(ymd)
+          }
+          const phone = me?.username || me?.phone || ''
+          if (!contactPhone && phone) setContactPhone(String(phone))
+        }
+      } catch { /* ignore */ }
+    })()
+    return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit]);
+  }, [isEdit])
 
-
-
-
-
-  // Prefill existing consultation (for EDIT)
+  /* ---------- Prefill (EDIT mode) ---------- */
   useEffect(() => {
     if (!isEdit) return
     let ignore = false
-      ; (async () => {
-        try {
-          const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' })
-          if (!ignore && r.ok) {
-            const j = await r.json()
-            setLocation(j.currentLocation || '')
-            setContactName(j.contactName || '')
-            setContactPhone(j.contactPhone || '')
-            setContactAddress(j.contactAddress || '')
-            setDob(toYMD(j.dob || ''))
-            // Merge answers into default keys
-            const merged: Record<string, Ans> = { ...defaultAnswers }
-            const incoming = j.answers || {}
-            Object.entries(incoming).forEach(([k, v]) => {
-              if (v === 'Yes' || v === 'No') merged[k] = v
-            })
-            setAnswers(merged)
-            setDetailsByQ(j.detailsByQuestion || {})
+    ;(async () => {
+      try {
+        const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' })
+        if (!ignore && r.ok) {
+          const j = await r.json()
+          setLocation(j.currentLocation || '')
+          setContactName(j.contactName || '')
+          setContactPhone(j.contactPhone || '')
+          setContactAddress(j.contactAddress || '')
+          setDob(toYMD(j.dob || ''))
+
+          // Build BOTH lists: the one your UI uses (patientOptions) and the legacy "people"
+          const r2 = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
+          if (!ignore && r2.ok) {
+            const reg = await r2.json().catch(() => null)
+            if (reg) {
+              if (reg?.primaryWhatsApp && !contactPhone) setContactPhone(String(reg.primaryWhatsApp))
+
+              // ✅ unique-key options for the select used by the UI
+              const opts = buildPatientOptionsFromRegistration(reg)
+              setPatientOptions(opts)
+              // preselect by matching name/dob
+              const nameOnly = (j.contactName || '').trim()
+              const matchByName = opts.find(o => o.label.replace(/\s*\(Primary\)\s*$/, '') === nameOnly)
+              const matchByDob  = opts.find(o => o.dob && o.dob === toYMD(j.dob || ''))
+              setSelectedPatientKey((matchByName || matchByDob || opts[0])?.key || 'primary')
+
+              // legacy "people" list (not used by the select, but kept for your other effect)
+              const ppl = buildPeopleFromRegistration(reg)
+              setPeople(ppl)
+              const matchByNameP = ppl.find(p => p.name === j.contactName)
+              const matchByDobP = ppl.find(p => p.dob && p.dob === toYMD(j.dob || ''))
+              setSelectedPersonKey((matchByNameP || matchByDobP || ppl[0]).key)
+            }
           }
-        } catch { }
-      })()
+
+          // merge answers
+          const merged: Record<string, Ans> = { ...defaultAnswers }
+          const incoming = j.answers || {}
+          Object.entries(incoming).forEach(([k, v]) => {
+            if (v === 'Yes' || v === 'No') merged[k] = v
+          })
+          setAnswers(merged)
+          setDetailsByQ(j.detailsByQuestion || {})
+        }
+      } catch { /* ignore */ }
+    })()
     return () => { ignore = true }
   }, [isEdit, cid, defaultAnswers])
+
+  // Legacy effect (kept): people + selectedPersonKey (doesn't drive the select the user sees)
+  useEffect(() => {
+    const sel = people.find(p => p.key === selectedPersonKey)
+    if (sel) {
+      setContactName(sel.name || '')
+      if (sel.dob) setDob(sel.dob)
+    }
+  }, [selectedPersonKey, people])
+
+  // Main select effect: when user changes dropdown selection, update contactName + dob
+  useEffect(() => {
+    if (!selectedPatientKey || patientOptions.length === 0) return
+    const opt = patientOptions.find(o => o.key === selectedPatientKey)
+    if (!opt) return
+    const cleanName = opt.label.replace(/\s*\(Primary\)\s*$/, '')
+    setContactName(cleanName)
+    setDob(opt.dob || '')
+  }, [selectedPatientKey, patientOptions])
 
   function setAnswer(id: string, v: YesNo) {
     setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
@@ -265,7 +400,6 @@ export default function PreConsultation() {
     e.preventDefault()
     if (submitting) return
 
-    // Validate every question is answered
     const unanswered = Object.entries(answers).filter(([, v]) => v === undefined)
     if (unanswered.length > 0) {
       alert('Please answer all questions (Yes/No) before submitting.')
@@ -274,11 +408,9 @@ export default function PreConsultation() {
 
     setSubmitting(true)
     try {
-      // Cast answers to Yes/No (safe after validation)
       const castAnswers: Record<string, YesNo> = {}
       for (const k of Object.keys(answers)) castAnswers[k] = answers[k] as YesNo
 
-      // Include only non-empty details
       const details: Record<string, string> = {}
       for (const [k, v] of Object.entries(detailsByQ)) {
         const trimmed = (v || '').trim()
@@ -361,25 +493,7 @@ export default function PreConsultation() {
     )
   }
 
-  // how far from the top the sticky banner should sit (header height + a little gap)
-  const [stickyTop, setStickyTop] = React.useState(64);
-
-  React.useEffect(() => {
-    const calc = () => {
-      // try a few common header selectors; change if your header has a specific id/class
-      const header =
-        (document.querySelector('header') ||
-          document.querySelector('.site-header') ||
-          document.querySelector('.topnav')) as HTMLElement | null;
-
-      const h = header?.offsetHeight ?? 56; // fallback if not found
-      setStickyTop(h - 1); // add small gap under header
-    };
-    calc();
-    window.addEventListener('resize', calc);
-    return () => window.removeEventListener('resize', calc);
-  }, []);
-
+  const redSectionTitles = new Set(['Emergency Symptoms', 'General Symptoms'])
 
   return (
     <section className="section">
@@ -418,15 +532,34 @@ export default function PreConsultation() {
         {/* Patient Contact & Address */}
         <div className="card" style={{ marginTop: 12 }}>
           <div className="strong" style={{ marginBottom: 8 }}>Patient Contact &amp; Address</div>
-          <div className="grid two">
-            <div className="field">
-              <label>Contact Name</label>
+
+          {/* Patient full width */}
+          <div className="field">
+            <label>Patient (Primary or Traveller)</label>
+            {patientOptions.length > 0 ? (
+              <select
+                value={selectedPatientKey}
+                onChange={(e) => setSelectedPatientKey(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                {patientOptions.map((o) => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
+                ))}
+              </select>
+            ) : (
               <input
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
                 placeholder="Full name"
               />
+            )}
+            <div className="muted small" style={{ marginTop: 4 }}>
+              WhatsApp (shared)
             </div>
+          </div>
+
+          {/* Phone + DOB in two columns */}
+          <div className="grid two">
             <div className="field">
               <label>Phone / WhatsApp</label>
               <input
@@ -435,17 +568,15 @@ export default function PreConsultation() {
                 placeholder="+44 7xxx xxx xxx"
               />
             </div>
-          </div>
-
-          {/* DOB field */}
-          <div className="field">
-            <label>Date of Birth</label>
-            <input
-              type="date"
-              value={dob}
-              onChange={(e) => setDob(e.target.value)}
-              placeholder="yyyy-mm-dd"
-            />
+            <div className="field">
+              <label>Date of Birth</label>
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                placeholder="yyyy-mm-dd"
+              />
+            </div>
           </div>
 
           <div className="field">
@@ -466,8 +597,8 @@ export default function PreConsultation() {
           aria-live="polite"
           style={{
             position: 'sticky',
-            top: stickyTop,     // 👈 sits just below the header
-            zIndex: 50,         // under the header if header has higher z-index
+            top: stickyTop,
+            zIndex: 50,
             background: '#B94A48',
             color: 'white',
             borderColor: 'transparent',
@@ -482,13 +613,11 @@ export default function PreConsultation() {
           </div>
         </div>
 
-
-
         {/* Sections */}
         {FORM.map((section) => {
           const isCritical =
             section.title === 'Emergency Symptoms' ||
-            section.title === 'General Symptoms';
+            section.title === 'General Symptoms'
 
           return (
             <div
@@ -496,7 +625,6 @@ export default function PreConsultation() {
               className="card"
               style={{
                 marginTop: 12,
-                // 🔴 thick red border only for Emergency & General
                 border: isCritical ? '4px solid #dc2626' : undefined,
                 borderRadius: 12,
               }}
@@ -505,7 +633,6 @@ export default function PreConsultation() {
                 className="strong"
                 style={{
                   marginBottom: 8,
-                  // darker red title for emphasis
                   color: isCritical ? '#991b1b' : undefined,
                 }}
               >
@@ -537,7 +664,6 @@ export default function PreConsultation() {
             </div>
           )
         })}
-
 
         <div className="actions" style={{ marginTop: 16 }}>
           <button className="btn" disabled={submitting}>

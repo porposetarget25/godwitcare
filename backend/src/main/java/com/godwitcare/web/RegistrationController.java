@@ -187,14 +187,33 @@ public class RegistrationController {
                     body.put("id", reg.getId());
                     body.put("firstName", reg.getFirstName());
                     body.put("lastName", reg.getLastName());
-                    body.put("primaryWhatsApp", u.getUsername());
-                    // LocalDate -> yyyy-MM-dd (perfect for <input type="date">)
+
+                    // Prefer the registration’s primary WhatsApp if present; else fallback to user username
+                    String wa = u.getUsername();
+                    if (wa == null || wa.isBlank()) wa = u.getUsername();
+                    body.put("primaryWhatsApp", wa);
+
+                    // Primary member DOB (top-level convenience)
                     body.put("dateOfBirth",
                             reg.getDateOfBirth() != null ? reg.getDateOfBirth().toString() : "");
+
+                    // Add travellers (only fields needed by UI)
+                    java.util.List<java.util.Map<String, Object>> travellers = new java.util.ArrayList<>();
+                    if (reg.getTravelers() != null) {
+                        for (var t : reg.getTravelers()) {
+                            var m = new java.util.HashMap<String, Object>();
+                            m.put("fullName", t.getFullName());
+                            m.put("dateOfBirth", t.getDateOfBirth() != null ? t.getDateOfBirth().toString() : "");
+                            travellers.add(m);
+                        }
+                    }
+                    body.put("travelers", travellers);
+
                     return ResponseEntity.ok(body);
                 })
                 .orElse(ResponseEntity.noContent().build());
     }
+
 
 
 }
