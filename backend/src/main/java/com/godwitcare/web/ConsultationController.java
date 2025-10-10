@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import com.godwitcare.util.PdfMaker;
+
 import java.util.*;
 
 @RestController
@@ -28,8 +29,6 @@ public class ConsultationController {
     private final PrescriptionRepository prescriptions;
     private RegistrationRepository registrations;
     private final PrescriptionPdfService pdfs;
-
-
 
 
     public ConsultationController(UserRepository users,
@@ -64,7 +63,7 @@ public class ConsultationController {
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
         // Generate unique 9-digit patientId
-        String patientId = "PV-" + String.format("%09d", (int)(Math.random() * 1_000_000_000));
+        String patientId = "PV-" + String.format("%09d", (int) (Math.random() * 1_000_000_000));
         c.setPatientId(patientId);
 
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -80,7 +79,10 @@ public class ConsultationController {
         ));
         Object dobVal = body.get("dob");
         if (dobVal instanceof String dobStr && !dobStr.isBlank()) {
-            try { c.setDob(java.time.LocalDate.parse(dobStr)); } catch (Exception ignored) {}
+            try {
+                c.setDob(java.time.LocalDate.parse(dobStr));
+            } catch (Exception ignored) {
+            }
         }
         c = consultations.save(c);
 
@@ -137,8 +139,7 @@ public class ConsultationController {
                     "id", c.getId(),
                     "patientEmail", u.getEmail(),
                     "patientName",
-                    ((u.getFirstName()==null?"":u.getFirstName()) +
-                            (u.getLastName()==null?"":" "+u.getLastName())).trim(),
+                    ((c.getContactName() == null ? "" : c.getContactName())),
                     "createdAt", c.getCreatedAt(),
                     "status", c.getStatus().name()
             ));
@@ -151,7 +152,7 @@ public class ConsultationController {
         try {
             return Consultation.Status.valueOf(statusParam.toUpperCase());
         } catch (IllegalArgumentException ex) {
-            return null; // unknown value -> treat as ALL
+            return null;
         }
     }
 
@@ -170,9 +171,9 @@ public class ConsultationController {
                     d.put("status", c.getStatus().name());
                     d.put("patient", Map.of(
                             "email", u.getEmail(),
-                            "firstName", u.getFirstName(),
-                            "lastName", u.getLastName(),
-                            "dob", c.getDob() != null ? c.getDob().toString():""
+                            "firstName", c.getContactName(),
+                            //"lastName", u.getLastName(),
+                            "dob", c.getDob() != null ? c.getDob().toString() : ""
                     ));
                     d.put("currentLocation", c.getCurrentLocation());
                     d.put("contactName", c.getContactName());
@@ -211,9 +212,9 @@ public class ConsultationController {
     // ---------- Doctor creates a prescription for a consultation ----------
     @PostMapping("/doctor/consultations/{id}/prescriptions")
     @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<Map<String,Object>> createPrescription(
+    public ResponseEntity<Map<String, Object>> createPrescription(
             @PathVariable Long id,
-            @RequestBody Map<String,Object> body
+            @RequestBody Map<String, Object> body
     ) throws Exception {
         Consultation c = consultations.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
@@ -223,10 +224,10 @@ public class ConsultationController {
         @SuppressWarnings("unchecked")
         List<String> meds = (List<String>) body.getOrDefault("medicines", java.util.List.of());
 
-        String patientName = (c.getUser().getFirstName() + " " + c.getUser().getLastName()).trim();
-        String patientDob   = c.getDob() != null ? c.getDob().toString() : null;
+        String patientName = (c.getContactName() == null ? "" : c.getContactName().trim());
+        String patientDob = c.getDob() != null ? c.getDob().toString() : null;
         String patientPhone = c.getContactPhone();
-        String patientId    = c.getPatientId(); // you already set this when first created
+        String patientId = c.getPatientId(); // you already set this when first created
 
         // Build the beautiful PDF (logo + signature) via the service
         byte[] pdf = pdfs.buildPrescriptionPdf(
@@ -282,6 +283,7 @@ public class ConsultationController {
                         .body(p.getPdfBytes()))
                 .orElse(ResponseEntity.notFound().build());
     }
+
     @GetMapping("/doctor/consultations/{id}/prescriptions/latest")
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<?> doctorLatestPrescription(@PathVariable Long id) {
@@ -358,7 +360,7 @@ public class ConsultationController {
 
     // Patient fetch own consultation to prefill the form
     @GetMapping("/consultations/{id}/mine")
-    public ResponseEntity<Map<String,Object>> getMine(
+    public ResponseEntity<Map<String, Object>> getMine(
             @PathVariable Long id, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();
         String principal = auth.getName();
@@ -371,7 +373,7 @@ public class ConsultationController {
         if (!Objects.equals(c.getUser().getId(), u.getId()))
             return ResponseEntity.status(403).build();
 
-        Map<String,Object> d = new HashMap<>();
+        Map<String, Object> d = new HashMap<>();
         d.put("id", c.getId());
         d.put("createdAt", c.getCreatedAt());
         d.put("currentLocation", c.getCurrentLocation());
@@ -379,19 +381,19 @@ public class ConsultationController {
         d.put("contactPhone", c.getContactPhone());
         d.put("contactAddress", c.getContactAddress());
         d.put("patientId", c.getPatientId());
-        d.put("dob", c.getDob()!=null ? c.getDob().toString() : "");
+        d.put("dob", c.getDob() != null ? c.getDob().toString() : "");
 
         try {
             var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             @SuppressWarnings("unchecked")
-            Map<String,String> answers = mapper.readValue(
-                    c.getAnswersJson()==null?"{}":c.getAnswersJson(), Map.class);
-            d.put("answers", answers!=null?answers:Map.of());
+            Map<String, String> answers = mapper.readValue(
+                    c.getAnswersJson() == null ? "{}" : c.getAnswersJson(), Map.class);
+            d.put("answers", answers != null ? answers : Map.of());
             @SuppressWarnings("unchecked")
-            Map<String,String> detailsByQuestion = mapper.readValue(
-                    c.getDetailsByQuestionJson()==null?"{}":c.getDetailsByQuestionJson(), Map.class);
-            d.put("detailsByQuestion", detailsByQuestion!=null?detailsByQuestion:Map.of());
-        } catch(Exception e){
+            Map<String, String> detailsByQuestion = mapper.readValue(
+                    c.getDetailsByQuestionJson() == null ? "{}" : c.getDetailsByQuestionJson(), Map.class);
+            d.put("detailsByQuestion", detailsByQuestion != null ? detailsByQuestion : Map.of());
+        } catch (Exception e) {
             d.put("answers", Map.of());
             d.put("detailsByQuestion", Map.of());
         }
@@ -402,7 +404,7 @@ public class ConsultationController {
     @PutMapping("/consultations/{id}")
     public ResponseEntity<?> updateMine(
             @PathVariable Long id,
-            @RequestBody Map<String,Object> body,
+            @RequestBody Map<String, Object> body,
             Authentication auth) throws Exception {
         if (auth == null) return ResponseEntity.status(401).build();
         String principal = auth.getName();
@@ -422,7 +424,10 @@ public class ConsultationController {
 
         Object dobVal = body.get("dob");
         if (dobVal instanceof String s && !s.isBlank()) {
-            try { c.setDob(java.time.LocalDate.parse(s)); } catch (Exception ignored) {}
+            try {
+                c.setDob(java.time.LocalDate.parse(s));
+            } catch (Exception ignored) {
+            }
         }
 
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
