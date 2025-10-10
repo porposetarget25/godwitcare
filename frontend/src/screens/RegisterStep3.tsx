@@ -16,6 +16,68 @@ type Errors = Partial<Record<
 
 type Person = { fullName: string; dateOfBirth: string }
 
+// ---- Date helpers ----
+const ymd = (d: Date) => {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const today = new Date()
+const todayYMD = ymd(today)
+// start must be strictly after today
+const tmr = new Date(today); tmr.setDate(today.getDate() + 1)
+const tomorrowYMD = ymd(tmr)
+
+// 18+ cutoff
+const cutoff18 = new Date(today); cutoff18.setFullYear(today.getFullYear() - 18)
+const cutoff18YMD = ymd(cutoff18)
+
+// Optional lower bound to avoid accidental 1800s
+const MIN_DOB_YMD = '1900-01-01'
+
+// Validators
+function isValidLocalDate(value?: string) {
+  if (!value) return false
+  const d = new Date(`${value}T00:00:00`)
+  return !Number.isNaN(d.getTime())
+}
+function parseLocal(value: string) {
+  return new Date(`${value}T00:00:00`)
+}
+function validateAdultDob(value?: string): string | null {
+  if (!value) return null // allow blank rows (dropped on submit)
+  if (!isValidLocalDate(value)) return 'Invalid date.'
+  const d = parseLocal(value)
+  if (d > today) return 'DOB cannot be in the future.'
+  if (d > cutoff18) return 'Adult must be at least 18 years old.'
+  return null
+}
+function validateChildDob(value?: string): string | null {
+  if (!value) return null // allow blank rows (dropped on submit)
+  if (!isValidLocalDate(value)) return 'Invalid date.'
+  const d = parseLocal(value)
+  if (d > today) return 'Child DOB cannot be in the future.'
+  if (d <= cutoff18) return 'Child must be under 18 years old.'
+  return null
+}
+function validateStartDateLaterThanToday(value?: string): string | null {
+  if (!value) return 'Required'
+  if (!isValidLocalDate(value)) return 'Please enter a valid date.'
+  const d = parseLocal(value)
+  if (d <= today) return 'Start date must be later than today.'
+  return null
+}
+function validateEndNotBeforeStart(start?: string, end?: string): string | null {
+  if (!start || !end) return null
+  if (!isValidLocalDate(start) || !isValidLocalDate(end)) return 'Please enter valid dates.'
+  const s = parseLocal(start)
+  const e = parseLocal(end)
+  if (e < s) return 'End date must be on or after the start date.'
+  return null
+}
+
 /* ===== Country lists ===== */
 const ALL_COUNTRIES = [
   'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia','Australia','Austria','Azerbaijan',
@@ -55,6 +117,10 @@ export default function Step3() {
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
 
+  // Per-row DOB error maps (inline messages)
+  const [adultDobErrors, setAdultDobErrors] = useState<Record<number, string>>({})
+  const [childDobErrors, setChildDobErrors] = useState<Record<number, string>>({})
+
   // Local lists for adults and children (merged before submit)
   const [adults, setAdults] = useState<Person[]>([])
   const [children, setChildren] = useState<Person[]>([])
@@ -69,16 +135,14 @@ export default function Step3() {
   const pkg = draft['Package Days']
 
   const dateProblem = useMemo(() => {
-    if (!start || !end) return ''
-    try {
-      const s = new Date(start)
-      const e = new Date(end)
-      if (isNaN(s.getTime()) || isNaN(e.getTime())) return 'Please enter valid dates.'
-      if (e < s) return 'End date must be on or after the start date.'
-      return ''
-    } catch {
-      return 'Please enter valid dates.'
+    // Start must be later than today
+    if (start) {
+      const err = validateStartDateLaterThanToday(start)
+      if (err && err !== 'Required') return err
     }
+    // End must be >= start
+    const rangeErr = validateEndNotBeforeStart(start, end)
+    return rangeErr || ''
   }, [start, end])
 
   const totalTravelers = adults.length + children.length
@@ -89,6 +153,11 @@ export default function Step3() {
   }
   function removeAdult(idx: number) {
     setAdults(a => a.filter((_, i) => i !== idx))
+    setAdultDobErrors(prev => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
   }
 
   function addChild() {
@@ -97,21 +166,60 @@ export default function Step3() {
   }
   function removeChild(idx: number) {
     setChildren(c => c.filter((_, i) => i !== idx))
+    setChildDobErrors(prev => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
   }
 
   function validate(): boolean {
     const next: Errors = {}
+
     if (!from) next.from = 'Required'
     if (!to) next.to = 'Required'
-    if (!start) next.start = 'Required'
-    if (!end) next.end = 'Required'
-    if (!pkg) next.package = 'Please select a package'
-    if (!next.start && !next.end && dateProblem) next.dates = dateProblem
 
-    // Validate travelers lightly (blank rows allowed; dropped on submit)
+    // Start date validations
+    const startErr = validateStartDateLaterThanToday(start)
+    if (startErr) next.start = startErr
+
+    // End date present
+    if (!end) next.end = 'Required'
+
+    // Range validation only if both start+end present and start ok
+    if (!next.start && !next.end) {
+      const rangeErr = validateEndNotBeforeStart(start, end)
+      if (rangeErr) next.dates = rangeErr
+    }
+
+    if (!pkg) next.package = 'Please select a package'
+
+    // Travelers: per-row DOB checks; blank rows allowed (dropped on submit)
     const merged = [...adults, ...children]
     const cleaned = merged.filter(t => t.fullName.trim() && t.dateOfBirth)
     if (cleaned.length > MAX_TRAVELERS) next.travelers = `Maximum ${MAX_TRAVELERS} travelers allowed.`
+
+    // Adults DOB checks
+    const aErrs: Record<number, string> = {}
+    adults.forEach((a, i) => {
+      if (!(a.fullName.trim() || a.dateOfBirth)) return // blank row allowed
+      const err = validateAdultDob(a.dateOfBirth)
+      if (err) aErrs[i] = err
+    })
+    setAdultDobErrors(aErrs)
+
+    // Children DOB checks
+    const cErrs: Record<number, string> = {}
+    children.forEach((c, i) => {
+      if (!(c.fullName.trim() || c.dateOfBirth)) return // blank row allowed
+      const err = validateChildDob(c.dateOfBirth)
+      if (err) cErrs[i] = err
+    })
+    setChildDobErrors(cErrs)
+
+    if (Object.keys(aErrs).length || Object.keys(cErrs).length) {
+      next.travelers = next.travelers || 'Please fix traveler date(s) of birth.'
+    }
 
     setErrors(next)
     return Object.keys(next).length === 0
@@ -142,11 +250,10 @@ export default function Step3() {
       // 3) Create user account (email optional, username required = primary WhatsApp)
       const firstName = draft['First Name'] || ''
       const lastName  = draft['Last Name']  || ''
-      const email     = (draft['Email Address'] || '').trim() || null // optional now
+      const email     = (draft['Email Address'] || '').trim() || null
       const password  = (draft['Account Password'] || '').trim()
       const username  = (draft['Username'] || draft['Primary WhatsApp Number'] || '').trim()
 
-      // Register only if we have password AND username (primary phone as username)
       if (password && username) {
         try {
           await registerAuthUser(firstName, lastName, email, password, username)
@@ -154,7 +261,6 @@ export default function Step3() {
           console.warn('registerAuthUser:', err)
         }
 
-        // Auto-login: identifier can be email OR username
         const identifier = email ?? username
         try {
           await login(identifier, password)
@@ -163,7 +269,6 @@ export default function Step3() {
         }
       }
 
-      // 4) Finish
       localStorage.removeItem('reg-draft')
       nav('/home')
     } catch (err) {
@@ -184,7 +289,6 @@ export default function Step3() {
           <div className="grid two">
             <div className="field">
               <label>Travelling From <span style={{color:'#e11d48'}}>*</span></label>
-              {/* Searchable dropdown via datalist (all countries) */}
               <input
                 list="country-from-list"
                 placeholder="Start typing to search…"
@@ -201,7 +305,6 @@ export default function Step3() {
 
             <div className="field">
               <label>Travelling To (UK &amp; Europe) <span style={{color:'#e11d48'}}>*</span></label>
-              {/* Searchable dropdown via datalist (Europe only) */}
               <input
                 list="country-to-list"
                 placeholder="Start typing to search…"
@@ -227,6 +330,7 @@ export default function Step3() {
                 value={start}
                 onChange={(e) => setDraft({ ...draft, ['Travel Start Date']: e.target.value })}
                 aria-invalid={!!(errors.start || errors.dates)}
+                min={tomorrowYMD} // must be later than today
               />
               {errors.start && <div className="help" style={{color:'#e11d48'}}>{errors.start}</div>}
             </div>
@@ -239,6 +343,7 @@ export default function Step3() {
                 value={end}
                 onChange={(e) => setDraft({ ...draft, ['Travel End Date']: e.target.value })}
                 aria-invalid={!!(errors.end || errors.dates)}
+                min={start || tomorrowYMD} // cannot be before start; if no start, at least after today
               />
               {errors.end && <div className="help" style={{color:'#e11d48'}}>{errors.end}</div>}
             </div>
@@ -281,8 +386,20 @@ export default function Step3() {
                       onChange={(e) => {
                         const v = e.target.value
                         setAdults(list => list.map((row, idx) => idx === i ? { ...row, dateOfBirth: v } : row))
+                        // live validate this row
+                        setAdultDobErrors(prev => {
+                          const msg = validateAdultDob(v)
+                          const next = { ...prev }
+                          if (msg) next[i] = msg; else delete next[i]
+                          return next
+                        })
                       }}
+                      min={MIN_DOB_YMD}
+                      max={cutoff18YMD} // adult must be at least 18
                     />
+                    {adultDobErrors[i] && (
+                      <div className="small" style={{ color:'#b91c1c', marginTop:4 }}>{adultDobErrors[i]}</div>
+                    )}
                   </div>
                 </div>
                 <button type="button" className="btn secondary" onClick={() => removeAdult(i)}>Remove</button>
@@ -323,8 +440,20 @@ export default function Step3() {
                       onChange={(e) => {
                         const v = e.target.value
                         setChildren(list => list.map((row, idx) => idx === i ? { ...row, dateOfBirth: v } : row))
+                        // live validate this row
+                        setChildDobErrors(prev => {
+                          const msg = validateChildDob(v)
+                          const next = { ...prev }
+                          if (msg) next[i] = msg; else delete next[i]
+                          return next
+                        })
                       }}
+                      min={MIN_DOB_YMD}
+                      max={todayYMD} // child DOB cannot be in the future
                     />
+                    {childDobErrors[i] && (
+                      <div className="small" style={{ color:'#b91c1c', marginTop:4 }}>{childDobErrors[i]}</div>
+                    )}
                   </div>
                 </div>
                 <button type="button" className="btn secondary" onClick={() => removeChild(i)}>Remove</button>

@@ -8,9 +8,46 @@ type Errors = Partial<Record<
   | 'dob'
   | 'gender'
   | 'primary'
-  | 'password',
+  | 'password'
+  | 'email',
   string
 >>
+
+// ===== Date helpers & validation =====
+const ymd = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// cutoff date = today minus 18 years
+const today = new Date();
+const cutoff18 = new Date(today);
+cutoff18.setFullYear(today.getFullYear() - 18);
+const CUTOFF_18_YMD = ymd(cutoff18);
+
+// Optional lower bound to avoid accidental 1800s
+const MIN_DOB_YMD = '1900-01-01';
+
+// validator
+function validateDob(value?: string): string | null {
+  if (!value) return 'Date of birth is required.';
+  // force local midnight to avoid TZ edge cases
+  const dob = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return 'Invalid date.';
+
+  const now = new Date();
+  if (dob > now) return 'Date of birth cannot be in the future.';
+  if (dob > cutoff18) return 'You must be at least 18 years old.';
+  return null;
+}
+
+function isValidEmail(value: string): boolean {
+  // simple & robust enough: chars@chars.domain
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
+
 
 // ===== Country list (Full name + dial), alphabetically by country name =====
 const RAW_COUNTRIES: Array<{ name: string; dial: string }> = [
@@ -229,22 +266,31 @@ export default function Step1() {
     [draft.secondaryDial]
   )
 
-  function validate(): boolean {
-    const next: Errors = {}
-    if (!draft['First Name']?.trim()) next.firstName = 'Required'
-    if (!draft['Last Name']?.trim()) next.lastName = 'Required'
-    if (!draft['Date of Birth']) next.dob = 'Required'
-    if (!draft['Gender']) next.gender = 'Required'
-    if (!draft['Primary WhatsApp Number']?.trim()) next.primary = 'Required'
-    // Secondary WhatsApp NOT required
-    // Email NOT required
-    if (!draft['Account Password']?.trim()) next.password = 'Required'
-    setErrors(next)
-    return Object.keys(next).length === 0
-  }
-
   function normalizeDigits(s: string): string {
     return String(s || '').replace(/[^\d]/g, '')
+  }
+
+  function validate(): boolean {
+    const next: Errors = {}
+
+    if (!draft['First Name']?.trim()) next.firstName = 'Required'
+    if (!draft['Last Name']?.trim()) next.lastName = 'Required'
+
+    // Use detailed DOB validation
+    const dobErr = validateDob(draft['Date of Birth'])
+    if (dobErr) next.dob = dobErr
+
+    if (!draft['Gender']) next.gender = 'Required'
+    if (!draft['Primary WhatsApp Number']?.trim()) next.primary = 'Required'
+    if (!draft['Account Password']?.trim()) next.password = 'Required'
+    // 👇 Only validate if user typed something
+    const email = (draft['Email Address'] || '').trim()
+    if (email && !isValidEmail(email)) {
+      next.email = 'Please enter a valid email address.'
+    }
+
+    setErrors(next)
+    return Object.keys(next).length === 0
   }
 
   function next(e: React.FormEvent) {
@@ -259,14 +305,13 @@ export default function Step1() {
     const secondaryRaw = normalizeDigits(draft['Carer/Secondary WhatsApp Number'] || '')
     const secondaryFull = secondaryRaw ? `${secondaryDial}${secondaryRaw}` : ''
 
-    // Username = primary WhatsApp number
     const updated = {
       ...draft,
       primaryDial,
       secondaryDial,
       ['Primary WhatsApp Number']: primaryFull,
       ['Carer/Secondary WhatsApp Number']: secondaryFull, // may be ''
-      Username: primaryFull,
+      Username: primaryFull, // Username = primary WhatsApp number
     }
 
     setDraft(updated)
@@ -280,13 +325,13 @@ export default function Step1() {
         <form className="grid" onSubmit={next} noValidate>
           <div className="grid two">
             <div className="field">
-              <label>First Name <span style={{color:'#e11d48'}}>*</span></label>
+              <label>First Name <span style={{ color: '#e11d48' }}>*</span></label>
               <input
                 value={draft['First Name'] || ''}
                 onChange={(e) => setDraft({ ...draft, ['First Name']: e.target.value })}
                 aria-invalid={!!errors.firstName}
               />
-              {errors.firstName && <div className="help" style={{color:'#e11d48'}}>{errors.firstName}</div>}
+              {errors.firstName && <div className="help" style={{ color: '#e11d48' }}>{errors.firstName}</div>}
             </div>
             <div className="field">
               <label>Middle Name</label>
@@ -299,29 +344,46 @@ export default function Step1() {
 
           <div className="grid two">
             <div className="field">
-              <label>Last Name <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Last Name <span style={{ color: '#e11d48' }}>*</span></label>
               <input
                 value={draft['Last Name'] || ''}
                 onChange={(e) => setDraft({ ...draft, ['Last Name']: e.target.value })}
                 aria-invalid={!!errors.lastName}
               />
-              {errors.lastName && <div className="help" style={{color:'#e11d48'}}>{errors.lastName}</div>}
+              {errors.lastName && <div className="help" style={{ color: '#e11d48' }}>{errors.lastName}</div>}
             </div>
             <div className="field">
-              <label>Date of Birth <span style={{color:'#e11d48'}}>*</span></label>
+              <label>
+                Date of Birth <span style={{ color: '#e11d48' }}>*</span>
+              </label>
               <input
                 type="date"
                 value={draft['Date of Birth'] || ''}
-                onChange={(e) => setDraft({ ...draft, ['Date of Birth']: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDraft({ ...draft, ['Date of Birth']: v });
+                  const err = validateDob(v);
+                  setErrors((prev) => ({ ...prev, dob: err || undefined }));
+                }}
+                onBlur={(e) => {
+                  const err = validateDob(e.target.value);
+                  setErrors((prev) => ({ ...prev, dob: err || undefined }));
+                }}
                 aria-invalid={!!errors.dob}
+                min={MIN_DOB_YMD}
+                max={CUTOFF_18_YMD}  // blocks selecting dates that make user < 18
               />
-              {errors.dob && <div className="help" style={{color:'#e11d48'}}>{errors.dob}</div>}
+              {errors.dob && (
+                <div role="alert" className="small" style={{ color: '#b91c1c', marginTop: 4 }}>
+                  {errors.dob}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="grid two">
             <div className="field">
-              <label>Gender <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Gender <span style={{ color: '#e11d48' }}>*</span></label>
               <select
                 value={draft['Gender'] || ''}
                 onChange={(e) => setDraft({ ...draft, ['Gender']: e.target.value })}
@@ -330,11 +392,11 @@ export default function Step1() {
                 <option value="">Select Gender</option>
                 <option>Male</option><option>Female</option><option>Other</option>
               </select>
-              {errors.gender && <div className="help" style={{color:'#e11d48'}}>{errors.gender}</div>}
+              {errors.gender && <div className="help" style={{ color: '#e11d48' }}>{errors.gender}</div>}
             </div>
 
             <div className="field">
-              <label>Primary WhatsApp Number <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Primary WhatsApp Number <span style={{ color: '#e11d48' }}>*</span></label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <select
                   value={draft.primaryDial || defaultPrimaryDial}
@@ -342,7 +404,7 @@ export default function Step1() {
                   style={{ minWidth: 220 }}
                 >
                   {COUNTRY_OPTIONS.map(opt => (
-                    <option key={opt.label} value={opt.value}>
+                    <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
@@ -354,7 +416,7 @@ export default function Step1() {
                   aria-invalid={!!errors.primary}
                 />
               </div>
-              {errors.primary && <div className="help" style={{color:'#e11d48'}}>{errors.primary}</div>}
+              {errors.primary && <div className="help" style={{ color: '#e11d48' }}>{errors.primary}</div>}
             </div>
           </div>
 
@@ -368,7 +430,7 @@ export default function Step1() {
                   style={{ minWidth: 220 }}
                 >
                   {COUNTRY_OPTIONS.map(opt => (
-                    <option key={opt.label} value={opt.value}>
+                    <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
@@ -379,23 +441,41 @@ export default function Step1() {
                   onChange={(e) => setDraft({ ...draft, ['Carer/Secondary WhatsApp Number']: e.target.value })}
                 />
               </div>
-              {/* Not required, so no error */}
             </div>
 
             <div className="field">
               <label>Email Address</label>
               <input
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 placeholder="you@example.com"
                 value={draft['Email Address'] || ''}
-                onChange={(e) => setDraft({ ...draft, ['Email Address']: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setDraft({ ...draft, ['Email Address']: v })
+                  // live-validate only when user has typed something (optional)
+                  const msg = v.trim() && !isValidEmail(v) ? 'Please enter a valid email address.' : undefined
+                  setErrors(prev => ({ ...prev, email: msg }))
+                }}
+                onBlur={(e) => {
+                  const v = e.target.value
+                  const msg = v.trim() && !isValidEmail(v) ? 'Please enter a valid email address.' : undefined
+                  setErrors(prev => ({ ...prev, email: msg }))
+                }}
+                aria-invalid={!!errors.email}
               />
-              {/* Not required, so no error */}
+              {errors.email && (
+                <div className="help" style={{ color: '#e11d48' }}>
+                  {errors.email}
+                </div>
+              )}
             </div>
+
           </div>
 
           <div className="field">
-            <label>Create Password <span style={{color:'#e11d48'}}>*</span></label>
+            <label>Create Password <span style={{ color: '#e11d48' }}>*</span></label>
             <input
               type="password"
               placeholder="Choose a secure password"
@@ -403,7 +483,7 @@ export default function Step1() {
               onChange={(e) => setDraft({ ...draft, ['Account Password']: e.target.value })}
               aria-invalid={!!errors.password}
             />
-            {errors.password && <div className="help" style={{color:'#e11d48'}}>{errors.password}</div>}
+            {errors.password && <div className="help" style={{ color: '#e11d48' }}>{errors.password}</div>}
           </div>
 
           <div className="actions">
