@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { me, logout, type UserDto } from '../api'
-import { API_BASE_URL } from '../api'
+import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
   id?: number
@@ -59,58 +59,58 @@ export default function Home() {
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
-      try {
-        const u = await me()
-        if (!alive) return
-        setUser(u)
+      ; (async () => {
+        try {
+          const u = await me()
+          if (!alive) return
+          setUser(u)
 
-        // For doctors we keep Home as a minimal console landing,
-        // so we skip pulling Registration/Docs entirely.
-        if (!u?.email || u?.roles?.includes?.('DOCTOR')) return
+          // For doctors we keep Home as a minimal console landing,
+          // so we skip pulling Registration/Docs entirely.
+          if (!u?.email || u?.roles?.includes?.('DOCTOR')) return
 
-        setLoadingReg(true)
-        const res = await fetch(
-          `${API_BASE_URL}/registrations?email=${encodeURIComponent(u.email)}`,
-          { credentials: 'include' }
-        )
-
-        let latest: RegApi | null = null
-        if (res.status === 200) {
-          const data = await res.json()
-          if (Array.isArray(data)) {
-            latest = data.length ? data[data.length - 1] : null
-          } else if (data && typeof data === 'object') {
-            latest = data as RegApi
-          }
-        } else if (res.status !== 204) {
-          console.warn('GET /registrations unexpected status:', res.status)
-        }
-
-        const normalized = normalizeReg(latest || undefined)
-        setReg(normalized)
-        setLoadingReg(false)
-
-        if (normalized?.id) {
-          setLoadingDocs(true)
-          const dres = await fetch(
-            `${API_BASE_URL}/registrations/${normalized.id}/documents`,
+          setLoadingReg(true)
+          const res = await fetch(
+            `${API_BASE_URL}/registrations?email=${encodeURIComponent(u.email)}`,
             { credentials: 'include' }
           )
-          if (dres.status === 200) {
-            const arr = (await dres.json()) as DocInfo[]
-            setDocs(Array.isArray(arr) ? arr : [])
-          } else if (dres.status !== 204) {
-            console.warn('GET /documents unexpected status:', dres.status)
+
+          let latest: RegApi | null = null
+          if (res.status === 200) {
+            const data = await res.json()
+            if (Array.isArray(data)) {
+              latest = data.length ? data[data.length - 1] : null
+            } else if (data && typeof data === 'object') {
+              latest = data as RegApi
+            }
+          } else if (res.status !== 204) {
+            console.warn('GET /registrations unexpected status:', res.status)
           }
-          setLoadingDocs(false)
-        } else {
-          setDocs([])
+
+          const normalized = normalizeReg(latest || undefined)
+          setReg(normalized)
+          setLoadingReg(false)
+
+          if (normalized?.id) {
+            setLoadingDocs(true)
+            const dres = await fetch(
+              `${API_BASE_URL}/registrations/${normalized.id}/documents`,
+              { credentials: 'include' }
+            )
+            if (dres.status === 200) {
+              const arr = (await dres.json()) as DocInfo[]
+              setDocs(Array.isArray(arr) ? arr : [])
+            } else if (dres.status !== 204) {
+              console.warn('GET /documents unexpected status:', dres.status)
+            }
+            setLoadingDocs(false)
+          } else {
+            setDocs([])
+          }
+        } finally {
+          if (alive) setChecking(false)
         }
-      } finally {
-        if (alive) setChecking(false)
-      }
-    })()
+      })()
     return () => {
       alive = false
     }
@@ -125,6 +125,27 @@ export default function Home() {
     if (!user) return ''
     return [user.firstName, user.lastName].filter(Boolean).join(' ')
   }, [user])
+
+
+  // Latest prescription URL (if exists)
+  const [rxUrl, setRxUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, { credentials: 'include' });
+        if (ignore) return;
+        if (!res.ok || res.status === 204) { setRxUrl(null); return; }
+        const j = await res.json().catch(() => null);
+        setRxUrl(j?.pdfUrl ? resolveApiUrl(API_BASE_URL, j.pdfUrl) : null);
+      } catch {
+        if (!ignore) setRxUrl(null);
+      }
+    })();
+    return () => { ignore = true; };
+  }, []);
+
 
   // ---------- DOCTOR LANDING ----------
   if (isDoctor) {
@@ -327,19 +348,179 @@ export default function Home() {
         </div>
       )}
 
-      {/* Quick links */}
+      {/* Quick Links */}
       <div className="ql-head">Quick Links</div>
-      <div className="quick-grid">
-        <Link to="/consultation/tracker" className="quick">
-          <span>I Need a Consultation</span>
+
+      <div
+        className="quick-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(120px, 1fr))',
+          gap: 20,
+          alignItems: 'stretch',
+        }}
+      >
+        {/* Care History (disabled for now) */}
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          className="quick"
+          style={{
+            borderRadius: 16,
+            padding: 16,
+            background: '#f3f7fb',
+            border: '1px solid #e6eef7',
+            cursor: 'not-allowed',
+            opacity: 0.45,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'white', margin: '0 auto 10px',
+              display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+            }}
+          >
+            {/* document icon */}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M16 13H8M16 17H8M10 9H8" />
+            </svg>
+          </div>
+          <div style={{ fontWeight: 600, color: '#0f172a' }}>Care History</div>
+        </button>
+
+        {/* Tracker */}
+        <Link
+          to="/consultation/tracker"
+          className="quick"
+          style={{
+            borderRadius: 16,
+            padding: 16,
+            background: '#f3f7fb',
+            border: '1px solid #e6eef7',
+            textAlign: 'center',
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          <div
+            style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'white', margin: '0 auto 10px',
+              display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+            }}
+          >
+            {/* flag/bookmark icon */}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+          </div>
+          <div style={{ fontWeight: 600, color: '#0f172a' }}>Tracker</div>
         </Link>
-        <Link to="/home#cases" className="quick">
-          <span>Case Notes</span>
-        </Link>
-        <Link to="/home#appts" className="quick">
-          <span>Appointments</span>
-        </Link>
+
+        {/* Prescription (enabled only if rx exists) */}
+        {rxUrl ? (
+          <a
+            href={rxUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="quick"
+            style={{
+              borderRadius: 16,
+              padding: 16,
+              background: '#f3f7fb',
+              border: '1px solid #e6eef7',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
+          >
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'white', margin: '0 auto 10px',
+                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              }}
+            >
+              {/* prescription/doc icon */}
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12" />
+                <path d="M14 2v6h6" />
+                <path d="M9 12h6M9 16h6" />
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>Prescription</div>
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="quick"
+            style={{
+              borderRadius: 16,
+              padding: 16,
+              background: '#f3f7fb',
+              border: '1px solid #e6eef7',
+              cursor: 'not-allowed',
+              opacity: 0.45,
+              textAlign: 'center',
+            }}
+            title="No prescription available yet"
+          >
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'white', margin: '0 auto 10px',
+                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12" />
+                <path d="M14 2v6h6" />
+                <path d="M9 12h6M9 16h6" />
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>Prescription</div>
+          </button>
+        )}
+
+        {/* Referral Letter (disabled for now) */}
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          className="quick"
+          style={{
+            borderRadius: 16,
+            padding: 16,
+            background: '#f3f7fb',
+            border: '1px solid #e6eef7',
+            cursor: 'not-allowed',
+            opacity: 0.45,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'white', margin: '0 auto 10px',
+              display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+            }}
+          >
+            {/* ribbon/bookmark icon */}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+              <path d="M8 21l4-4 4 4V5a2 2 0 0 0-2-2H10A2 2 0 0 0 8 5z" />
+            </svg>
+          </div>
+          <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
+        </button>
       </div>
+
 
       {/* Offers */}
       <div className="offers-head">Featured Offers</div>
