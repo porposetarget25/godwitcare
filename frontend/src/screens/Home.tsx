@@ -448,10 +448,10 @@ export default function Home() {
             >
               {/* prescription/doc icon */}
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12" />
-                <path d="M14 2v6h6" />
-                <path d="M9 12h6M9 16h6" />
-              </svg>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M16 13H8M16 17H8M10 9H8" />
+            </svg>
             </div>
             <div style={{ fontWeight: 600, color: '#0f172a' }}>Prescription</div>
           </a>
@@ -514,7 +514,9 @@ export default function Home() {
           >
             {/* ribbon/bookmark icon */}
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-              <path d="M8 21l4-4 4 4V5a2 2 0 0 0-2-2H10A2 2 0 0 0 8 5z" />
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M16 13H8M16 17H8M10 9H8" />
             </svg>
           </div>
           <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
