@@ -38,7 +38,17 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="nav">
           <div className="row" style={{ alignItems: 'center', gap: 10 }}>
             <img className="logo" src={logoSrc} alt="GodwitCare" />
-            <strong>GodwitCare</strong>
+            <strong
+              style={{
+                backgroundColor: 'green',
+                color: 'white',
+                padding: '2px 8px',
+                borderRadius: 6,
+                display: 'inline-block',
+              }}
+            >
+              GodwitCare - Test Environment
+            </strong>
           </div>
           <div className="navlinks">
             <Link to="/dashboard#top">Home</Link>
@@ -52,6 +62,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+
 
 function AppRoutes() {
   const user = useCurrentUser()
