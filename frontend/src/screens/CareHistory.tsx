@@ -124,23 +124,39 @@ export default function CareHistory() {
       </div>
 
       {/* Patient Overview */}
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div className="strong" style={{ marginBottom: 8 }}>Patient Overview</div>
-        <div className="grid three" style={{ rowGap: 8 }}>
-          <div>
-            <div className="muted small">Patient Name</div>
-            <div className="strong">{patient.name || '—'}</div>
-          </div>
-          <div>
-            <div className="muted small">Patient ID</div>
-            <div className="strong">{String(patient.patientId ?? '—')}</div>
-          </div>
-          <div>
-            <div className="muted small">Date of Birth</div>
-            <div className="strong">{patient.dob || '—'}</div>
-          </div>
-        </div>
+<div className="card" style={{ marginBottom: 12, borderRadius: 16, padding: 20 }}>
+  <div className="strong" style={{ marginBottom: 12, fontSize: 18 }}>Patient Overview</div>
+
+  {/* Horizontal 3-column layout */}
+  <div
+    className="grid three"
+    style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr 1.2fr',
+      columnGap: 24,
+      rowGap: 0,
+      alignItems: 'start',
+    }}
+  >
+    <div>
+      <div className="muted small" style={{ marginBottom: 4 }}>Patient Name:</div>
+      <div className="strong" style={{ fontSize: 16 }}>{patient.name || '—'}</div>
+    </div>
+
+    <div>
+      <div className="muted small" style={{ marginBottom: 4 }}>Patient ID:</div>
+      <div className="strong" style={{ fontSize: 16 }}>{String(patient.patientId ?? '—')}</div>
+    </div>
+
+    <div>
+      <div className="muted small" style={{ marginBottom: 4 }}>Gender / Date of Birth:</div>
+      <div className="strong" style={{ fontSize: 16 }}>
+        {[patient.gender, patient.dob].filter(Boolean).join(', ') || '—'}
       </div>
+    </div>
+  </div>
+</div>
+
 
       {/* Prescription quick link (if exists) */}
       {rxUrl && (
