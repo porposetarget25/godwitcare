@@ -19,6 +19,7 @@ import DoctorConsultations from './screens/DoctorConsultations'
 import DoctorConsultationDetails from './screens/DoctorConsultationDetails'
 import { RequireRole } from './screens/RequireRole'
 import type { UserDto } from './api'
+import CareHistory from './screens/CareHistory'
 
 // read the user placed in localStorage by your login()
 function useCurrentUser(): UserDto | null {
@@ -86,6 +87,9 @@ function AppRoutes() {
 
       {/* Doctor login (public) */}
       <Route path="/doctor/login" element={<Shell><DoctorLogin /></Shell>} />
+
+      {/* Care History - patient */} 
+      <Route path="/care-history" element={<Shell><CareHistory /></Shell>} />
 
       {/* Doctor-only routes */}
       <Route

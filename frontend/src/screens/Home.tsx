@@ -360,38 +360,70 @@ export default function Home() {
           alignItems: 'stretch',
         }}
       >
-        {/* Care History (disabled for now) */}
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="quick"
-          style={{
-            borderRadius: 16,
-            padding: 16,
-            background: '#f3f7fb',
-            border: '1px solid #e6eef7',
-            cursor: 'not-allowed',
-            opacity: 0.45,
-            textAlign: 'center',
-          }}
-        >
-          <div
+        {/* Care History — enabled only if prescription exists */}
+        {rxUrl ? (
+          <Link
+            to="/care-history"
+            className="quick"
             style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: 'white', margin: '0 auto 10px',
-              display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              borderRadius: 16,
+              padding: 16,
+              background: '#f3f7fb',
+              border: '1px solid #e6eef7',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: 'inherit',
             }}
           >
-            {/* document icon */}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M16 13H8M16 17H8M10 9H8" />
-            </svg>
-          </div>
-          <div style={{ fontWeight: 600, color: '#0f172a' }}>Care History</div>
-        </button>
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'white', margin: '0 auto 10px',
+                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              }}
+            >
+              {/* document icon */}
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8M16 17H8M10 9H8" />
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>Care History</div>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="quick"
+            style={{
+              borderRadius: 16,
+              padding: 16,
+              background: '#f3f7fb',
+              border: '1px solid #e6eef7',
+              cursor: 'not-allowed',
+              opacity: 0.45,
+              textAlign: 'center',
+            }}
+            title="Care history becomes available when a prescription is issued"
+          >
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'white', margin: '0 auto 10px',
+                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8M16 17H8M10 9H8" />
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>Care History</div>
+          </button>
+        )}
 
         {/* Tracker */}
         <Link
@@ -433,7 +465,7 @@ export default function Home() {
               borderRadius: 16,
               padding: 16,
               background: '#f3f7fb',
-              border: '1px solid #e6eef7',
+              border: '1px solid  #e6eef7',
               textAlign: 'center',
               textDecoration: 'none',
               color: 'inherit',

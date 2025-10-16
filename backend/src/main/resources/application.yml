@@ -5,6 +5,8 @@ server:
       cookie:
         same-site: none
         secure: true
+  tomcat:
+    max-swallow-size: -1
 
 spring:
   datasource:
@@ -24,6 +26,7 @@ spring:
       org.hibernate.SQL: INFO
   servlet:
     multipart:
+      enabled: true
       max-file-size: 20MB
       max-request-size: 20MB
 

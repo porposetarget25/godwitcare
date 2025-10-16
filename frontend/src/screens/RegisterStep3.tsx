@@ -37,6 +37,10 @@ const cutoff18YMD = ymd(cutoff18)
 // Optional lower bound to avoid accidental 1800s
 const MIN_DOB_YMD = '1900-01-01'
 
+const MAX_DOC_BYTES = 20 * 1024 * 1024; // 20MB (match backend)
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+
 // Validators
 function isValidLocalDate(value?: string) {
   if (!value) return false
@@ -80,34 +84,34 @@ function validateEndNotBeforeStart(start?: string, end?: string): string | null 
 
 /* ===== Country lists ===== */
 const ALL_COUNTRIES = [
-  'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia','Australia','Austria','Azerbaijan',
-  'Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize','Benin','Bhutan','Bolivia','Bosnia and Herzegovina','Botswana','Brazil','Brunei','Bulgaria','Burkina Faso','Burundi',
-  'Cabo Verde','Cambodia','Cameroon','Canada','Central African Republic','Chad','Chile','China','Colombia','Comoros','Congo (Republic)','Congo (DRC)','Costa Rica','Côte d’Ivoire','Croatia','Cuba','Cyprus','Czechia',
-  'Denmark','Djibouti','Dominica','Dominican Republic',
-  'Ecuador','Egypt','El Salvador','Equatorial Guinea','Eritrea','Estonia','Eswatini','Ethiopia',
-  'Fiji','Finland','France',
-  'Gabon','Gambia','Georgia','Germany','Ghana','Greece','Grenada','Guatemala','Guinea','Guinea-Bissau','Guyana',
-  'Haiti','Honduras','Hungary',
-  'Iceland','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy',
-  'Jamaica','Japan','Jordan','Kazakhstan','Kenya','Kiribati','Kuwait','Kyrgyzstan',
-  'Laos','Latvia','Lebanon','Lesotho','Liberia','Libya','Liechtenstein','Lithuania','Luxembourg',
-  'Madagascar','Malawi','Malaysia','Maldives','Mali','Malta','Marshall Islands','Mauritania','Mauritius','Mexico','Micronesia','Moldova','Monaco','Mongolia','Montenegro','Morocco','Mozambique','Myanmar',
-  'Namibia','Nauru','Nepal','Netherlands','New Zealand','Nicaragua','Niger','Nigeria','North Korea','North Macedonia','Norway',
-  'Oman','Pakistan','Palau','Panama','Papua New Guinea','Paraguay','Peru','Philippines','Poland','Portugal','Qatar',
-  'Romania','Russia','Rwanda',
-  'Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','Samoa','San Marino','São Tomé and Príncipe','Saudi Arabia','Senegal','Serbia','Seychelles','Sierra Leone','Singapore','Slovakia','Slovenia','Solomon Islands','Somalia','South Africa','South Korea','South Sudan','Spain','Sri Lanka','Sudan','Suriname','Sweden','Switzerland','Syria',
-  'Taiwan','Tajikistan','Tanzania','Thailand','Timor-Leste','Togo','Tonga','Trinidad and Tobago','Tunisia','Turkey','Turkmenistan','Tuvalu',
-  'Uganda','Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay','Uzbekistan','Vanuatu','Venezuela','Vietnam',
-  'Yemen','Zambia','Zimbabwe'
-].sort((a,b)=>a.localeCompare(b))
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
+  'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
+  'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo (Republic)', 'Congo (DRC)', 'Costa Rica', 'Côte d’Ivoire', 'Croatia', 'Cuba', 'Cyprus', 'Czechia',
+  'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
+  'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia',
+  'Fiji', 'Finland', 'France',
+  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
+  'Haiti', 'Honduras', 'Hungary',
+  'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+  'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar',
+  'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
+  'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar',
+  'Romania', 'Russia', 'Rwanda',
+  'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'São Tomé and Príncipe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
+  'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Venezuela', 'Vietnam',
+  'Yemen', 'Zambia', 'Zimbabwe'
+].sort((a, b) => a.localeCompare(b))
 
 const EUROPE_COUNTRIES = [
-  'Albania','Andorra','Armenia','Austria','Azerbaijan','Belarus','Belgium','Bosnia and Herzegovina','Bulgaria','Croatia','Cyprus','Czechia',
-  'Denmark','Estonia','Finland','France','Georgia','Germany','Greece','Hungary','Iceland','Ireland','Italy',
-  'Kazakhstan (European part)','Kosovo','Latvia','Liechtenstein','Lithuania','Luxembourg','Malta','Moldova','Monaco','Montenegro',
-  'Netherlands','North Macedonia','Norway','Poland','Portugal','Romania','Russia (European part)','San Marino','Serbia',
-  'Slovakia','Slovenia','Spain','Sweden','Switzerland','Turkey (European part)','Ukraine','United Kingdom','Vatican City'
-].sort((a,b)=>a.localeCompare(b))
+  'Albania', 'Andorra', 'Armenia', 'Austria', 'Azerbaijan', 'Belarus', 'Belgium', 'Bosnia and Herzegovina', 'Bulgaria', 'Croatia', 'Cyprus', 'Czechia',
+  'Denmark', 'Estonia', 'Finland', 'France', 'Georgia', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland', 'Italy',
+  'Kazakhstan (European part)', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Malta', 'Moldova', 'Monaco', 'Montenegro',
+  'Netherlands', 'North Macedonia', 'Norway', 'Poland', 'Portugal', 'Romania', 'Russia (European part)', 'San Marino', 'Serbia',
+  'Slovakia', 'Slovenia', 'Spain', 'Sweden', 'Switzerland', 'Turkey (European part)', 'Ukraine', 'United Kingdom', 'Vatican City'
+].sort((a, b) => a.localeCompare(b))
 
 export default function Step3() {
   const { draft, setDraft } = useReg()
@@ -243,16 +247,31 @@ export default function Step3() {
       // 2) Save registration (+doc upload)
       const created = await saveRegistration(payload)
 
-      if (file) {
-        await uploadDocument(created.id!, file)
+      // ---- optional document upload (robust) ----
+      try {
+        if (file) {
+          // front-end size guard (avoid server reset for big files)
+          if (file.size > MAX_DOC_BYTES) {
+            alert('File too large. Max allowed is 10MB.');
+          } else {
+            // tiny delay so the new registration is visible even if tx commit is lagging
+            await sleep(200);
+
+            // try once
+            await uploadDocument(created.id!, file);
+          }
+        }
+      } catch (e) {
+        console.warn('Document upload failed:', e);
+        // don’t block the rest of the flow if upload fails
       }
 
       // 3) Create user account (email optional, username required = primary WhatsApp)
       const firstName = draft['First Name'] || ''
-      const lastName  = draft['Last Name']  || ''
-      const email     = (draft['Email Address'] || '').trim() || null
-      const password  = (draft['Account Password'] || '').trim()
-      const username  = (draft['Username'] || draft['Primary WhatsApp Number'] || '').trim()
+      const lastName = draft['Last Name'] || ''
+      const email = (draft['Email Address'] || '').trim() || null
+      const password = (draft['Account Password'] || '').trim()
+      const username = (draft['Username'] || draft['Primary WhatsApp Number'] || '').trim()
 
       if (password && username) {
         try {
@@ -288,7 +307,7 @@ export default function Step3() {
           {/* From / To */}
           <div className="grid two">
             <div className="field">
-              <label>Travelling From <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Travelling From <span style={{ color: '#e11d48' }}>*</span></label>
               <input
                 list="country-from-list"
                 placeholder="Start typing to search…"
@@ -300,11 +319,11 @@ export default function Step3() {
               <datalist id="country-from-list">
                 {ALL_COUNTRIES.map(c => <option key={c} value={c} />)}
               </datalist>
-              {errors.from && <div className="help" style={{color:'#e11d48'}}>{errors.from}</div>}
+              {errors.from && <div className="help" style={{ color: '#e11d48' }}>{errors.from}</div>}
             </div>
 
             <div className="field">
-              <label>Travelling To (UK &amp; Europe) <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Travelling To (UK &amp; Europe) <span style={{ color: '#e11d48' }}>*</span></label>
               <input
                 list="country-to-list"
                 placeholder="Start typing to search…"
@@ -316,14 +335,14 @@ export default function Step3() {
               <datalist id="country-to-list">
                 {EUROPE_COUNTRIES.map(c => <option key={c} value={c} />)}
               </datalist>
-              {errors.to && <div className="help" style={{color:'#e11d48'}}>{errors.to}</div>}
+              {errors.to && <div className="help" style={{ color: '#e11d48' }}>{errors.to}</div>}
             </div>
           </div>
 
           {/* Dates */}
           <div className="grid two">
             <div className="field">
-              <label>Travel Start Date <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Travel Start Date <span style={{ color: '#e11d48' }}>*</span></label>
               <input
                 type="date"
                 required
@@ -332,11 +351,11 @@ export default function Step3() {
                 aria-invalid={!!(errors.start || errors.dates)}
                 min={tomorrowYMD} // must be later than today
               />
-              {errors.start && <div className="help" style={{color:'#e11d48'}}>{errors.start}</div>}
+              {errors.start && <div className="help" style={{ color: '#e11d48' }}>{errors.start}</div>}
             </div>
 
             <div className="field">
-              <label>Travel End Date <span style={{color:'#e11d48'}}>*</span></label>
+              <label>Travel End Date <span style={{ color: '#e11d48' }}>*</span></label>
               <input
                 type="date"
                 required
@@ -345,17 +364,17 @@ export default function Step3() {
                 aria-invalid={!!(errors.end || errors.dates)}
                 min={start || tomorrowYMD} // cannot be before start; if no start, at least after today
               />
-              {errors.end && <div className="help" style={{color:'#e11d48'}}>{errors.end}</div>}
+              {errors.end && <div className="help" style={{ color: '#e11d48' }}>{errors.end}</div>}
             </div>
           </div>
 
           {!errors.start && !errors.end && errors.dates && (
-            <div className="help" style={{color:'#e11d48'}}>{errors.dates}</div>
+            <div className="help" style={{ color: '#e11d48' }}>{errors.dates}</div>
           )}
 
           {/* Adults only */}
           <div className="field">
-            <label className="h3" style={{display:'block', marginBottom:8}}>Adults only</label>
+            <label className="h3" style={{ display: 'block', marginBottom: 8 }}>Adults only</label>
             <button
               type="button"
               className="btn"
@@ -366,7 +385,7 @@ export default function Step3() {
             </button>
 
             {adults.map((a, i) => (
-              <div key={`a-${i}`} className="card" style={{marginTop:10, padding:12}}>
+              <div key={`a-${i}`} className="card" style={{ marginTop: 10, padding: 12 }}>
                 <div className="grid two">
                   <div className="field">
                     <label>Full Name</label>
@@ -398,7 +417,7 @@ export default function Step3() {
                       max={cutoff18YMD} // adult must be at least 18
                     />
                     {adultDobErrors[i] && (
-                      <div className="small" style={{ color:'#b91c1c', marginTop:4 }}>{adultDobErrors[i]}</div>
+                      <div className="small" style={{ color: '#b91c1c', marginTop: 4 }}>{adultDobErrors[i]}</div>
                     )}
                   </div>
                 </div>
@@ -408,8 +427,8 @@ export default function Step3() {
           </div>
 
           {/* Children */}
-          <div className="field" style={{marginTop:16}}>
-            <label className="h3" style={{display:'block', marginBottom:8}}>Children</label>
+          <div className="field" style={{ marginTop: 16 }}>
+            <label className="h3" style={{ display: 'block', marginBottom: 8 }}>Children</label>
             <button
               type="button"
               className="btn"
@@ -420,7 +439,7 @@ export default function Step3() {
             </button>
 
             {children.map((c, i) => (
-              <div key={`c-${i}`} className="card" style={{marginTop:10, padding:12}}>
+              <div key={`c-${i}`} className="card" style={{ marginTop: 10, padding: 12 }}>
                 <div className="grid two">
                   <div className="field">
                     <label>Full Name</label>
@@ -452,7 +471,7 @@ export default function Step3() {
                       max={todayYMD} // child DOB cannot be in the future
                     />
                     {childDobErrors[i] && (
-                      <div className="small" style={{ color:'#b91c1c', marginTop:4 }}>{childDobErrors[i]}</div>
+                      <div className="small" style={{ color: '#b91c1c', marginTop: 4 }}>{childDobErrors[i]}</div>
                     )}
                   </div>
                 </div>
@@ -461,13 +480,13 @@ export default function Step3() {
             ))}
           </div>
 
-          <div className="muted" style={{marginTop:8}}>
+          <div className="muted" style={{ marginTop: 8 }}>
             Total Travelers: {totalTravelers} / {MAX_TRAVELERS}
           </div>
-          {errors.travelers && <div className="help" style={{color:'#e11d48'}}>{errors.travelers}</div>}
+          {errors.travelers && <div className="help" style={{ color: '#e11d48' }}>{errors.travelers}</div>}
 
           {/* Optional document */}
-          <div className="field" style={{marginTop:16}}>
+          <div className="field" style={{ marginTop: 16 }}>
             <label>Boarding Pass / E-Ticket (optional)</label>
             <input
               type="file"
@@ -480,7 +499,7 @@ export default function Step3() {
           {/* Package selection */}
           <div className="field">
             <label>
-              Select a Package <span style={{color:'#e11d48'}}>*</span>
+              Select a Package <span style={{ color: '#e11d48' }}>*</span>
             </label>
             <div className="actions" role="group" aria-label="Select a package">
               {[7, 14, 30].map((p) => (
@@ -495,7 +514,7 @@ export default function Step3() {
                 </button>
               ))}
             </div>
-            {errors.package && <div className="help" style={{color:'#e11d48'}}>{errors.package}</div>}
+            {errors.package && <div className="help" style={{ color: '#e11d48' }}>{errors.package}</div>}
           </div>
 
           <div className="actions">
