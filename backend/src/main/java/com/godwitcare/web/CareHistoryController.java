@@ -69,6 +69,7 @@ public class CareHistoryController {
             m.put("diagnosis", Optional.ofNullable(rx.getDiagnosis()).orElse(""));
             // You can keep this as a single string or split into a list on newline
             m.put("medicines", Optional.ofNullable(rx.getMedicines()).orElse(""));
+            m.put("recommendations", Optional.ofNullable(rx.getRecommendations()).orElse(""));
             items.add(m);
         }
 

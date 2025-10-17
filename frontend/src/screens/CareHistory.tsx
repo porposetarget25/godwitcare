@@ -10,6 +10,7 @@ type Item = {
   presentingComplaint?: string;    // Prescription.historyOfPresentingComplaint
   diagnosis?: string;              // Prescription.diagnosis
   medicines?: string;              // Prescription.medicines (newline-separated)
+  recommendations?: string;
 };
 
 type Payload = {
@@ -71,7 +72,7 @@ export default function CareHistory() {
   if (loading) {
     return (
       <section className="section">
-        <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
           <Link to="/home" className="btn secondary">Back</Link>
         </div>
@@ -83,11 +84,11 @@ export default function CareHistory() {
   if (err) {
     return (
       <section className="section">
-        <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
           <Link to="/home" className="btn secondary">Back</Link>
         </div>
-        <div className="card" style={{ color:'#b91c1c' }}>{err}</div>
+        <div className="card" style={{ color: '#b91c1c' }}>{err}</div>
       </section>
     );
   }
@@ -95,7 +96,7 @@ export default function CareHistory() {
   if (!data) {
     return (
       <section className="section">
-        <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
           <Link to="/home" className="btn secondary">Back</Link>
         </div>
@@ -115,47 +116,47 @@ export default function CareHistory() {
   return (
     <section className="section">
       {/* Header */}
-      <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Care History</h1>
-        <div style={{ display:'flex', gap:8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <Link to="/home" className="btn secondary">Back</Link>
           <button className="btn" onClick={printPdf}>Print / Save as PDF</button>
         </div>
       </div>
 
       {/* Patient Overview */}
-<div className="card" style={{ marginBottom: 12, borderRadius: 16, padding: 20 }}>
-  <div className="strong" style={{ marginBottom: 12, fontSize: 18 }}>Patient Overview</div>
+      <div className="card" style={{ marginBottom: 12, borderRadius: 16, padding: 20 }}>
+        <div className="strong" style={{ marginBottom: 12, fontSize: 18 }}>Patient Overview</div>
 
-  {/* Horizontal 3-column layout */}
-  <div
-    className="grid three"
-    style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr 1.2fr',
-      columnGap: 24,
-      rowGap: 0,
-      alignItems: 'start',
-    }}
-  >
-    <div>
-      <div className="muted small" style={{ marginBottom: 4 }}>Patient Name:</div>
-      <div className="strong" style={{ fontSize: 16 }}>{patient.name || '—'}</div>
-    </div>
+        {/* Horizontal 3-column layout */}
+        <div
+          className="grid three"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1.2fr',
+            columnGap: 24,
+            rowGap: 0,
+            alignItems: 'start',
+          }}
+        >
+          <div>
+            <div className="muted small" style={{ marginBottom: 4 }}>Patient Name:</div>
+            <div className="strong" style={{ fontSize: 16 }}>{patient.name || '—'}</div>
+          </div>
 
-    <div>
-      <div className="muted small" style={{ marginBottom: 4 }}>Patient ID:</div>
-      <div className="strong" style={{ fontSize: 16 }}>{String(patient.patientId ?? '—')}</div>
-    </div>
+          <div>
+            <div className="muted small" style={{ marginBottom: 4 }}>Patient ID:</div>
+            <div className="strong" style={{ fontSize: 16 }}>{String(patient.patientId ?? '—')}</div>
+          </div>
 
-    <div>
-      <div className="muted small" style={{ marginBottom: 4 }}>Gender / Date of Birth:</div>
-      <div className="strong" style={{ fontSize: 16 }}>
-        {[patient.gender, patient.dob].filter(Boolean).join(', ') || '—'}
+          <div>
+            <div className="muted small" style={{ marginBottom: 4 }}>Gender / Date of Birth:</div>
+            <div className="strong" style={{ fontSize: 16 }}>
+              {[patient.gender, patient.dob].filter(Boolean).join(', ') || '—'}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
 
 
       {/* Prescription quick link (if exists) */}
@@ -208,6 +209,8 @@ export default function CareHistory() {
               ) : (
                 <div>—</div>
               )}
+              <div className="strong" style={{ marginTop: 8 }}>Recommendations:</div>
+              <div style={{ marginBottom: 10 }}>{it.recommendations || '—'}</div>
             </div>
           </div>
         );

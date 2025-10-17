@@ -223,6 +223,7 @@ public class ConsultationController {
         String diagnosis = (String) body.getOrDefault("diagnosis", "");
         @SuppressWarnings("unchecked")
         List<String> meds = (List<String>) body.getOrDefault("medicines", java.util.List.of());
+        String recommendations = (String) body.getOrDefault("recommendations", "");
 
         String patientName = (c.getContactName() == null ? "" : c.getContactName().trim());
         String patientDob = c.getDob() != null ? c.getDob().toString() : null;
@@ -256,6 +257,7 @@ public class ConsultationController {
         p.setHistoryOfPresentingComplaint(history);
         p.setDiagnosis(diagnosis);
         p.setMedicines(String.join("\n", meds));
+        p.setRecommendations(recommendations);
         p.setPdfBytes(pdf);
         p.setSize(pdf.length);
         p.setContentType("application/pdf");

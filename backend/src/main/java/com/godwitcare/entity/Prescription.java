@@ -26,6 +26,8 @@ public class Prescription {
     private String diagnosis;
     @Column(length = 8000)
     private String medicines; // simple newline-separated list, or JSON if you prefer
+    @Column(length = 4000)
+    private String recommendations;
 
     // Rendered PDF
     @Lob
@@ -65,4 +67,12 @@ public class Prescription {
     public long getSize() { return size; }
     public void setSize(long size) { this.size = size; }
     public Instant getCreatedAt() { return createdAt; }
+
+    public String getRecommendations() {
+        return recommendations;
+    }
+
+    public void setRecommendations(String recommendations) {
+        this.recommendations = recommendations;
+    }
 }
