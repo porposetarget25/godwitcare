@@ -15,7 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import com.godwitcare.util.PdfMaker;
+
 
 import java.util.*;
 
@@ -239,7 +239,7 @@ public class ConsultationController {
                 c.getContactAddress(),
                 /* consult */ diagnosis,
                 history,
-                meds,
+                meds,recommendations,
                 /* doctor block (put your real values / pull from auth doctor profile) */
                 "Dr. Dimitris–Christos Zachariades",
                 "GMC Registration: 6164496",

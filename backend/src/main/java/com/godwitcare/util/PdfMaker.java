@@ -20,13 +20,13 @@ public class PdfMaker {
     /** Legacy API (kept). Generates the previous simple layout. */
     public static byte[] makePrescriptionPdf(
             String logoText, String patientName, String patientDob, String patientPhone,
-            String patientId, String patientAddress ,String diagnosis, String history, List<String> meds
+            String patientId, String patientAddress ,String diagnosis, String history, List<String> meds, String recommendations
     ) throws Exception {
         // For backward compatibility, call the V2 method with no images and minimal doctor block.
         return makePrescriptionPdfV2(
                 null, null,
                 patientName, patientDob, patientPhone, patientId,patientAddress ,
-                diagnosis, history, meds,
+                diagnosis, history, meds,recommendations,
                 "Attending Clinician", "", "", "", ""
         );
     }
@@ -39,7 +39,7 @@ public class PdfMaker {
             byte[] logoPng,
             byte[] doctorSignaturePng,
             String patientName, String patientDob, String patientPhone, String patientId, String patientAddress,
-            String diagnosis, String history, java.util.List<String> meds,
+            String diagnosis, String history, java.util.List<String> meds, String recommendations ,
             String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
 
@@ -229,7 +229,7 @@ public class PdfMaker {
                 y -= 16;
                 float notesH = 48f;
                 roundedField(cs, doc, H_REG, 11,
-                        "More medication as mentioned in the Consultation slide",
+                        recommendations,
                         margin, y, contentWidth, notesH, Color.WHITE, GRAY_200);
                 y -= (notesH + 18);
 

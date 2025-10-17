@@ -37,7 +37,7 @@ public class PrescriptionPdfService {
             // patient
             String patientName, LocalDate dob, String phone, String patientId,String patientAddress,
             // consultation/prescription
-            String diagnosis, String history, List<String> meds,
+            String diagnosis, String history, List<String> meds,String recommendations,
             // doctor block
             String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
@@ -45,7 +45,7 @@ public class PrescriptionPdfService {
         return PdfMaker.makePrescriptionPdfV2(
                 logoBytes, signatureBytes,
                 patientName, dobStr, phone, patientId,patientAddress,
-                diagnosis, history, meds,
+                diagnosis, history, meds,recommendations,
                 doctorName, doctorReg, doctorAddress, doctorPhone, doctorEmail
         );
     }
