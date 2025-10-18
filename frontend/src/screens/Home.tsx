@@ -153,17 +153,38 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/referrals/latest`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE_URL}/referrals/latest`, {
+          credentials: 'include',
+        });
         if (ignore) return;
-        if (!res.ok || res.status === 204) { setReferralUrl(null); return; }
+
+        // No referral yet
+        if (res.status === 204) { setReferralUrl(null); return; }
+        if (!res.ok) { setReferralUrl(null); return; }
+
+        const ct = res.headers.get('content-type') || '';
+
+        // Backend might stream the PDF directly
+        if (ct.includes('application/pdf')) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          setReferralUrl(url);
+          return;
+        }
+
+        // Otherwise expect JSON with a PDF URL
         const j = await res.json().catch(() => null);
-        setReferralUrl(j?.pdfUrl ? resolveApiUrl(API_BASE_URL, j.pdfUrl) : null);
+        const raw = j?.pdfUrl || j?.url || j?.link || null;
+
+        // Normalize so we never end up with /api/api/...
+        setReferralUrl(raw ? resolveApiUrl(API_BASE_URL, raw) : null);
       } catch {
         if (!ignore) setReferralUrl(null);
       }
     })();
     return () => { ignore = true; };
   }, []);
+
 
 
   // ---------- DOCTOR LANDING ----------

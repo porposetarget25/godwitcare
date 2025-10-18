@@ -6,16 +6,21 @@ import com.godwitcare.entity.ReferralLetter;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.util.PdfMaker;
-
 import org.springframework.http.*;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+
 
 @RestController
 @RequestMapping("/api/doctor")
@@ -23,6 +28,12 @@ public class DoctorReferralController {
 
     private final ConsultationRepository consultations;
     private final ReferralLetterRepo referrals;
+    @Value("classpath:/static/branding/logo.jpg")
+    private Resource logoRes;
+
+    @Value("classpath:/static/branding/doctor_signature.jpg")
+    private Resource signRes;
+
 
     public DoctorReferralController(ConsultationRepository consultations,
                                     ReferralLetterRepo referrals) {
@@ -78,11 +89,12 @@ public class DoctorReferralController {
 
         // Editable paragraph body
         String narrative = Optional.ofNullable(body.paragraph()).orElse("").trim();
-
+        byte[] logoBytes = readBytes(logoRes);
+        byte[] signBytes = readBytes(signRes);
         // ===== IMPORTANT FIX: use the REFERRAL PDF builder (not prescription) =====
         byte[] pdf = PdfMaker.makeReferralPdfV2(
-                null,                       // logo (optional)
-                null,                       // doctor signature image (optional)
+                logoBytes,
+                signBytes,
                 ascii(patientName),
                 ascii(patientDob),
                 ascii(patientPhone),
@@ -135,4 +147,13 @@ public class DoctorReferralController {
 
         return new ResponseEntity<>(ref.getPdfBytes(), h, HttpStatus.OK);
     }
+
+    private static byte[] readBytes(Resource res) {
+        try (InputStream in = res != null ? res.getInputStream() : null) {
+            return (in != null) ? StreamUtils.copyToByteArray(in) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 }

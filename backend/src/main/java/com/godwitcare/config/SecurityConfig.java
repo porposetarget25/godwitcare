@@ -95,6 +95,8 @@ public class SecurityConfig {
 
                         /* ---------- Doctors only ---------- */
                         .requestMatchers("/api/doctor/**").hasRole(Role.DOCTOR.name())
+                        .requestMatchers(HttpMethod.GET, "/api/referrals/latest").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/referrals/*/pdf").authenticated()
 
                         /* ---------- Everything else requires auth ---------- */
                         .anyRequest().authenticated()

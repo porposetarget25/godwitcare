@@ -4,6 +4,7 @@ import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+
 import java.text.Normalizer;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -17,16 +18,18 @@ public class PdfMaker {
 
     // ====== public API (kept) =====================================================
 
-    /** Legacy API (kept). Generates the previous simple layout. */
+    /**
+     * Legacy API (kept). Generates the previous simple layout.
+     */
     public static byte[] makePrescriptionPdf(
             String logoText, String patientName, String patientDob, String patientPhone,
-            String patientId, String patientAddress ,String diagnosis, String history, List<String> meds, String recommendations
+            String patientId, String patientAddress, String diagnosis, String history, List<String> meds, String recommendations
     ) throws Exception {
         // For backward compatibility, call the V2 method with no images and minimal doctor block.
         return makePrescriptionPdfV2(
                 null, null,
-                patientName, patientDob, patientPhone, patientId,patientAddress ,
-                diagnosis, history, meds,recommendations,
+                patientName, patientDob, patientPhone, patientId, patientAddress,
+                diagnosis, history, meds, recommendations,
                 "Attending Clinician", "", "", "", ""
         );
     }
@@ -39,7 +42,7 @@ public class PdfMaker {
             byte[] logoPng,
             byte[] doctorSignaturePng,
             String patientName, String patientDob, String patientPhone, String patientId, String patientAddress,
-            String diagnosis, String history, java.util.List<String> meds, String recommendations ,
+            String diagnosis, String history, java.util.List<String> meds, String recommendations,
             String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
 
@@ -60,8 +63,8 @@ public class PdfMaker {
 
             // Fonts
             final PDType1Font H_BOLD = PDType1Font.HELVETICA_BOLD;
-            final PDType1Font H_REG  = PDType1Font.HELVETICA;
-            final PDType1Font H_OBL  = PDType1Font.HELVETICA_OBLIQUE;
+            final PDType1Font H_REG = PDType1Font.HELVETICA;
+            final PDType1Font H_OBL = PDType1Font.HELVETICA_OBLIQUE;
 
             try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
                 cs.setStrokingColor(Color.BLACK);
@@ -82,7 +85,7 @@ public class PdfMaker {
                 y -= 16;
 
                 // 2) Brand + Patient panel (no-overlap)
-                float leftW  = contentWidth * 0.44f;
+                float leftW = contentWidth * 0.44f;
                 float rightW = contentWidth - leftW - 10;
                 float rowTop = y;
 
@@ -95,13 +98,13 @@ public class PdfMaker {
                     float logoW = logoH * logoAspect;
                     cs.drawImage(logo, margin, rowTop - logoH, logoW, logoH);
                 }
-                text(cs, H_BOLD, 16, TEXT,     margin + 56, rowTop - 8,  "GodwitCare");
-                text(cs, H_REG,  10, GRAY_500, margin + 56, rowTop - 26, "Care Beyond Borders");
+                text(cs, H_BOLD, 16, TEXT, margin + 56, rowTop - 8, "GodwitCare");
+                text(cs, H_REG, 10, GRAY_500, margin + 56, rowTop - 26, "Care Beyond Borders");
 
                 // Right: patient info panel (dynamic height incl. address)
-                float panelX   = margin + leftW + 10;
+                float panelX = margin + leftW + 10;
                 float panelPad = 10f;
-                float lineH    = 12f;
+                float lineH = 12f;
                 float panelTitleH = 16f;
 
                 java.util.List<String> addrLines =
@@ -132,7 +135,8 @@ public class PdfMaker {
                 text(cs, H_BOLD, 12, TEXT, panelX + panelPad, rowTop - 32, nz(patientName));
 
                 float ty = rowTop - 32 - 6 - lineH;
-                smallPair(cs, panelX + panelPad, ty, "DOB:", nz(patientDob)); ty -= lineH;
+                smallPair(cs, panelX + panelPad, ty, "DOB:", nz(patientDob));
+                ty -= lineH;
 
                 // Address (wrapped WITH label)
                 if (addrLines.isEmpty()) {
@@ -151,7 +155,8 @@ public class PdfMaker {
                     }
                 }
 
-                smallPair(cs, panelX + panelPad, ty, "Contact:", nz(patientPhone)); ty -= lineH;
+                smallPair(cs, panelX + panelPad, ty, "Contact:", nz(patientPhone));
+                ty -= lineH;
                 smallPair(cs, panelX + panelPad, ty, "Patient ID:", nz(patientId));
 
                 // Move below tallest column
@@ -177,18 +182,18 @@ public class PdfMaker {
                 if (meds != null && !meds.isEmpty()) {
                     int idx = 1;
                     for (String m : meds) {
-                        float cardPad   = 10f;
-                        float topPad    = 12f;
+                        float cardPad = 10f;
+                        float topPad = 12f;
                         float bottomPad = 12f;
-                        float textW     = contentWidth - (cardPad * 2);
-                        float lineHt    = 14f;
+                        float textW = contentWidth - (cardPad * 2);
+                        float lineHt = 14f;
 
                         java.util.List<String> lines = wrap(nz(m), H_REG, 11, textW);
                         float titleH = 14f;
-                        float bodyH  = Math.max(0, (lines.size() - 1)) * lineHt;
+                        float bodyH = Math.max(0, (lines.size() - 1)) * lineHt;
 
                         // NEW: no per-item signature meta -> shorter box
-                        float boxH   = topPad + titleH + 6 + bodyH + bottomPad;
+                        float boxH = topPad + titleH + 6 + bodyH + bottomPad;
 
                         // card
                         fillRect(cs, margin, y - boxH, contentWidth, boxH, Color.WHITE);
@@ -229,7 +234,7 @@ public class PdfMaker {
 
                 float sigLeftW = contentWidth * 0.45f;
                 text(cs, H_BOLD, 11, TEXT, margin, y - 2, "Prescribing Doctor’s Signature");
-                text(cs, H_REG,   9, GRAY_500, margin, y - 16,
+                text(cs, H_REG, 9, GRAY_500, margin, y - 16,
                         "Date of Prescription: " + DateTimeFormatter.ISO_LOCAL_DATE
                                 .withZone(ZoneId.of("UTC")).format(Instant.now()));
 
@@ -247,10 +252,19 @@ public class PdfMaker {
                 float rx = margin + sigLeftW + 18;
                 text(cs, H_BOLD, 12, TEXT, rx, y - 2, nz(doctorName));
                 float dyy = y - 18;
-                text(cs, H_REG, 10, TEXT, rx, dyy, nz(doctorReg)); dyy -= 14;
-                if (!nz(doctorAddress).equals("—")) { text(cs, H_REG, 10, TEXT, rx, dyy, doctorAddress); dyy -= 14; }
-                if (!nz(doctorPhone).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone); dyy -= 14; }
-                if (!nz(doctorEmail).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail); }
+                text(cs, H_REG, 10, TEXT, rx, dyy, nz(doctorReg));
+                dyy -= 14;
+                if (!nz(doctorAddress).equals("—")) {
+                    text(cs, H_REG, 10, TEXT, rx, dyy, doctorAddress);
+                    dyy -= 14;
+                }
+                if (!nz(doctorPhone).equals("—")) {
+                    text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone);
+                    dyy -= 14;
+                }
+                if (!nz(doctorEmail).equals("—")) {
+                    text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail);
+                }
 
                 // NEW: one-time digital signature meta under the signature area
                 String signedByOnce = "Digitally signed by " + (doctorName == null ? "Attending Clinician" : doctorName);
@@ -259,17 +273,21 @@ public class PdfMaker {
                         .withZone(ZoneId.of("UTC"))
                         .format(Instant.now());
                 float metaY = y - 56; // slightly below the signature image/label
-                text(cs, H_OBL, 9, GRAY_500, margin, metaY, signedByOnce);             metaY -= 12;
+                text(cs, H_OBL, 9, GRAY_500, margin, metaY, signedByOnce);
+                metaY -= 12;
                 //text(cs, H_OBL, 9, GRAY_500, margin, metaY, signedDateOnce);           metaY -= 12;
                 //text(cs, H_OBL, 9, GRAY_500, margin, metaY, "Reason: Symptomatic Relief"); metaY -= 12;
-                text(cs, H_REG, 10, TEAL,     margin, metaY, "Signature is valid");
+                text(cs, H_REG, 10, TEAL, margin, metaY, "Signature is valid");
 
                 y -= 72;
 
                 // 8) Footer
-                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
-                y -= 10;
-                text(cs, H_REG, 9, GRAY_500, margin, y, "Company   •   Support   •   Legal");
+                {
+                    float footerBaseline = margin; // bottom printable area
+                    float footerLineY = footerBaseline + 16f; // line just above footer text
+                    strokeLine(cs, margin, footerLineY, margin + contentWidth, footerLineY, GRAY_200, 0.5f);
+                    text(cs, H_REG, 9, GRAY_500, margin, footerBaseline + 4f, "Company  |  Support  |  Legal");
+                }
             }
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -300,13 +318,13 @@ public class PdfMaker {
     }
 
     private static void sectionTitle(PDPageContentStream cs, float x, float y, String title) throws Exception {
-        text(cs, PDType1Font.HELVETICA_BOLD, 12, new Color(31,41,55), x, y, title);
+        text(cs, PDType1Font.HELVETICA_BOLD, 12, new Color(31, 41, 55), x, y, title);
     }
 
     private static void smallPair(PDPageContentStream cs, float x, float y, String k, String v) throws Exception {
-        text(cs, PDType1Font.HELVETICA_BOLD, 10, new Color(55,65,81), x, y, k);
+        text(cs, PDType1Font.HELVETICA_BOLD, 10, new Color(55, 65, 81), x, y, k);
         float off = x + 56;
-        text(cs, PDType1Font.HELVETICA, 10, new Color(31,41,55), off, y, v);
+        text(cs, PDType1Font.HELVETICA, 10, new Color(31, 41, 55), off, y, v);
     }
 
     private static void strokeLine(PDPageContentStream cs, float x1, float y1, float x2, float y2, Color c, float w) throws Exception {
@@ -339,12 +357,14 @@ public class PdfMaker {
         List<String> lines = wrap(text, font, size, w - (pad * 2));
         float lh = 14f, ty = y - pad - 12;
         for (String line : lines) {
-            text(cs, font, size, new Color(31,41,55), x + pad, ty, line);
+            text(cs, font, size, new Color(31, 41, 55), x + pad, ty, line);
             ty -= lh;
         }
     }
 
-    /** Draw paragraph in a light box and return the resulting height used. */
+    /**
+     * Draw paragraph in a light box and return the resulting height used.
+     */
     private static float drawParagraphBox(PDPageContentStream cs, PDType1Font font, float size,
                                           String text, float x, float y, float w,
                                           Color bg, Color border, float lineH) throws Exception {
@@ -354,7 +374,7 @@ public class PdfMaker {
         strokeRect(cs, x, y - h, w, h, border, 0.8f);
         float ty = y - 12;
         for (String line : lines) {
-            text(cs, font, size, new Color(31,41,55), x + 8, ty, line);
+            text(cs, font, size, new Color(31, 41, 55), x + 8, ty, line);
             ty -= lineH;
         }
         return h;
@@ -365,18 +385,25 @@ public class PdfMaker {
     private static List<String> wrap(String text, PDType1Font font, float fontSize, float maxWidth) throws Exception {
         List<String> lines = new ArrayList<>();
         String t = safe(text);
-        if (t.isBlank()) { lines.add("—"); return lines; }
+        if (t.isBlank()) {
+            lines.add("—");
+            return lines;
+        }
 
         String[] words = t.split("\\s+");
         StringBuilder line = new StringBuilder();
         for (String w : words) {
-            String candidate = (line.length()==0) ? w : line + " " + w;
+            String candidate = (line.length() == 0) ? w : line + " " + w;
             float width = font.getStringWidth(candidate) / 1000f * fontSize;
             if (width > maxWidth) {
-                if (line.length() > 0) { lines.add(line.toString()); line.setLength(0); }
+                if (line.length() > 0) {
+                    lines.add(line.toString());
+                    line.setLength(0);
+                }
                 line.append(w);
             } else {
-                line.setLength(0); line.append(candidate);
+                line.setLength(0);
+                line.append(candidate);
             }
         }
         if (line.length() > 0) lines.add(line.toString());
@@ -420,7 +447,9 @@ public class PdfMaker {
     }
 
 
-    private static String nz(String s) { return safe(s); }
+    private static String nz(String s) {
+        return safe(s);
+    }
 
     // in PdfMaker.java – add this new method (keep existing methods untouched)
     public static byte[] makeReferralPdfV2(
@@ -441,8 +470,8 @@ public class PdfMaker {
             final Color TEXT = new Color(17, 24, 39);
 
             final PDType1Font H_BOLD = PDType1Font.HELVETICA_BOLD;
-            final PDType1Font H_REG  = PDType1Font.HELVETICA;
-            final PDType1Font H_OBL  = PDType1Font.HELVETICA_OBLIQUE;
+            final PDType1Font H_REG = PDType1Font.HELVETICA;
+            final PDType1Font H_OBL = PDType1Font.HELVETICA_OBLIQUE;
 
             float margin = 42f;
             float contentWidth = page.getMediaBox().getWidth() - (margin * 2);
@@ -470,21 +499,34 @@ public class PdfMaker {
                 text(cs, H_BOLD, 12, TEXT, margin + panelPad, y - 32, nz(patientName));
 
                 float ty = y - 32 - 6 - 12;
-                smallPair(cs, margin + panelPad, ty, "DOB:", nz(patientDob)); ty -= 12;
-                smallPair(cs, margin + panelPad, ty, "Patient ID:", nz(patientId)); ty -= 12;
-                smallPair(cs, margin + panelPad, ty, "Contact:", nz(patientPhone)); ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "DOB:", nz(patientDob));
+                ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "Patient ID:", nz(patientId));
+                ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "Contact:", nz(patientPhone));
+                ty -= 12;
                 smallPair(cs, margin + panelPad, ty, "Address:", nz(patientAddress));
                 y -= (panelH + 16);
 
-                // Referral From panel
+                // Referral From panel (LEFT column with wider value offset = +80)
                 strokeRect(cs, margin, y - 92, rightW, 92, GRAY_200, 0.8f);
                 text(cs, H_BOLD, 11, TEXT, margin + panelPad, y - 16, "Referral From");
-                smallPair(cs, margin + panelPad, y - 16 - 16, "GP Name:", nz(doctorName));
-                smallPair(cs, margin + panelPad, y - 16 - 28, "GMS Number:", nz(doctorReg));
-                smallPair(cs, margin + contentWidth/2, y - 16 - 16, "Address:", nz(doctorAddress));
-                smallPair(cs, margin + contentWidth/2, y - 16 - 28, "Email:", nz(doctorEmail));
-                smallPair(cs, margin + contentWidth/2, y - 16 - 40, "Contact:", nz(doctorPhone));
+
+                // GP Name (wide)
+                text(cs, H_BOLD, 10, new Color(55, 65, 81), margin + panelPad, y - 32, "GP Name:");
+                text(cs, H_REG, 10, new Color(31, 41, 55), margin + panelPad + 80, y - 32, nz(doctorName));
+
+                // GMS Number (wide)
+                text(cs, H_BOLD, 10, new Color(55, 65, 81), margin + panelPad, y - 44, "GMS Number:");
+                text(cs, H_REG, 10, new Color(31, 41, 55), margin + panelPad + 80, y - 44, nz(doctorReg));
+
+                // RIGHT column stays the same
+                smallPair(cs, margin + contentWidth / 2, y - 32, "Address:", nz(doctorAddress));
+                smallPair(cs, margin + contentWidth / 2, y - 44, "Email:", nz(doctorEmail));
+                smallPair(cs, margin + contentWidth / 2, y - 56, "Contact:", nz(doctorPhone));
+
                 y -= (92 + 16);
+
 
                 // Body box
                 text(cs, H_BOLD, 11, TEXT, margin, y, "Letter");
@@ -510,18 +552,30 @@ public class PdfMaker {
                 float rx = margin + (contentWidth * 0.45f) + 18;
                 text(cs, H_BOLD, 12, TEXT, rx, y - 2, nz(doctorName));
                 float dyy = y - 18;
-                text(cs, H_REG, 10, TEXT, rx, dyy, nz(doctorReg)); dyy -= 14;
-                if (!nz(doctorAddress).equals("—")) { text(cs, H_REG, 10, TEXT, rx, dyy, doctorAddress); dyy -= 14; }
-                if (!nz(doctorPhone).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone); dyy -= 14; }
-                if (!nz(doctorEmail).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail); }
+                text(cs, H_REG, 10, TEXT, rx, dyy, nz(doctorReg));
+                dyy -= 14;
+                if (!nz(doctorAddress).equals("—")) {
+                    text(cs, H_REG, 10, TEXT, rx, dyy, doctorAddress);
+                    dyy -= 14;
+                }
+                if (!nz(doctorPhone).equals("—")) {
+                    text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone);
+                    dyy -= 14;
+                }
+                if (!nz(doctorEmail).equals("—")) {
+                    text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail);
+                }
 
                 // One-time digital signature note (single place)
                 y -= 66;
-                text(cs, H_OBL, 9, GRAY_500, margin, y, "Digitally signed by " + nz(doctorName)); y -= 12;
+                text(cs, H_OBL, 9, GRAY_500, margin, y, "Digitally signed by " + nz(doctorName));
+                y -= 12;
                 text(cs, H_OBL, 9, GRAY_500, margin, y, "Date: " +
                         java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'GMT'")
-                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now())); y -= 12;
-                text(cs, H_OBL, 9, GRAY_500, margin, y, "Reason: Referral"); y -= 12;
+                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now()));
+                y -= 12;
+                text(cs, H_OBL, 9, GRAY_500, margin, y, "Reason: Referral");
+                y -= 12;
                 text(cs, H_REG, 10, TEAL, margin, y, "Signature is valid");
             }
 
