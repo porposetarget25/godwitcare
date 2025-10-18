@@ -147,9 +147,15 @@ const API_BASE = API_BASE_RAW.replace(/\/$/, '')
 export const API_BASE_URL = API_BASE
 
 // ---------- Generic request helper (resilient to HTML error pages) ----------
+// ---------- Generic request helper (resilient to HTML error pages) ----------
 async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
-  const res = await fetch(url, init)
+
+  // Always include cookies (session) unless explicitly overridden by caller
+  const res = await fetch(url, {
+    credentials: 'include',
+    ...init,
+  })
 
   const contentType = res.headers.get('content-type') || ''
   const text = await res.text()
@@ -166,6 +172,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
     return text as unknown as T
   }
 }
+
 
 // ===================================================================
 // Public API
@@ -391,4 +398,6 @@ export function resolveApiUrl(base: string, path: string) {
 
   return `${cleanBase}/${effectivePath}`;
 }
+
+
 

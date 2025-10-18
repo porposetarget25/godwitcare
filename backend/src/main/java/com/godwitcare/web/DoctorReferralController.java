@@ -20,6 +20,7 @@ import java.util.*;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 
 @RestController
@@ -127,11 +128,18 @@ public class DoctorReferralController {
         ref.setSize(pdf.length);
         ref = referrals.save(ref);
 
+        String pdfUrl = ServletUriComponentsBuilder
+                .fromCurrentContextPath()
+                .path("/api/doctor/referrals/")
+                .path(ref.getId().toString())
+                .path("/pdf")
+                .toUriString();
+
         Map<String,Object> resp = new HashMap<>();
         resp.put("id", ref.getId());
-        resp.put("pdfUrl", "/api/doctor/referrals/" + ref.getId() + "/pdf");
+        resp.put("pdfUrl", pdfUrl);
 
-        return ResponseEntity.created(URI.create((String) resp.get("pdfUrl"))).body(resp);
+        return ResponseEntity.created(URI.create(pdfUrl)).body(resp);
     }
 
     @GetMapping(value = "/referrals/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
