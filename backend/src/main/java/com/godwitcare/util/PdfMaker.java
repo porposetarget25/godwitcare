@@ -4,7 +4,7 @@ import org.apache.pdfbox.pdmodel.*;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
-
+import java.text.Normalizer;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
@@ -388,8 +388,147 @@ public class PdfMaker {
     }
 
     private static String safe(String s) {
-        return (s == null || s.isBlank()) ? "—" : s;
+        // Treat null/blank uniformly
+        if (s == null) return "—";
+        String t = s.trim();
+        if (t.isEmpty()) return "—";
+
+        // Normalize to NFD and strip combining marks (accents/diacritics).
+        // Example: "ā" -> "a", "é" -> "e"
+        t = Normalizer.normalize(t, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+
+        // Replace common Unicode punctuation with ASCII equivalents
+        t = t
+                .replace('\u2013', '-')   // en dash –
+                .replace('\u2014', '-')   // em dash —
+                .replace('\u2015', '-')   // horizontal bar ―
+                .replace('\u2212', '-')   // minus sign −
+                .replace('\u2018', '\'')  // left single quote ‘
+                .replace('\u2019', '\'')  // right single quote ’
+                .replace('\u201C', '\"')  // left double quote “
+                .replace('\u201D', '\"')  // right double quote ”
+                .replace('\u00A0', ' ');  // non-breaking space
+
+        // As a last resort, replace any remaining non-WinAnsi/ASCII-ish chars
+        // with a harmless '?' so PDFBox can compute widths & draw without error.
+        // Allow basic printable ASCII plus tab/newline/carriage return.
+        t = t.replaceAll("[^\\x09\\x0A\\x0D\\x20-\\x7E]", "?");
+
+        // After normalization, if it's empty, keep your em dash placeholder
+        return t.isEmpty() ? "—" : t;
     }
 
+
     private static String nz(String s) { return safe(s); }
+
+    // in PdfMaker.java – add this new method (keep existing methods untouched)
+    public static byte[] makeReferralPdfV2(
+            byte[] logoPng,
+            byte[] doctorSignaturePng,
+            String patientName, String patientDob, String patientPhone, String patientId, String patientAddress,
+            String body,
+            String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
+    ) throws Exception {
+        try (PDDocument doc = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            doc.addPage(page);
+
+            final Color TEAL = new Color(16, 185, 129);
+            final Color GRAY_100 = new Color(243, 244, 246);
+            final Color GRAY_200 = new Color(229, 231, 235);
+            final Color GRAY_500 = new Color(107, 114, 128);
+            final Color TEXT = new Color(17, 24, 39);
+
+            final PDType1Font H_BOLD = PDType1Font.HELVETICA_BOLD;
+            final PDType1Font H_REG  = PDType1Font.HELVETICA;
+            final PDType1Font H_OBL  = PDType1Font.HELVETICA_OBLIQUE;
+
+            float margin = 42f;
+            float contentWidth = page.getMediaBox().getWidth() - (margin * 2);
+            float y = page.getMediaBox().getHeight() - margin;
+
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                // Title row
+                float bannerH = 20f;
+                fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(229, 246, 255));
+                text(cs, H_REG, 10, TEXT, margin + 10, y - bannerH + 6, "Referral Letter");
+                y -= (bannerH + 16);
+
+                centeredText(cs, H_BOLD, 20, new Color(6, 95, 70), page, "Referral Letter", y);
+                y -= 26;
+                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                y -= 16;
+
+                // Patient panel (reuse pattern)
+                float panelPad = 10f;
+                float rightW = contentWidth;
+                float panelH = 96f;
+
+                strokeRect(cs, margin, y - panelH, rightW, panelH, GRAY_200, 0.8f);
+                text(cs, H_BOLD, 11, TEXT, margin + panelPad, y - 16, "Patient Information");
+                text(cs, H_BOLD, 12, TEXT, margin + panelPad, y - 32, nz(patientName));
+
+                float ty = y - 32 - 6 - 12;
+                smallPair(cs, margin + panelPad, ty, "DOB:", nz(patientDob)); ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "Patient ID:", nz(patientId)); ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "Contact:", nz(patientPhone)); ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "Address:", nz(patientAddress));
+                y -= (panelH + 16);
+
+                // Referral From panel
+                strokeRect(cs, margin, y - 92, rightW, 92, GRAY_200, 0.8f);
+                text(cs, H_BOLD, 11, TEXT, margin + panelPad, y - 16, "Referral From");
+                smallPair(cs, margin + panelPad, y - 16 - 16, "GP Name:", nz(doctorName));
+                smallPair(cs, margin + panelPad, y - 16 - 28, "GMS Number:", nz(doctorReg));
+                smallPair(cs, margin + contentWidth/2, y - 16 - 16, "Address:", nz(doctorAddress));
+                smallPair(cs, margin + contentWidth/2, y - 16 - 28, "Email:", nz(doctorEmail));
+                smallPair(cs, margin + contentWidth/2, y - 16 - 40, "Contact:", nz(doctorPhone));
+                y -= (92 + 16);
+
+                // Body box
+                text(cs, H_BOLD, 11, TEXT, margin, y, "Letter");
+                y -= 16;
+                float bodyH = drawParagraphBox(cs, H_REG, 11, nz(body), margin, y, contentWidth, GRAY_100, GRAY_200, 14);
+                y -= (bodyH + 18);
+
+                // Signature row
+                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                y -= 12;
+
+                text(cs, H_BOLD, 11, TEXT, margin, y - 2, "Referring Doctor’s Signature");
+                if (doctorSignaturePng != null) {
+                    PDImageXObject sign = PDImageXObject.createFromByteArray(doc, doctorSignaturePng, "sign");
+                    float h = 28f;
+                    float r = (float) sign.getWidth() / (float) sign.getHeight();
+                    float w = h * r;
+                    cs.drawImage(sign, margin, y - 52, w, h);
+                } else {
+                    text(cs, H_OBL, 10, GRAY_500, margin, y - 36, "(Signature)");
+                }
+
+                float rx = margin + (contentWidth * 0.45f) + 18;
+                text(cs, H_BOLD, 12, TEXT, rx, y - 2, nz(doctorName));
+                float dyy = y - 18;
+                text(cs, H_REG, 10, TEXT, rx, dyy, nz(doctorReg)); dyy -= 14;
+                if (!nz(doctorAddress).equals("—")) { text(cs, H_REG, 10, TEXT, rx, dyy, doctorAddress); dyy -= 14; }
+                if (!nz(doctorPhone).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone); dyy -= 14; }
+                if (!nz(doctorEmail).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail); }
+
+                // One-time digital signature note (single place)
+                y -= 66;
+                text(cs, H_OBL, 9, GRAY_500, margin, y, "Digitally signed by " + nz(doctorName)); y -= 12;
+                text(cs, H_OBL, 9, GRAY_500, margin, y, "Date: " +
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'GMT'")
+                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now())); y -= 12;
+                text(cs, H_OBL, 9, GRAY_500, margin, y, "Reason: Referral"); y -= 12;
+                text(cs, H_REG, 10, TEAL, margin, y, "Signature is valid");
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            return out.toByteArray();
+        }
+    }
+
 }

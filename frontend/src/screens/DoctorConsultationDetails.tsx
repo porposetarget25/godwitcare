@@ -320,7 +320,22 @@ export default function DoctorConsultationDetails() {
           )}
           <button className="btn secondary" type="button" disabled>View Case History</button>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
-          <button className="btn secondary" type="button" disabled>Referral Letter</button>
+          {/* Referral Letter */}
+          {(id || data?.id) ? (
+            <Link
+              to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}
+              className="btn secondary"
+              type="button"
+            >
+              Referral Letter
+            </Link>
+          ) : (
+            <button className="btn secondary" type="button" disabled>
+              Referral Letter
+            </button>
+          )}
+
+
         </div>
       </div>
     </section>

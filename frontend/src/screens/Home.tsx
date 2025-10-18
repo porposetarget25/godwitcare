@@ -146,6 +146,25 @@ export default function Home() {
     return () => { ignore = true; };
   }, []);
 
+  // Latest referral URL (if exists)
+  const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/referrals/latest`, { credentials: 'include' });
+        if (ignore) return;
+        if (!res.ok || res.status === 204) { setReferralUrl(null); return; }
+        const j = await res.json().catch(() => null);
+        setReferralUrl(j?.pdfUrl ? resolveApiUrl(API_BASE_URL, j.pdfUrl) : null);
+      } catch {
+        if (!ignore) setReferralUrl(null);
+      }
+    })();
+    return () => { ignore = true; };
+  }, []);
+
 
   // ---------- DOCTOR LANDING ----------
   if (isDoctor) {
@@ -480,10 +499,10 @@ export default function Home() {
             >
               {/* prescription/doc icon */}
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M16 13H8M16 17H8M10 9H8" />
-            </svg>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8M16 17H8M10 9H8" />
+              </svg>
             </div>
             <div style={{ fontWeight: 600, color: '#0f172a' }}>Prescription</div>
           </a>
@@ -521,38 +540,73 @@ export default function Home() {
           </button>
         )}
 
-        {/* Referral Letter (disabled for now) */}
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="quick"
-          style={{
-            borderRadius: 16,
-            padding: 16,
-            background: '#f3f7fb',
-            border: '1px solid #e6eef7',
-            cursor: 'not-allowed',
-            opacity: 0.45,
-            textAlign: 'center',
-          }}
-        >
-          <div
+        {/* Referral Letter (enabled only if referral exists) */}
+        {referralUrl ? (
+          <a
+            href={referralUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="quick"
             style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: 'white', margin: '0 auto 10px',
-              display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              borderRadius: 16,
+              padding: 16,
+              background: '#f3f7fb',
+              border: '1px solid #e6eef7',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: 'inherit',
             }}
           >
-            {/* ribbon/bookmark icon */}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M16 13H8M16 17H8M10 9H8" />
-            </svg>
-          </div>
-          <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
-        </button>
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'white', margin: '0 auto 10px',
+                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              }}
+            >
+              {/* document icon */}
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8M16 17H8M10 9H8" />
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="quick"
+            style={{
+              borderRadius: 16,
+              padding: 16,
+              background: '#f3f7fb',
+              border: '1px solid #e6eef7',
+              cursor: 'not-allowed',
+              opacity: 0.45,
+              textAlign: 'center',
+            }}
+            title="No referral letter available yet"
+          >
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'white', margin: '0 auto 10px',
+                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
+              }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12" />
+                <path d="M14 2v6h6" />
+                <path d="M9 12h6M9 16h6" />
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
+          </button>
+        )}
+
       </div>
 
 
