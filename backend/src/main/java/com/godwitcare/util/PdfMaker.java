@@ -186,8 +186,9 @@ public class PdfMaker {
                         java.util.List<String> lines = wrap(nz(m), H_REG, 11, textW);
                         float titleH = 14f;
                         float bodyH  = Math.max(0, (lines.size() - 1)) * lineHt;
-                        float metaH  = 12f * 4; // signedBy, date, reason, "Signature is valid"
-                        float boxH   = topPad + titleH + 6 + bodyH + 8 + metaH + bottomPad;
+
+                        // NEW: no per-item signature meta -> shorter box
+                        float boxH   = topPad + titleH + 6 + bodyH + bottomPad;
 
                         // card
                         fillRect(cs, margin, y - boxH, contentWidth, boxH, Color.WHITE);
@@ -204,17 +205,6 @@ public class PdfMaker {
                                 ly -= lineHt;
                             }
                         }
-
-                        // meta
-                        String signedBy = "Digitally signed by " + (doctorName == null ? "Attending Clinician" : doctorName);
-                        String signedDate = "Date: " + java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'GMT'")
-                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now());
-
-                        ly -= 2;
-                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedBy);  ly -= 12;
-                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, signedDate); ly -= 12;
-                        text(cs, H_OBL, 9, GRAY_500, margin + cardPad, ly, "Reason: Symptomatic Relief"); ly -= 12;
-                        text(cs, H_REG, 10, TEAL,     margin + cardPad, ly, "Signature is valid");
 
                         y -= (boxH + 12); // gap
                         idx++;
@@ -240,8 +230,8 @@ public class PdfMaker {
                 float sigLeftW = contentWidth * 0.45f;
                 text(cs, H_BOLD, 11, TEXT, margin, y - 2, "Prescribing Doctor’s Signature");
                 text(cs, H_REG,   9, GRAY_500, margin, y - 16,
-                        "Date of Prescription: " + java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
-                                .withZone(java.time.ZoneId.of("UTC")).format(java.time.Instant.now()));
+                        "Date of Prescription: " + DateTimeFormatter.ISO_LOCAL_DATE
+                                .withZone(ZoneId.of("UTC")).format(Instant.now()));
 
                 if (doctorSignaturePng != null) {
                     PDImageXObject sign = PDImageXObject.createFromByteArray(doc, doctorSignaturePng, "sign");
@@ -262,6 +252,18 @@ public class PdfMaker {
                 if (!nz(doctorPhone).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "Phone: " + doctorPhone); dyy -= 14; }
                 if (!nz(doctorEmail).equals("—"))   { text(cs, H_REG, 10, TEXT, rx, dyy, "E-mail: " + doctorEmail); }
 
+                // NEW: one-time digital signature meta under the signature area
+                String signedByOnce = "Digitally signed by " + (doctorName == null ? "Attending Clinician" : doctorName);
+                String signedDateOnce = "Date: " + DateTimeFormatter
+                        .ofPattern("yyyy-MM-dd HH:mm 'GMT'")
+                        .withZone(ZoneId.of("UTC"))
+                        .format(Instant.now());
+                float metaY = y - 56; // slightly below the signature image/label
+                text(cs, H_OBL, 9, GRAY_500, margin, metaY, signedByOnce);             metaY -= 12;
+                //text(cs, H_OBL, 9, GRAY_500, margin, metaY, signedDateOnce);           metaY -= 12;
+                //text(cs, H_OBL, 9, GRAY_500, margin, metaY, "Reason: Symptomatic Relief"); metaY -= 12;
+                text(cs, H_REG, 10, TEAL,     margin, metaY, "Signature is valid");
+
                 y -= 72;
 
                 // 8) Footer
@@ -270,7 +272,7 @@ public class PdfMaker {
                 text(cs, H_REG, 9, GRAY_500, margin, y, "Company   •   Support   •   Legal");
             }
 
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
             return out.toByteArray();
         }

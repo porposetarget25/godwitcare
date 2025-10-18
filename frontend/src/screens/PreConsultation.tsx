@@ -10,15 +10,23 @@ function Toggle({
   label,
   value,
   onChange,
+  critical = false,
 }: {
   label: string
   value: Ans
   onChange: (v: YesNo) => void
+  /** when true, render the label bold + red */
+  critical?: boolean
 }) {
   const isUnset = value === undefined
   return (
     <div className="field" style={{ marginBottom: 12 }}>
-      <label className="strong">{label}</label>
+      <label
+        className="strong"
+        style={critical ? { color: '#991b1b', fontWeight: 700 } : undefined}
+      >
+        {label}
+      </label>
       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
         <button
           type="button"
@@ -150,7 +158,7 @@ function buildPatientOptionsFromRegistration(reg: any): PatientOpt[] {
   if (Array.isArray(reg?.travelers)) {
     reg.travelers.forEach((t: any, idx: number) => {
       const idPart = t?.id != null ? String(t.id) : `idx-${idx}`
-      const key = `trav-${idPart}`  // ✅ always defined & unique
+      const key = `trav-${idPart}`
       const label = (t?.fullName || `Traveller ${idx + 1}`).trim()
       push(key, label, toYMD(t?.dateOfBirth))
     })
@@ -254,12 +262,10 @@ export default function PreConsultation() {
             const ymd = toYMD(reg?.dateOfBirth)
             if (!dob && ymd) setDob(ymd)
 
-            // ✅ Build options with unique keys
             const opts = buildPatientOptionsFromRegistration(reg)
             if (opts.length > 0) {
               setPatientOptions(opts)
-              setSelectedPatientKey(opts[0].key) // default to primary
-              // also sync name/dob with the selected option
+              setSelectedPatientKey(opts[0].key)
               const sel = opts[0]
               const nameOnly = sel.label.replace(/\s*\(Primary\)\s*$/, '')
               setContactName(nameOnly)
@@ -287,7 +293,7 @@ export default function PreConsultation() {
         }
       } catch { /* ignore */ }
 
-      // 3) Fallback /auth/me for phone/name if needed
+      // 3) Fallback /auth/me
       try {
         const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
         if (!ignore && r.ok) {
@@ -331,23 +337,19 @@ export default function PreConsultation() {
           setContactAddress(j.contactAddress || '')
           setDob(toYMD(j.dob || ''))
 
-          // Build BOTH lists: the one your UI uses (patientOptions) and the legacy "people"
           const r2 = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
           if (!ignore && r2.ok) {
             const reg = await r2.json().catch(() => null)
             if (reg) {
               if (reg?.primaryWhatsApp && !contactPhone) setContactPhone(String(reg.primaryWhatsApp))
 
-              // ✅ unique-key options for the select used by the UI
               const opts = buildPatientOptionsFromRegistration(reg)
               setPatientOptions(opts)
-              // preselect by matching name/dob
               const nameOnly = (j.contactName || '').trim()
               const matchByName = opts.find(o => o.label.replace(/\s*\(Primary\)\s*$/, '') === nameOnly)
               const matchByDob  = opts.find(o => o.dob && o.dob === toYMD(j.dob || ''))
               setSelectedPatientKey((matchByName || matchByDob || opts[0])?.key || 'primary')
 
-              // legacy "people" list (not used by the select, but kept for your other effect)
               const ppl = buildPeopleFromRegistration(reg)
               setPeople(ppl)
               const matchByNameP = ppl.find(p => p.name === j.contactName)
@@ -356,7 +358,6 @@ export default function PreConsultation() {
             }
           }
 
-          // merge answers
           const merged: Record<string, Ans> = { ...defaultAnswers }
           const incoming = j.answers || {}
           Object.entries(incoming).forEach(([k, v]) => {
@@ -370,7 +371,7 @@ export default function PreConsultation() {
     return () => { ignore = true }
   }, [isEdit, cid, defaultAnswers])
 
-  // Legacy effect (kept): people + selectedPersonKey (doesn't drive the select the user sees)
+  // Legacy effect
   useEffect(() => {
     const sel = people.find(p => p.key === selectedPersonKey)
     if (sel) {
@@ -379,7 +380,7 @@ export default function PreConsultation() {
     }
   }, [selectedPersonKey, people])
 
-  // Main select effect: when user changes dropdown selection, update contactName + dob
+  // Main select effect
   useEffect(() => {
     if (!selectedPatientKey || patientOptions.length === 0) return
     const opt = patientOptions.find(o => o.key === selectedPatientKey)
@@ -493,7 +494,24 @@ export default function PreConsultation() {
     )
   }
 
-  const redSectionTitles = new Set(['Emergency Symptoms', 'General Symptoms'])
+  /** Critical sections that should be red-bordered (and labels red/bold). */
+  const CRITICAL_SECTION_TITLES = useMemo(
+    () =>
+      new Set([
+        'Emergency Symptoms',
+        'Signs of a Stroke (FAST)',
+        'Indications of Sepsis',
+        'Signs of Heart Attack',
+      ]),
+    []
+  )
+
+  /** Show 999 banner only if ANY critical question is answered "Yes". */
+  const showEmergencyBanner = useMemo(() => {
+    return FORM
+      .filter(s => CRITICAL_SECTION_TITLES.has(s.title))
+      .some(s => s.questions.some(q => answers[q.id] === 'Yes'))
+  }, [answers, CRITICAL_SECTION_TITLES])
 
   return (
     <section className="section">
@@ -590,42 +608,41 @@ export default function PreConsultation() {
           </div>
         </div>
 
-        {/* Emergency banner (sticky below header) */}
-        <div
-          className="card"
-          role="note"
-          aria-live="polite"
-          style={{
-            position: 'sticky',
-            top: stickyTop,
-            zIndex: 50,
-            background: '#B94A48',
-            color: 'white',
-            borderColor: 'transparent',
-            marginTop: 0,
-            borderRadius: 12,
-            padding: 16,
-            boxShadow: '0 8px 20px rgba(185,74,72,.25)',
-          }}
-        >
-          <div className="strong" style={{ marginBottom: 0 }}>
-            If you answer “Yes” to any of these emergency questions, please dial 999 immediately.
+        {/* Emergency banner (now conditional) */}
+        {showEmergencyBanner && (
+          <div
+            className="card"
+            role="note"
+            aria-live="polite"
+            style={{
+              position: 'sticky',
+              top: stickyTop,
+              zIndex: 50,
+              background: '#B94A48',
+              color: 'white',
+              borderColor: 'transparent',
+              marginTop: 0,
+              borderRadius: 12,
+              padding: 16,
+              boxShadow: '0 8px 20px rgba(185,74,72,.25)',
+            }}
+          >
+            <div className="strong" style={{ marginBottom: 0 }}>
+              If you answer “Yes” to any of these emergency questions, please dial 999 immediately.
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Sections */}
         {FORM.map((section) => {
-          const isCritical =
-            section.title === 'Emergency Symptoms' ||
-            section.title === 'General Symptoms'
-
+          const isCritical = CRITICAL_SECTION_TITLES.has(section.title)
           return (
             <div
               key={section.title}
               className="card"
               style={{
                 marginTop: 12,
-                border: isCritical ? '4px solid #dc2626' : undefined,
+                border: isCritical ? '3px solid #dc2626' : '3px solid #16a34a',
                 borderRadius: 12,
               }}
             >
@@ -647,6 +664,7 @@ export default function PreConsultation() {
                       label={q.label}
                       value={val}
                       onChange={(v) => setAnswer(q.id, v)}
+                      critical={isCritical}
                     />
                     {val === 'Yes' && (
                       <div className="field" style={{ marginTop: 6 }}>
