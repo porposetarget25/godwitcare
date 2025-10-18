@@ -478,16 +478,34 @@ public class PdfMaker {
             float y = page.getMediaBox().getHeight() - margin;
 
             try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
-                // Title row
-                float bannerH = 20f;
-                fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(229, 246, 255));
-                text(cs, H_REG, 10, TEXT, margin + 10, y - bannerH + 6, "Referral Letter");
-                y -= (bannerH + 16);
+                // === Brand + title header (logo + wordmark + centered title) ===
+                {
+                    float headerTopY = y;                  // start at current top
+                    float logoH = 28f;                     // visual size of the logo
+                    float brandGap = 12f;                  // gap between logo and wordmark
 
-                centeredText(cs, H_BOLD, 20, new Color(6, 95, 70), page, "Referral Letter", y);
-                y -= 26;
-                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
-                y -= 16;
+                    float logoW = 0f;
+                    if (logoPng != null) {
+                        PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
+                        float ratio = (float) logo.getWidth() / (float) logo.getHeight();
+                        logoW = logoH * ratio;
+                        cs.drawImage(logo, margin, headerTopY - logoH, logoW, logoH);
+                    }
+
+                    // Wordmark (left side)
+                    float wordX = margin + (logoW > 0 ? logoW + brandGap : 0f);
+                    text(cs, H_BOLD, 18, new Color(13, 148, 136), wordX, headerTopY - 6, "GodwitCare");
+                    text(cs, H_REG,  8,  GRAY_500,                 wordX, headerTopY - 22, "Care Beyond Borders");
+
+                    // Centered page title
+                    centeredText(cs, H_BOLD, 22, new Color(17, 24, 39), page, "Referral Letter", headerTopY - 4);
+
+                    // Move below header & add separator
+                    y = headerTopY - Math.max(logoH, 28f) - 16f;
+                    strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                    y -= 16f;
+                }
+
 
                 // Patient panel (reuse pattern)
                 float panelPad = 10f;

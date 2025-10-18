@@ -15,7 +15,7 @@ function Toggle({
   label: string
   value: Ans
   onChange: (v: YesNo) => void
-  /** when true, render the label bold + red */
+  /** when true, render the label bold + red; when false, bold + green */
   critical?: boolean
 }) {
   const isUnset = value === undefined
@@ -23,7 +23,7 @@ function Toggle({
     <div className="field" style={{ marginBottom: 12 }}>
       <label
         className="strong"
-        style={critical ? { color: '#991b1b', fontWeight: 700 } : undefined}
+        style={critical ? { color: '#991b1b', fontWeight: 700 } : { color: '#166534', fontWeight: 700 }}
       >
         {label}
       </label>
@@ -506,12 +506,10 @@ export default function PreConsultation() {
     []
   )
 
-  /** Show 999 banner only if ANY critical question is answered "Yes". */
+  /** Show 999 banner if ANY question is answered "Yes" (critical or not). */
   const showEmergencyBanner = useMemo(() => {
-    return FORM
-      .filter(s => CRITICAL_SECTION_TITLES.has(s.title))
-      .some(s => s.questions.some(q => answers[q.id] === 'Yes'))
-  }, [answers, CRITICAL_SECTION_TITLES])
+    return FORM.some(s => s.questions.some(q => answers[q.id] === 'Yes'))
+  }, [answers])
 
   return (
     <section className="section">
@@ -608,7 +606,7 @@ export default function PreConsultation() {
           </div>
         </div>
 
-        {/* Emergency banner (now conditional) */}
+        {/* Emergency banner (now shows if ANY Yes) */}
         {showEmergencyBanner && (
           <div
             className="card"
@@ -628,7 +626,7 @@ export default function PreConsultation() {
             }}
           >
             <div className="strong" style={{ marginBottom: 0 }}>
-              If you answer “Yes” to any of these emergency questions, please dial 999 immediately.
+              If you answer “Yes” to any of these questions, please dial 999 immediately.
             </div>
           </div>
         )}
@@ -650,7 +648,7 @@ export default function PreConsultation() {
                 className="strong"
                 style={{
                   marginBottom: 8,
-                  color: isCritical ? '#991b1b' : undefined,
+                  color: isCritical ? '#991b1b' : '#166534',
                 }}
               >
                 {section.title}
