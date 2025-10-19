@@ -164,4 +164,23 @@ public class DoctorReferralController {
         }
     }
 
+    // Return latest referral meta for a consultation (doctor view)
+    @GetMapping(
+            value = "/consultations/{id}/referrals/latest",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<Map<String,Object>> latestReferralForConsultation(
+            @PathVariable("id") Long consultationId) {
+
+        return referrals.findTopByConsultationIdOrderByIdDesc(consultationId)
+                .map(ref -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", ref.getId());
+                    // keep a doctor-only URL so it works in the doctor UI
+                    m.put("pdfUrl", "/api/doctor/referrals/" + ref.getId() + "/pdf");
+                    return ResponseEntity.ok(m);
+                })
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
 }

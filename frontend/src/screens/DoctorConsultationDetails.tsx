@@ -27,6 +27,11 @@ export default function DoctorConsultationDetails() {
     }
   }, [])
 
+  // ===== Referral state (for "View generated referral letter") =====
+  const [referralId, setReferralId] = useState<number | null>(null)
+  const [referralPdfUrl, setReferralPdfUrl] = useState<string | null>(null)
+
+  // Load consultation + latest prescription meta
   useEffect(() => {
     (async () => {
       try {
@@ -50,6 +55,49 @@ export default function DoctorConsultationDetails() {
         }
       } catch { /* handled */ }
     })()
+  }, [id])
+
+  // Load latest referral meta for this consultation
+  useEffect(() => {
+    const cid = Number(id)
+    if (!cid) {
+      setReferralId(null)
+      setReferralPdfUrl(null)
+      return
+    }
+
+    let ignore = false
+    ;(async () => {
+      try {
+        const r = await fetch(
+          `${API_BASE_URL}/doctor/consultations/${cid}/referrals/latest`,
+          { credentials: 'include' }
+        )
+
+        if (ignore) return
+
+        if (r.status === 204) {
+          setReferralId(null)
+          setReferralPdfUrl(null)
+        } else if (r.ok) {
+          const meta = await r.json().catch(() => ({} as any))
+          setReferralId(typeof meta?.id === 'number' ? meta.id : null)
+          setReferralPdfUrl(
+            meta?.pdfUrl ? resolveApiUrl(API_BASE_URL, meta.pdfUrl) : null
+          )
+        } else {
+          setReferralId(null)
+          setReferralPdfUrl(null)
+        }
+      } catch {
+        if (!ignore) {
+          setReferralId(null)
+          setReferralPdfUrl(null)
+        }
+      }
+    })()
+
+    return () => { ignore = true }
   }, [id])
 
   if (!data) return (
@@ -120,6 +168,8 @@ export default function DoctorConsultationDetails() {
 
       const blob = await pdfRes.blob();
       const url = URL.createObjectURL(blob);
+      if (rxUrlRef.current) URL.revokeObjectURL(rxUrlRef.current);
+      rxUrlRef.current = url;
       setRxPdfUrl(url);
 
     } catch (err: any) {
@@ -128,7 +178,6 @@ export default function DoctorConsultationDetails() {
       setCreatingRx(false);
     }
   }
-
 
   return (
     <section className="section">
@@ -320,7 +369,7 @@ export default function DoctorConsultationDetails() {
           )}
           <button className="btn secondary" type="button" disabled>View Case History</button>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
-          {/* Referral Letter */}
+          {/* Referral Letter (builder) */}
           {(id || data?.id) ? (
             <Link
               to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}
@@ -334,8 +383,23 @@ export default function DoctorConsultationDetails() {
               Referral Letter
             </button>
           )}
+          {/* View generated Referral (only if one exists) */}
+          {(() => {
+            const href =
+              (typeof referralPdfUrl === 'string' && referralPdfUrl) ||
+              ((typeof referralId === 'number' || typeof referralId === 'string') &&
+                `${API_BASE_URL}/doctor/referrals/${encodeURIComponent(String(referralId))}/pdf`);
 
-
+            return href ? (
+              <a className="btn secondary" href={href as string} target="_blank" rel="noreferrer">
+                View generated referral letter
+              </a>
+            ) : (
+              <button className="btn secondary" type="button" disabled>
+                View generated referral letter
+              </button>
+            );
+          })()}
         </div>
       </div>
     </section>

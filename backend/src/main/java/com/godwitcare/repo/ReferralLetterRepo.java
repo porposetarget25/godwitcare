@@ -10,4 +10,7 @@ public interface ReferralLetterRepo extends JpaRepository<ReferralLetter, Long> 
     Optional<ReferralLetter> findTopByConsultationUserUsernameOrConsultationUserEmailOrderByIdDesc(
             String username, String email
     );
+
+    Optional<ReferralLetter> findTopByConsultationIdOrderByIdDesc(Long consultationId);
+
 }
