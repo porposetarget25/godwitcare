@@ -1,0 +1,39 @@
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        same-site: none
+        secure: true
+  tomcat:
+    max-swallow-size: -1
+
+spring:
+  datasource:
+    url: jdbc:postgresql://dpg-d3qsho49c44c73d0l9ag-a:5432/faiz_g80x
+    username: ${DB_USERNAME:godwitcare}
+    password: ${DB_PASSWORD:khgFj6nQHK0kaljjCkimQ1bGcFHVM7RX}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update   # consider 'validate' once you add Flyway
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc.lob.non_contextual_creation: true
+        format_sql: true
+  sql:
+    init:
+      mode: never        # don't auto-run schema/data scripts in prod
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+# Log levels (prod-appropriate)
+logging:
+  level:
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
