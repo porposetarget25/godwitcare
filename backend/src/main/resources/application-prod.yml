@@ -10,9 +10,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://dpg-d3qsho49c44c73d0l9ag-a:5432/faiz_g80x
-    username: ${DB_USERNAME:godwitcare}
-    password: ${DB_PASSWORD:khgFj6nQHK0kaljjCkimQ1bGcFHVM7RX}
+    url: jdbc:postgresql://dpg-d44cvvali9vc73e8vimg-a:5432/godwitcare_prod
+    username: ${DB_USERNAME:godwitcare_prod_user}
+    password: ${DB_PASSWORD:C7vRQI9fsjY5KhXCjlot7unHZcp6wYnA}
     driver-class-name: org.postgresql.Driver
 
   jpa:
