@@ -19,6 +19,7 @@ spring:
     hibernate:
       ddl-auto: update   # consider 'validate' once you add Flyway
     show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         jdbc.lob.non_contextual_creation: true
@@ -35,5 +36,6 @@ spring:
 # Log levels (prod-appropriate)
 logging:
   level:
-    org.hibernate.SQL: INFO
+    org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.hibernate.type.descriptor.sql: TRACE
