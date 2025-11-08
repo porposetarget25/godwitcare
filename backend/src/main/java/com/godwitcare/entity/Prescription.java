@@ -1,10 +1,15 @@
 package com.godwitcare.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 
 @Entity
+@Access(AccessType.FIELD) // bind by field types (avoids wrong JDBC casting)
 public class Prescription {
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -13,37 +18,38 @@ public class Prescription {
     private Consultation consultation;
 
     // Denormalized patient fields
-    private String patientId;
-    private String patientName;
-    private String patientDob;
-    private String patientPhone;
+    private String patientId;     // e.g. PV-987654321
+    private String patientName;   // "First Last"
+    private String patientDob;    // yyyy-MM-dd
+    private String patientPhone;  // WhatsApp
 
-    // Free text
+    // Free text fields from doctor
     @Column(length = 4000)
     private String historyOfPresentingComplaint;
     @Column(length = 4000)
     private String diagnosis;
     @Column(length = 8000)
-    private String medicines;
+    private String medicines; // newline-separated (or JSON if you prefer)
     @Column(length = 4000)
     private String recommendations;
 
-    // Current prod columns
+    // ---- BINARY PDF DATA ----
     @Lob
-    @Column(name = "pdf_bytes2")
+    @Column(name = "pdf_bytes")            // prod column for Prescription is pdf_bytes (bytea)
+    @JdbcTypeCode(SqlTypes.BINARY)         // ensure Hibernate binds as binary
     private byte[] pdfBytes;
 
+    // Canonical size
     @Column(name = "size_bytes")
     private Long sizeBytes;
 
-    // Legacy NOT NULL column in prod
+    // Legacy NOT NULL column still present in prod
     @Basic(optional = false)
     @Column(name = "size", nullable = false)
     private Long size = 0L;
 
     private String fileName = "prescription.pdf";
     private String contentType = "application/pdf";
-
     private Instant createdAt = Instant.now();
 
     @PrePersist
@@ -51,10 +57,10 @@ public class Prescription {
     private void syncSizes() {
         long len = (pdfBytes != null) ? pdfBytes.length : 0L;
         if (sizeBytes == null || sizeBytes == 0L) sizeBytes = len;
-        if (size == null || size == 0L) size = sizeBytes;
+        if (size == null || size == 0L) size = sizeBytes; // keep legacy column populated
     }
 
-    // getters/setters
+    // ---- getters/setters ----
     public Long getId() { return id; }
     public Consultation getConsultation() { return consultation; }
     public void setConsultation(Consultation consultation) { this.consultation = consultation; }
