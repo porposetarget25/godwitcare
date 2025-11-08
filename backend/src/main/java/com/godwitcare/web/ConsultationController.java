@@ -259,7 +259,7 @@ public class ConsultationController {
         p.setMedicines(String.join("\n", meds));
         p.setRecommendations(recommendations);
         p.setPdfBytes(pdf);
-        p.setSize(pdf.length);
+        p.setSize(Long.valueOf(pdf.length));
         p.setContentType("application/pdf");
         if (p.getFileName() == null || p.getFileName().isBlank()) {
             p.setFileName("prescription-" + System.currentTimeMillis() + ".pdf");

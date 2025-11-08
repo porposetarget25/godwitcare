@@ -125,7 +125,7 @@ public class DoctorReferralController {
         ref.setPdfBytes(pdf);
         ref.setFileName("referral.pdf");
         ref.setContentType("application/pdf");
-        ref.setSize(pdf.length);
+        ref.setSize(Long.valueOf(pdf.length));
         ref = referrals.save(ref);
 
         String pdfUrl = ServletUriComponentsBuilder

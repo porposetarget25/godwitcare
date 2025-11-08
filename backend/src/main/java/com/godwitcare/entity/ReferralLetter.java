@@ -1,10 +1,7 @@
-// src/main/java/com/godwitcare/entity/ReferralLetter.java
 package com.godwitcare.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 public class ReferralLetter {
@@ -30,25 +27,35 @@ public class ReferralLetter {
     private String doctorEmail;
 
     @Column(length = 10000)
-    private String body; // the paragraph block doctor edits
+    private String body;
 
-    // ===== Rendered PDF (NEW columns to avoid the broken existing ones) =====
+    // Current prod columns
     @Lob
-    @JdbcTypeCode(SqlTypes.BINARY)               // works on H2 and Postgres
-    @Column(name = "pdf_bytes2")                 // NEW column name; avoids clash with old/bad pdf_bytes
+    @Column(name = "pdf_bytes2")
     private byte[] pdfBytes;
 
-    @Column(name = "size_bytes")                 // NEW column name; bigint in Postgres, bigInt in H2
-    private Long sizeBytes;
+    @Column(name = "size_bytes")
+    private Long sizeBytes;                 // canonical byte size
 
-    private String fileName = "referral-letter.pdf";
+    // Legacy NOT NULL column in prod
+    @Basic(optional = false)
+    @Column(name = "size", nullable = false)
+    private Long size = 0L;                 // MUST be named 'size' so Hibernate inserts it
+
+    private String fileName = "referral.pdf";
     private String contentType = "application/pdf";
 
     private Instant createdAt = Instant.now();
 
-    // ====== getters/setters ======
-    public Long getId() { return id; }
+    @PrePersist
+    @PreUpdate
+    private void syncSizes() {
+        long len = (pdfBytes != null) ? pdfBytes.length : 0L;
+        if (sizeBytes == null || sizeBytes == 0L) sizeBytes = len;
+        if (size == null || size == 0L) size = sizeBytes; // keep legacy column populated
+    }
 
+    public Long getId() { return id; }
     public Consultation getConsultation() { return consultation; }
     public void setConsultation(Consultation c) { this.consultation = c; }
 
@@ -77,21 +84,15 @@ public class ReferralLetter {
 
     public byte[] getPdfBytes() { return pdfBytes; }
     public void setPdfBytes(byte[] bytes) { this.pdfBytes = bytes; }
+    public Long getSizeBytes() { return sizeBytes; }
+    public void setSizeBytes(Long s) { this.sizeBytes = s; }
+    public Long getSize() { return size; }
+    public void setSize(Long s) { this.size = s; }
 
     public String getFileName() { return fileName; }
     public void setFileName(String s) { this.fileName = s; }
-
     public String getContentType() { return contentType; }
     public void setContentType(String s) { this.contentType = s; }
 
     public Instant getCreatedAt() { return createdAt; }
-
-    // -------- compatibility accessors for old 'size' field --------
-    @Transient
-    public long getSize() { return sizeBytes == null ? 0L : sizeBytes; }
-    public void setSize(long size) { this.sizeBytes = size; }
-
-    // Preferred explicit accessors
-    public Long getSizeBytes() { return sizeBytes; }
-    public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
 }
