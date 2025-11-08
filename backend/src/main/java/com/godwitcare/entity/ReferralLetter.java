@@ -3,6 +3,8 @@ package com.godwitcare.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 public class ReferralLetter {
@@ -30,17 +32,23 @@ public class ReferralLetter {
     @Column(length = 10000)
     private String body; // the paragraph block doctor edits
 
-    // Rendered PDF
+    // ===== Rendered PDF (NEW columns to avoid the broken existing ones) =====
     @Lob
-    @Column(name = "pdf_bytes", columnDefinition = "bytea")
+    @JdbcTypeCode(SqlTypes.BINARY)               // works on H2 and Postgres
+    @Column(name = "pdf_bytes2")                 // NEW column name; avoids clash with old/bad pdf_bytes
     private byte[] pdfBytes;
+
+    @Column(name = "size_bytes")                 // NEW column name; bigint in Postgres, bigInt in H2
+    private Long sizeBytes;
+
     private String fileName = "referral-letter.pdf";
     private String contentType = "application/pdf";
-    private long size;
 
     private Instant createdAt = Instant.now();
 
+    // ====== getters/setters ======
     public Long getId() { return id; }
+
     public Consultation getConsultation() { return consultation; }
     public void setConsultation(Consultation c) { this.consultation = c; }
 
@@ -69,12 +77,21 @@ public class ReferralLetter {
 
     public byte[] getPdfBytes() { return pdfBytes; }
     public void setPdfBytes(byte[] bytes) { this.pdfBytes = bytes; }
+
     public String getFileName() { return fileName; }
     public void setFileName(String s) { this.fileName = s; }
+
     public String getContentType() { return contentType; }
     public void setContentType(String s) { this.contentType = s; }
-    public long getSize() { return size; }
-    public void setSize(long size) { this.size = size; }
 
     public Instant getCreatedAt() { return createdAt; }
+
+    // -------- compatibility accessors for old 'size' field --------
+    @Transient
+    public long getSize() { return sizeBytes == null ? 0L : sizeBytes; }
+    public void setSize(long size) { this.sizeBytes = size; }
+
+    // Preferred explicit accessors
+    public Long getSizeBytes() { return sizeBytes; }
+    public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
 }
