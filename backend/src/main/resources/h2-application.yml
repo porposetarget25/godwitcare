@@ -10,16 +10,19 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/godwitcare
-    username: godwitcare_user
-    password: godwitcare_pwd
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:godwitcare;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
   flyway:
-    enabled: false
+    enabled: true
     locations: classpath:db/migration/h2
     baseline-on-migrate: true
     validate-on-migrate: false
