@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+
 @RestController
 @RequestMapping("/api")
 public class ConsultationController {
@@ -123,29 +124,27 @@ public class ConsultationController {
         List<Consultation> all = consultations.findAll();
         all.sort(Comparator.comparingLong(Consultation::getId).reversed());
 
-        // must be final/effectively final to use inside lambda
         final Consultation.Status filterStatus = parseFilterStatus(statusParam);
-
         if (filterStatus != null) {
             all = all.stream()
                     .filter(c -> c.getStatus() == filterStatus)
-                    .collect(java.util.stream.Collectors.toList()); // use .toList() if on Java 16+
+                    .collect(java.util.stream.Collectors.toList());
         }
 
-        List<Map<String, Object>> out = new ArrayList<>();
+        List<Map<String, Object>> out = new ArrayList<>(all.size());
         for (Consultation c : all) {
-            var u = c.getUser();
-            out.add(Map.of(
-                    "id", c.getId(),
-                    "patientEmail", u.getEmail(),
-                    "patientName",
-                    ((c.getContactName() == null ? "" : c.getContactName())),
-                    "createdAt", c.getCreatedAt(),
-                    "status", c.getStatus().name()
-            ));
+            var u = c.getUser(); // can be null in prod data
+            var row = new LinkedHashMap<String, Object>();
+            row.put("id", c.getId());
+            row.put("patientEmail", u != null ? u.getEmail() : null); // allow null safely
+            row.put("patientName", nz(c.getContactName()));
+            row.put("createdAt", c.getCreatedAt()); // Instant (non-null typically; ok if null)
+            row.put("status", c.getStatus() != null ? c.getStatus().name() : "LOGGED");
+            out.add(row);
         }
         return out;
     }
+
 
     private static Consultation.Status parseFilterStatus(String statusParam) {
         if (statusParam == null || "ALL".equalsIgnoreCase(statusParam)) return null;
@@ -163,51 +162,49 @@ public class ConsultationController {
     public ResponseEntity<Map<String, Object>> details(@PathVariable Long id) {
         return consultations.findById(id)
                 .map(c -> {
-                    var u = c.getUser();
-                    Map<String, Object> d = new HashMap<>();
+                    var u = c.getUser(); // may be null in prod
+                    Map<String, Object> d = new LinkedHashMap<>();
                     d.put("id", c.getId());
                     d.put("patientId", c.getPatientId());
                     d.put("createdAt", c.getCreatedAt());
-                    d.put("status", c.getStatus().name());
-                    d.put("patient", Map.of(
-                            "email", u.getEmail(),
-                            "firstName", c.getContactName(),
-                            //"lastName", u.getLastName(),
-                            "dob", c.getDob() != null ? c.getDob().toString() : ""
-                    ));
-                    d.put("currentLocation", c.getCurrentLocation());
-                    d.put("contactName", c.getContactName());
-                    d.put("contactPhone", c.getContactPhone());
-                    d.put("contactAddress", c.getContactAddress());
-                    ObjectMapper mapper = new ObjectMapper();
+                    d.put("status", c.getStatus() != null ? c.getStatus().name() : "LOGGED");
 
-                    // Existing: answers (qid -> "Yes"/"No")
+                    // build patient sub-map without Map.of (null-safe)
+                    Map<String, Object> patient = new LinkedHashMap<>();
+                    patient.put("email", u != null ? u.getEmail() : null);
+                    patient.put("firstName", nz(c.getContactName()));
+                    patient.put("dob", c.getDob() != null ? c.getDob().toString() : "");
+                    d.put("patient", patient);
+
+                    d.put("currentLocation", nz(c.getCurrentLocation()));
+                    d.put("contactName", nz(c.getContactName()));
+                    d.put("contactPhone", nz(c.getContactPhone()));
+                    d.put("contactAddress", nz(c.getContactAddress()));
+
+                    ObjectMapper mapper = new ObjectMapper();
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, String> answers =
-                                mapper.readValue(c.getAnswersJson(), Map.class);
-                        d.put("answers", answers != null ? answers : Map.of());
+                                mapper.readValue(c.getAnswersJson() == null ? "{}" : c.getAnswersJson(), Map.class);
+                        d.put("answers", answers != null ? answers : Collections.emptyMap());
                     } catch (Exception ex) {
-                        d.put("answers", Map.of());
+                        d.put("answers", Collections.emptyMap());
                     }
 
-                    // NEW: free-text notes per question (qid -> note)
                     try {
                         @SuppressWarnings("unchecked")
                         Map<String, String> detailsByQuestion =
-                                mapper.readValue(
-                                        c.getDetailsByQuestionJson() == null ? "{}" : c.getDetailsByQuestionJson(),
-                                        Map.class
-                                );
-                        d.put("detailsByQuestion", detailsByQuestion != null ? detailsByQuestion : Map.of());
+                                mapper.readValue(c.getDetailsByQuestionJson() == null ? "{}" : c.getDetailsByQuestionJson(), Map.class);
+                        d.put("detailsByQuestion", detailsByQuestion != null ? detailsByQuestion : Collections.emptyMap());
                     } catch (Exception ex) {
-                        d.put("detailsByQuestion", Map.of());
+                        d.put("detailsByQuestion", Collections.emptyMap());
                     }
 
                     return ResponseEntity.ok(d);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
 
     // ---------- Doctor creates a prescription for a consultation ----------
     @PostMapping("/doctor/consultations/{id}/prescriptions")
@@ -239,7 +236,7 @@ public class ConsultationController {
                 c.getContactAddress(),
                 /* consult */ diagnosis,
                 history,
-                meds,recommendations,
+                meds, recommendations,
                 /* doctor block (put your real values / pull from auth doctor profile) */
                 "Dr. Dimitris–Christos Zachariades",
                 "GMC Registration: 6164496",
@@ -442,6 +439,10 @@ public class ConsultationController {
 
         consultations.save(c);
         return ResponseEntity.ok(Map.of("id", c.getId(), "updated", true));
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
 }
