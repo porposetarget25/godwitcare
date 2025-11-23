@@ -309,7 +309,7 @@ export default function Home() {
             <div className="muted">Time Difference: +6 hours from Origin (GMT+2)</div>
           </div>
           <div className="pc-actions">
-            {/* <a className="btn" href="https://wa.me/64211899955" target="_blank" rel="noreferrer">
+            {/* <a className="btn" href="https://wa.me/447904141541" target="_blank" rel="noreferrer">
               WhatsApp
             </a> */}
             <Link
