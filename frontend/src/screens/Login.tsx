@@ -1,27 +1,31 @@
 // src/screens/Login.tsx
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { login } from '../api'   // session login
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { login } from '../api';   // session login
+import { useAuth } from '../state/auth';
 
 export default function Login() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const navigate = useNavigate()
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { refresh } = useAuth();
 
   async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
       // Use WhatsApp number as username
-      await login(username, password)
-      navigate('/home')
+      await login(username, password);
+      // Immediately refresh auth context (so useAuth() has the user)
+      await refresh();
+      navigate('/home');
     } catch (err: any) {
-      setError(err?.message || 'Login failed')
+      setError(err?.message || 'Login failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -39,13 +43,13 @@ export default function Login() {
         {error && (
           <div
             style={{
-              background:'#fee2e2',
-              border:'1px solid #fecaca',
-              color:'#991b1b',
-              borderRadius:10,
-              padding:'10px 12px',
-              marginBottom:12,
-              fontSize:14
+              background: '#fee2e2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              borderRadius: 10,
+              padding: '10px 12px',
+              marginBottom: 12,
+              fontSize: 14,
             }}
           >
             {error}
@@ -94,5 +98,5 @@ export default function Login() {
         </form>
       </div>
     </section>
-  )
+  );
 }

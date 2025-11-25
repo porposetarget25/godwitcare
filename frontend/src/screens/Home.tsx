@@ -55,7 +55,9 @@ export default function Home() {
 
   const navigate = useNavigate()
 
-  const isDoctor = !!user?.roles?.includes?.('DOCTOR')
+  const isDoctor = !!user?.roles?.some?.(
+  r => typeof r === 'string' && r.toUpperCase().includes('DOCTOR')
+   )
 
   useEffect(() => {
     let alive = true
