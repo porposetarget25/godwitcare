@@ -1,7 +1,9 @@
 // src/main.tsx
-import React from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+
+
 import Dashboard from './screens/Dashboard'
 import Login from './screens/Login'
 import Step1 from './screens/RegisterStep1'
@@ -18,18 +20,52 @@ import DoctorLogin from './screens/DoctorLogin'
 import DoctorConsultations from './screens/DoctorConsultations'
 import DoctorConsultationDetails from './screens/DoctorConsultationDetails'
 import { RequireRole } from './screens/RequireRole'
-import type { UserDto } from './api'
+import { getMe as fetchMe, type UserDto } from './api'
+
 import CareHistory from './screens/CareHistory'
 import ReferralLetter from './screens/ReferralLetter'
 
-// read the user placed in localStorage by your login()
-function useCurrentUser(): UserDto | null {
-  try {
-    const raw = localStorage.getItem('gc_user')
-    return raw ? (JSON.parse(raw) as UserDto) : null
-  } catch {
-    return null
+import { useNavigate } from 'react-router-dom'
+import { logout as apiLogout } from './api'
+
+
+// -------- Auth context (server is source of truth) --------
+type AuthState = {
+  user: UserDto | null
+  loading: boolean
+  refresh: () => Promise<void>
+}
+const AuthCtx = createContext<AuthState>({ user: null, loading: true, refresh: async () => {} })
+export function useAuth() { return useContext(AuthCtx) }
+
+function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<UserDto | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = async () => {
+    try {
+      setLoading(true)
+      const u = await fetchMe()
+      setUser(u)
+      // optional: keep a copy for non-critical UI, but DO NOT trust for routing
+      try { localStorage.setItem('gc_user', JSON.stringify(u ?? null)) } catch {}
+    } catch {
+      setUser(null)
+      try { localStorage.removeItem('gc_user') } catch {}
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  return (
+    <AuthCtx.Provider value={{ user, loading, refresh: load }}>
+      {children}
+    </AuthCtx.Provider>
+  )
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -65,9 +101,16 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
-
 function AppRoutes() {
-  const user = useCurrentUser()
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div style={{ padding: 24 }}>
+        <div className="muted">Loading…</div>
+      </div>
+    )
+  }
 
   return (
     <Routes>
@@ -86,11 +129,10 @@ function AppRoutes() {
       <Route path="/consultation/details" element={<Shell><ConsultationDetails /></Shell>} />
       <Route path="/doctor/referral/:id" element={<Shell><ReferralLetter /></Shell>} />
 
-
       {/* Doctor login (public) */}
       <Route path="/doctor/login" element={<Shell><DoctorLogin /></Shell>} />
 
-      {/* Care History - patient */} 
+      {/* Care History - patient */}
       <Route path="/care-history" element={<Shell><CareHistory /></Shell>} />
 
       {/* Doctor-only routes */}
@@ -115,11 +157,15 @@ function AppRoutes() {
         }
       />
 
-
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )
+}
+
+// Kill any service worker (prevents stale shell/pages)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()))
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -127,7 +173,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <RegProvider>
       <HashRouter>
         <ScrollToHash />
-        <AppRoutes />
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </HashRouter>
     </RegProvider>
   </React.StrictMode>

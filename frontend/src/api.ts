@@ -1,5 +1,15 @@
 // ========================= api.ts =========================
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\]\\^])/g, '\\$1') + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
 
+function csrfHeaders(): Record<string, string> {
+  // Spring (CookieCsrfTokenRepository) uses XSRF-TOKEN cookie + X-XSRF-TOKEN header
+  const token = getCookie('XSRF-TOKEN') || getCookie('X-CSRF-TOKEN');
+  return token ? { 'X-XSRF-TOKEN': token } : {};
+}
 // ---------- Types ----------
 export type Traveler = {
   fullName: string
@@ -150,10 +160,10 @@ export const API_BASE_URL = API_BASE
 // ---------- Generic request helper (resilient to HTML error pages) ----------
 async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
-
-  // Always include cookies (session) unless explicitly overridden by caller
   const res = await fetch(url, {
     credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache', ...(init.headers || {}) },
     ...init,
   })
 
@@ -166,11 +176,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
 
   if (!text) return {} as T
   if (contentType.includes('application/json')) return JSON.parse(text) as T
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    return text as unknown as T
-  }
+  try { return JSON.parse(text) as T } catch { return text as unknown as T }
 }
 
 
@@ -219,17 +225,12 @@ export async function downloadDocumentBlob(
 //   GET  /api/auth/me         -> 200 UserDto if logged-in; 401 otherwise
 
 export async function login(email: string, password: string): Promise<UserDto> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const user = await request<UserDto>('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // keep session cookie
     body: JSON.stringify({ email, password }),
   })
-  if (!res.ok) throw new Error('Login failed')
-  const user = (await res.json()) as UserDto
-  try {
-    localStorage.setItem('gc_user', JSON.stringify(user))
-  } catch {}
+  try { localStorage.setItem('gc_user', JSON.stringify(user)) } catch {}
   return user
 }
 
@@ -238,18 +239,28 @@ export async function logout(): Promise<void> {
     await fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
-    })
+      headers: {
+        ...csrfHeaders(),
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
+  } catch {
+    // network/other error -> ignore
   } finally {
-    try {
-      localStorage.removeItem('gc_user')
-    } catch {}
+    // client-side logout regardless of server result
+    try { localStorage.removeItem('gc_user'); } catch {}
   }
 }
 
 export async function me(): Promise<UserDto | null> {
+  // use fetch to inspect 401 without throwing
   const res = await fetch(`${API_BASE}/auth/me`, {
     method: 'GET',
     credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' }
   })
   if (res.status === 401) return null
   if (!res.ok) throw new Error('Failed to fetch current user')
@@ -398,6 +409,22 @@ export function resolveApiUrl(base: string, path: string) {
 
   return `${cleanBase}/${effectivePath}`;
 }
+
+// api.ts
+
+export async function getMe(): Promise<UserDto | null> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error('Failed to fetch current user');
+  return res.json() as Promise<UserDto>;
+}
+
+
 
 
 
