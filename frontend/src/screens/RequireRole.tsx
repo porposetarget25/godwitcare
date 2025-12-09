@@ -1,32 +1,37 @@
 // src/screens/RequireRole.tsx
-import React from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
-import type { UserDto } from '../api'
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import type { UserDto } from '../api';
 
-export function RequireRole({
-  user,
-  role,
-  children,
-}: {
-  user: UserDto | null
-  role: string
-  children: React.ReactNode
-}) {
-  const location = useLocation()
+type Props = {
+  user: UserDto | null;
+  role: string;
+  loading?: boolean;
+  children: React.ReactNode;
+};
 
-  // If user not present yet (first paint), show a tiny placeholder.
-  // AuthProvider will populate soon after mount.
-  if (user === null) {
-    return <div style={{ padding: 16 }} className="muted">Loading…</div>
+export function RequireRole({ user, role, loading, children }: Props) {
+  if (loading) {
+    return (
+      <div style={{ padding: 24 }}>
+        <div className="muted">Loading…</div>
+      </div>
+    );
   }
 
-  const hasRole =
-    Array.isArray(user.roles) && user.roles.some(r => r?.toUpperCase() === role.toUpperCase())
+  if (!user) {
+    // not logged in – send to doctor login (or normal login)
+    return <Navigate to="/doctor/login" replace />;
+  }
+
+  const hasRole = !!user.roles?.some(
+    (r) => typeof r === 'string' && r.toUpperCase().includes(role.toUpperCase())
+  );
 
   if (!hasRole) {
-    // Not a doctor → send to login and remember where to return
-    return <Navigate to="/doctor/login" replace state={{ from: location }} />
+    // logged in but wrong role
+    return <Navigate to="/home" replace />;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

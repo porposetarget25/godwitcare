@@ -63,17 +63,13 @@ function Shell({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div style={{ padding: 24 }}>
-        <div className="muted">Loading…</div>
-      </div>
-    );
-  }
-
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* PUBLIC routes - these should not wait on auth */}
+      <Route
+        path="/"
+        element={<Navigate to="/dashboard" replace />}
+      />
       <Route
         path="/dashboard"
         element={
@@ -115,14 +111,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/home"
-        element={
-          <Shell>
-            <Home />
-          </Shell>
-        }
-      />
-      <Route
         path="/consultation"
         element={
           <Shell>
@@ -130,8 +118,6 @@ function AppRoutes() {
           </Shell>
         }
       />
-
-      {/* Consultation flow */}
       <Route
         path="/consultation/tracker"
         element={
@@ -157,6 +143,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/doctor/login"
+        element={
+          <Shell>
+            <DoctorLogin />
+          </Shell>
+        }
+      />
+      <Route
         path="/doctor/referral/:id"
         element={
           <Shell>
@@ -165,17 +159,17 @@ function AppRoutes() {
         }
       />
 
-      {/* Doctor login (public) */}
+      {/* ROUTES THAT NEED AUTH */}
+
       <Route
-        path="/doctor/login"
+        path="/home"
         element={
           <Shell>
-            <DoctorLogin />
+            {/* Home can read loading/user itself if needed */}
+            <Home />
           </Shell>
         }
       />
-
-      {/* Care History - patient */}
       <Route
         path="/care-history"
         element={
@@ -185,12 +179,11 @@ function AppRoutes() {
         }
       />
 
-      {/* Doctor-only routes */}
       <Route
         path="/doctor/consultations"
         element={
           <Shell>
-            <RequireRole user={user} role="DOCTOR">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
               <DoctorConsultations />
             </RequireRole>
           </Shell>
@@ -200,18 +193,21 @@ function AppRoutes() {
         path="/doctor/consultations/:id"
         element={
           <Shell>
-            <RequireRole user={user} role="DOCTOR">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
               <DoctorConsultationDetails />
             </RequireRole>
           </Shell>
         }
       />
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route
+        path="*"
+        element={<Navigate to="/dashboard" replace />}
+      />
     </Routes>
   );
 }
+ 
 
 // Kill any service worker (prevents stale shell/pages)
 if ('serviceWorker' in navigator) {
