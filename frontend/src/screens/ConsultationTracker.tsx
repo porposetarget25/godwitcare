@@ -43,7 +43,7 @@ export default function ConsultationTracker() {
   }, [])
 
   // WhatsApp deep-link (digits only)
-  const WA_NUMBER = '447766479636'
+  const WA_NUMBER = '447783579014'
   const waHref = `https://wa.me/${WA_NUMBER}`
 
   // Latest prescription URL (if exists)
