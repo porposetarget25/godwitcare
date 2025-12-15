@@ -112,6 +112,12 @@ public class ConsultationController {
         res.put("id", c.getId());
         res.put("createdAt", c.getCreatedAt());
         res.put("status", c.getStatus().name());
+        res.put("contactName", c.getContactName());
+        res.put("contactPhone", c.getContactPhone());
+        res.put("contactAddress", c.getContactAddress());
+        res.put("currentLocation", c.getCurrentLocation());
+        res.put("dob", c.getDob() != null ? c.getDob().toString() : null);
+        res.put("patientId", c.getPatientId());
         return ResponseEntity.ok(res);
     }
 

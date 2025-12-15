@@ -1,7 +1,7 @@
 // src/screens/ConsultationTracker.tsx
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { API_BASE_URL, resolveApiUrl } from '../api'
+import { API_BASE_URL, resolveApiUrl, getMe } from '../api'
 
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
@@ -13,6 +13,13 @@ export default function ConsultationTracker() {
   const [latestStatus, setLatestStatus] =
     useState<'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null>(null)
 
+  // Patient info for WhatsApp draft message
+  const [patientName, setPatientName] = useState<string>('N/A')
+  const [dob, setDob] = useState<string>('N/A')
+  const [mobile, setMobile] = useState<string>('N/A')
+  const [address, setAddress] = useState<string>('N/A')
+
+  // Toast on landing after logging consultation
   useEffect(() => {
     if (!isLogged) return
     setShowToast(true)
@@ -20,56 +27,117 @@ export default function ConsultationTracker() {
     return () => clearTimeout(timer)
   }, [isLogged])
 
-  // Load latest consultation (if any)
+  // Load basic user info + latest consultation once (single effect, no duplicates)
   useEffect(() => {
-    ; (async () => {
+    let alive = true
+
+    const nz = (v: any, fallback = 'N/A') => {
+      const s = v === null || v === undefined ? '' : String(v).trim()
+      return s ? s : fallback
+    }
+
+    ;(async () => {
       try {
+        // 1) Try to populate from /auth/me (most reliable for name)
+        const me = await getMe().catch(() => null)
+        if (!alive) return
+
+        if (me) {
+          const fullName = [me.firstName, me.lastName].filter(Boolean).join(' ').trim()
+          if (fullName) setPatientName(fullName)
+
+          // Some backends include username in DTO; if yours doesn't, no harm.
+          // @ts-ignore
+          if (me.username) setMobile(nz((me as any).username))
+        }
+
+        // 2) Latest consultation (cid/status + address/mobile if available)
         const res = await fetch(`${API_BASE_URL}/consultations/mine/latest`, {
           credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
         })
+        if (!alive) return
+
         if (res.status === 204 || !res.ok) {
           setLatestCid(null)
           setLatestStatus(null)
           return
         }
+
         const j = await res.json()
-        setLatestCid(typeof j?.id === 'number' ? j.id : null)
+
+        const cid = typeof j?.id === 'number' ? j.id : null
+        setLatestCid(cid)
         setLatestStatus(typeof j?.status === 'string' ? j.status : null)
+
+        // Defensive mapping across likely field names
+        setPatientName(prev => nz(j?.patientName ?? j?.contactName ?? j?.fullName ?? j?.name, prev))
+        setMobile(prev => nz(j?.patientPhone ?? j?.contactPhone ?? j?.phone ?? j?.mobile ?? j?.whatsAppNumber ?? j?.primaryWhatsAppNumber, prev))
+        setAddress(prev => nz(j?.patientAddress ?? j?.contactAddress ?? j?.address ?? j?.currentLocation, prev))
+        setDob(prev => nz(j?.dob ?? j?.dateOfBirth ?? j?.patientDob, prev))
       } catch {
-        setLatestCid(null)
-        setLatestStatus(null)
+        // keep defaults (no crash)
       }
     })()
+
+    return () => {
+      alive = false
+    }
   }, [])
 
-  // WhatsApp deep-link (digits only)
-  const WA_NUMBER = '447783579014'
-  const waHref = `https://wa.me/${WA_NUMBER}`
+  // WhatsApp deep-link (prefilled message)
+  const WA_NUMBER = '447783579014' // digits only, country code + number
+
+  const waHref = useMemo(() => {
+    const consultationId = latestCid ? String(latestCid) : 'N/A'
+
+    const waMessage =
+      `Hi, This is the patient ${patientName || 'N/A'}, ` +
+      `I have logged a consultation call with GodwitCare, ` +
+      `my details are Address: ${address || 'N/A'}, DOB: ${dob || 'N/A'}, Mobile: ${mobile || 'N/A'}. ` +
+      `Consultation ID: ${consultationId}. ` +
+      `Please look into my case.`
+
+    const waText = encodeURIComponent(waMessage)
+
+    const isMobile =
+      typeof navigator !== 'undefined' &&
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    // Desktop: web.whatsapp.com is most reliable for prefilled text
+    // Mobile: api.whatsapp.com is reliable
+    return isMobile
+      ? `https://api.whatsapp.com/send?phone=${WA_NUMBER}&text=${waText}`
+      : `https://web.whatsapp.com/send?phone=${WA_NUMBER}&text=${waText}`
+  }, [latestCid, patientName, address, dob, mobile])
 
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = useState<string | null>(null)
   useEffect(() => {
     let ignore = false
-      ; (async () => {
-        try {
-          const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
-            credentials: 'include',
-          })
-          if (ignore) return
-          if (res.status === 204 || !res.ok) {
-            setRxUrl(null)
-            return
-          }
-          const j = await res.json().catch(() => null)
-          if (j && j.pdfUrl) {
-            setRxUrl(resolveApiUrl(API_BASE_URL, j.pdfUrl))
-          } else {
-            setRxUrl(null)
-          }
-        } catch {
-          if (!ignore) setRxUrl(null)
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        })
+        if (ignore) return
+        if (res.status === 204 || !res.ok) {
+          setRxUrl(null)
+          return
         }
-      })()
+        const j = await res.json().catch(() => null)
+        if (j && j.pdfUrl) {
+          setRxUrl(resolveApiUrl(API_BASE_URL, j.pdfUrl))
+        } else {
+          setRxUrl(null)
+        }
+      } catch {
+        if (!ignore) setRxUrl(null)
+      }
+    })()
     return () => {
       ignore = true
     }
@@ -112,9 +180,7 @@ export default function ConsultationTracker() {
   function openNearbyPharmacies() {
     setFindingPharmacy(true)
 
-    const open = (url: string) =>
-      window.open(url, '_blank', 'noopener,noreferrer')
-
+    const open = (url: string) => window.open(url, '_blank', 'noopener,noreferrer')
     const fallback = 'https://www.google.com/maps/search/pharmacy'
 
     // Geolocation works on HTTPS or http://localhost
@@ -184,14 +250,13 @@ export default function ConsultationTracker() {
               border: 'none',
               fontSize: 18,
               lineHeight: 1,
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             ×
           </button>
         </div>
       )}
-
 
       {/* Step 1 */}
       <div style={step1CardStyle}>
@@ -235,28 +300,15 @@ export default function ConsultationTracker() {
               chat with our helpline.
             </div>
           </div>
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noreferrer"
+
+          <button
+            type="button"
             className="btn"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            onClick={() => window.open(waHref, '_blank', 'noopener,noreferrer')}
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.9.32 1.77.58 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.09a2 2 0 0 1 2.11-.45c.84.26 1.71.46 2.61.58A2 2 0 0 1 22 16.92z" />
-            </svg>
             Notify Clinician
-          </a>
+          </button>
         </div>
       </div>
 
@@ -308,12 +360,7 @@ export default function ConsultationTracker() {
           </div>
 
           {hasRxOrCompleted ? (
-            <button
-              className="btn"
-              type="button"
-              onClick={openNearbyPharmacies}
-              disabled={findingPharmacy}
-            >
+            <button className="btn" type="button" onClick={openNearbyPharmacies} disabled={findingPharmacy}>
               {findingPharmacy ? 'Finding…' : 'Find Nearby Pharmacies'}
             </button>
           ) : (
