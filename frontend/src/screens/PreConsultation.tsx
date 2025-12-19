@@ -6,6 +6,17 @@ import { API_BASE_URL } from '../api'
 type YesNo = 'Yes' | 'No'
 type Ans = YesNo | undefined
 
+function sanitizeAscii(input: string): string {
+  if (!input) return input
+
+  // Normalize accents (ā → a) and remove remaining non-ASCII chars
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[^\x20-\x7E]/g, '')    // remove non-printable / non-ASCII
+}
+
+
 function Toggle({
   label,
   value,
@@ -419,7 +430,7 @@ export default function PreConsultation() {
       }
 
       const payload = {
-        currentLocation: location,
+        currentLocation: sanitizeAscii(location),
         contactName,
         contactPhone,
         contactAddress,
@@ -528,7 +539,7 @@ export default function PreConsultation() {
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={(e) => setLocation(sanitizeAscii(e.target.value))}
               placeholder="123 Main St, Anytown"
               style={{ flex: 1 }}
             />
