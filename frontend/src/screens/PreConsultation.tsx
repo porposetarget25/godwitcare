@@ -506,10 +506,13 @@ export default function PreConsultation() {
     []
   )
 
-  /** Show 999 banner if ANY question is answered "Yes" (critical or not). */
+    /** Show 999 banner ONLY if ANY "Yes" is answered inside critical (red) sections. */
   const showEmergencyBanner = useMemo(() => {
-    return FORM.some(s => s.questions.some(q => answers[q.id] === 'Yes'))
-  }, [answers])
+    return FORM
+      .filter(s => CRITICAL_SECTION_TITLES.has(s.title))
+      .some(s => s.questions.some(q => answers[q.id] === 'Yes'))
+  }, [answers, CRITICAL_SECTION_TITLES])
+
 
   return (
     <section className="section">

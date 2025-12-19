@@ -58,7 +58,7 @@ export default function Login() {
 
         <form className="auth-form" onSubmit={onSubmit}>
           <div className="field">
-            <label htmlFor="username">WhatsApp Number</label>
+            <label htmlFor="username">WhatsApp Number/Email</label>
             <input
               id="username"
               type="text"
