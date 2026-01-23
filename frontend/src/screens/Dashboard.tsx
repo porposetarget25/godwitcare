@@ -185,7 +185,7 @@ export default function Dashboard() {
               src={doctorSrc}
             />
 
-          </div>
+          </div>  
         </section>
 
         {/* HOW IT WORKS */}

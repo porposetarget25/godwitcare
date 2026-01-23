@@ -132,12 +132,20 @@ header img.logo {
 .heroGrid {
   display: grid;
   grid-template-columns: 1.1fr .9fr;
+  grid-template-areas: "copy media";
   gap: 24px;
   max-width: 1100px;
   margin: 0 auto;
   align-items: center;
 }
+.heroGrid > div { grid-area: copy; }
+.heroGrid > img { grid-area: media; }
 .hero h1 { font-size: 42px; line-height: 1.1; margin: 0 0 14px }
+.hero h2 {
+  font-size: 36px;
+  line-height: 1.1;
+  margin: 0 0 14px;
+}
 .hero p { color: var(--muted) }
 
 /* Primitives / helpers */
@@ -284,9 +292,28 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     flex-wrap: wrap;
     gap: 10px 16px;
   }
+  .heroGrid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "media"
+      "copy";
+  }
+
+  /* Optional: make the image feel “hero-like” on mobile */
+  .heroGrid > img {
+    width: 100%;
+    max-width: 520px;
+    justify-self: center;
+  }
 }
 
 
+@media (max-width: 600px) {
+  .hero h2 {
+    font-size: 28px;
+    line-height: 1.15;
+  }
+}
 @media (min-width: 860px) {
   .form .two { grid-template-columns: 1fr 1fr; gap: 16px }
   .btn.block { width: auto }
