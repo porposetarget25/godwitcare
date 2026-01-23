@@ -84,7 +84,7 @@ header img.logo {
 .navlinks {
   display: flex;
   align-items: center;
-  gap: 18px;                 /* spacing between links */
+  gap: 9px;                 /* spacing between links */
   margin-left: auto;         /* push links to the right */
 }
 
