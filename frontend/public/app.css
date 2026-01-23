@@ -84,7 +84,7 @@ header img.logo {
 .navlinks {
   display: flex;
   align-items: center;
-  gap: 9px;                 /* spacing between links */
+  gap: 6px;                 /* spacing between links */
   margin-left: auto;         /* push links to the right */
 }
 
@@ -227,7 +227,41 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
 @media (max-width: 900px) {
   .heroGrid, .twoCol { grid-template-columns: 1fr }
   .cards { grid-template-columns: 1fr }
+
+  /* --- Header mobile fix --- */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  /* Left side (logo + env pill) */
+  .brand {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .env-pill {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  /* Right side links */
+  .navlinks {
+    flex: 1 1 100%;
+    justify-content: center;
+    gap: 8px;     /* reduce spacing */
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .navlinks a {
+    font-size: 14px;
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
 }
+
 @media (min-width: 860px) {
   .form .two { grid-template-columns: 1fr 1fr; gap: 16px }
   .btn.block { width: auto }
