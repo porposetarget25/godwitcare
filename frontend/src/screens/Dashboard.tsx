@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+const doctorSrc = `${import.meta.env.BASE_URL}assets/doctor.jpg`; // change filename as per your actual file
 
 export default function Dashboard() {
   return (
@@ -181,8 +182,9 @@ export default function Dashboard() {
             <img
               alt="Consultation"
               style={{ width: '100%', borderRadius: 16, border: '1px solid var(--line)' }}
-              src="https://plus.unsplash.com/premium_photo-1661286686818-5823db33959d?q=80&w=1170&auto=format&fit=crop"
+              src={doctorSrc}
             />
+
           </div>
         </section>
 
