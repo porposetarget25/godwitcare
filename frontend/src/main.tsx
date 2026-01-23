@@ -27,25 +27,16 @@ import { AuthProvider, useAuth } from './state/auth';
 
 // ---------- Shell layout ----------
 function Shell({ children }: { children: React.ReactNode }) {
-  const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
+  const logoSrc = `${import.meta.env.BASE_URL}assets/logo1.png`;
   return (
     <div className="container">
       <header>
         <div className="nav">
-          <div className="row" style={{ alignItems: 'center', gap: 10 }}>
+          <div className="nav-left">
             <img className="logo" src={logoSrc} alt="GodwitCare" />
-            <strong
-              style={{
-                backgroundColor: 'green',
-                color: 'white',
-                padding: '2px 8px',
-                borderRadius: 6,
-                display: 'inline-block',
-              }}
-            >
-              GodwitCare - Test Environment
-            </strong>
+            <span className="envBadge">GodwitCare - Test Environment</span>
           </div>
+
           <div className="navlinks">
             <Link to="/dashboard#top">Home</Link>
             <Link to="/dashboard#how">How it Works</Link>
@@ -207,7 +198,7 @@ function AppRoutes() {
     </Routes>
   );
 }
- 
+
 
 // Kill any service worker (prevents stale shell/pages)
 if ('serviceWorker' in navigator) {

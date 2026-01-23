@@ -1,7 +1,14 @@
 :root {
-  --bg:#ffffff; --text:#0f172a; --muted:#475569; --line:#e2e8f0;
-  --brand:#0ea5e9; --brand-dark:#0284c7; --surface:#f8fafc;
+  --bg:#f5f7ff;
+  --surface:#eef2ff;
+  --text:#0f172a;
+  --muted:#475569;
+
+  --brand:#6366f1;        /* Indigo */
+  --brand-dark:#4338ca;
+  --line:#e0e7ff;
 }
+
 
 * { box-sizing: border-box }
 body {
@@ -27,26 +34,96 @@ main { flex: 1 }
 header {
   position: sticky;
   top: 0;
-  z-index: 10;
-  backdrop-filter: saturate(180%) blur(6px);
-  background-color: rgba(255,255,255,.85);
-  border-bottom: 1px solid var(--line);
+  z-index: 20;
+  background: linear-gradient(
+    135deg,
+    #6366f1 0%,
+    #8b5cf6 50%,
+    #3b82f6 100%
+  );
 }
+
+/* Keep nav content aligned and spaced */
 .nav {
-  padding: 12px 20px;
+  padding: 14px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 18px;
 }
-header img.logo { height: 36px }
-.navlinks a { margin: 0 10px; color: #334155; font-weight: 600 }
+/* Left side: logo + badge */
+.nav-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 240px; /* prevents links from crushing into left on medium widths */
+}
+header img.logo {
+  height: 44px;
+  width: auto;
+}
+
+/* “Test Environment” badge: theme-consistent */
+.envBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 24px rgba(2, 8, 23, 0.12);
+  white-space: nowrap;
+}
+
+/* Right-side navigation links */
+.navlinks {
+  display: flex;
+  align-items: center;
+  gap: 18px;                 /* spacing between links */
+  margin-left: auto;         /* push links to the right */
+}
+
+.navlinks a {
+  position: relative;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.2px;
+  padding: 6px 2px;
+  transition: color 0.2s ease;
+}
+
+/* underline animation */
+.navlinks a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0;
+  height: 2px;
+  background: #0cf0ec;
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+
+.navlinks a:hover {
+  color: #0bd92a;
+}
+
+.navlinks a:hover::after {
+  width: 100%;
+}
+
 .navcta {
-  background: var(--brand);
-  color: #fff;
-  padding: 10px 14px;
-  border-radius: 10px;
+  background: #fff;
+  color: #4338ca;
+  padding: 10px 16px;
+  border-radius: 999px;
   font-weight: 700;
 }
 

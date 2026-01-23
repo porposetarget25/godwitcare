@@ -4,9 +4,143 @@ import { Link } from 'react-router-dom'
 export default function Dashboard() {
   return (
     // Flex layout: footer sits flush without extra whitespace
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
-      {/* Hard override to kill bottom gap from global styles */}
+    <div className="dashboardShell" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+      {/* Page-scoped theme override (Dashboard only). No global CSS edits needed. */}
       <style>{`
+        /* ------------------------------
+           Dashboard Theme (page-scoped)
+           ------------------------------ */
+
+        .dashboardShell {
+          /* soft purple/blue gradient like the reference */
+          background:
+            radial-gradient(1200px 700px at 15% 15%, rgba(145, 160, 255, .55) 0%, rgba(145, 160, 255, 0) 60%),
+            radial-gradient(900px 600px at 85% 20%, rgba(110, 231, 255, .35) 0%, rgba(110, 231, 255, 0) 55%),
+            linear-gradient(180deg, rgba(89, 102, 255, .15) 0%, rgba(255,255,255,1) 65%);
+        }
+
+        .dashboard-page {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .dashboard-page .section {
+          background: transparent;
+        }
+
+        /* "Glass" containers */
+        .dashboard-page .card,
+        .dashboard-page .heroGrid > img,
+        .dashboard-page .twoCol > img,
+        .dashboard-page footer,
+        .dashboard-page .hero.section {
+          border-radius: 22px;
+        }
+
+        /* Buttons (more pill / modern) */
+        .dashboard-page .btn {
+          border-radius: 999px !important;
+          padding: 10px 16px !important;
+          box-shadow: 0 10px 30px rgba(49, 46, 129, .12);
+          border: 1px solid rgba(99, 102, 241, .18);
+          backdrop-filter: blur(10px);
+        }
+        .dashboard-page .btn.secondary {
+          background: rgba(255,255,255,.7) !important;
+          border: 1px solid rgba(17, 24, 39, .10) !important;
+          box-shadow: 0 10px 30px rgba(17, 24, 39, .08);
+        }
+
+        /* HERO: glass panel + gentle gradient border */
+        .dashboard-page .hero.section {
+          margin-top: 18px;
+          padding: 26px 22px;
+          background: rgba(255,255,255,.55);
+          border: 1px solid rgba(99,102,241,.18);
+          box-shadow: 0 18px 50px rgba(49, 46, 129, .12);
+          backdrop-filter: blur(14px);
+        }
+
+        /* Hero title/subtitle: more premium feel */
+        .dashboard-page .hero.section h2 {
+          font-size: clamp(28px, 3vw, 44px);
+          line-height: 1.08;
+          letter-spacing: -0.02em;
+          margin-bottom: 10px;
+          color: #0f172a;
+        }
+        .dashboard-page .hero.section p {
+          font-size: 15px;
+          line-height: 1.55;
+          color: rgba(15, 23, 42, .72);
+          max-width: 58ch;
+        }
+
+        /* Hero image: glass frame */
+        .dashboard-page .heroGrid > img {
+          border: 1px solid rgba(99,102,241,.16) !important;
+          box-shadow: 0 18px 50px rgba(49, 46, 129, .12);
+        }
+
+        /* Section headers */
+        .dashboard-page .kicker {
+          letter-spacing: .12em;
+          text-transform: uppercase;
+          font-weight: 700;
+          color: rgba(79, 70, 229, .85);
+        }
+        .dashboard-page .h2 {
+          letter-spacing: -0.015em;
+          color: #0f172a;
+        }
+
+        /* Cards: glassmorphism */
+        .dashboard-page .card {
+          background: rgba(255,255,255,.60) !important;
+          border: 1px solid rgba(99,102,241,.14) !important;
+          box-shadow: 0 14px 40px rgba(49, 46, 129, .10);
+          backdrop-filter: blur(14px);
+          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+        .dashboard-page .card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 18px 55px rgba(49, 46, 129, .14);
+          border-color: rgba(99,102,241,.22) !important;
+        }
+
+        /* Icons inside cards: give them a soft "badge" */
+        .dashboard-page .how-card svg,
+        .dashboard-page .feature-card svg {
+          filter: drop-shadow(0 10px 22px rgba(49, 46, 129, .14));
+        }
+
+        /* Features section "band": make it glass instead of flat */
+        .dashboard-page #features.section {
+          background: rgba(255,255,255,.45) !important;
+          border-top: 1px solid rgba(99,102,241,.12) !important;
+          border-bottom: 1px solid rgba(99,102,241,.12) !important;
+          backdrop-filter: blur(14px);
+        }
+
+        /* CTA section: stronger gradient glass */
+        .dashboard-page .cta.section {
+          background:
+            radial-gradient(700px 300px at 20% 10%, rgba(99,102,241,.25) 0%, rgba(99,102,241,0) 60%),
+            radial-gradient(700px 300px at 80% 40%, rgba(56,189,248,.18) 0%, rgba(56,189,248,0) 55%),
+            rgba(255,255,255,.55) !important;
+          border: 1px solid rgba(99,102,241,.16) !important;
+          box-shadow: 0 18px 55px rgba(49, 46, 129, .12);
+          border-radius: 22px;
+          backdrop-filter: blur(14px);
+        }
+
+        /* Footer: glass + compact */
+        .dashboardShell footer {
+          background: rgba(255,255,255,.65) !important;
+          border-top: 1px solid rgba(99,102,241,.12) !important;
+          backdrop-filter: blur(14px);
+        }
+
         /* Remove any trailing space below the last section on this page only */
         .dashboard-page main > section:last-of-type {
           margin-bottom: 0 !important;
@@ -16,6 +150,16 @@ export default function Dashboard() {
         .dashboard-page .cta.section {
           margin-bottom: 0 !important;
           padding-bottom: 0 !important;
+        }
+
+        /* Small screens: keep spacing pleasant */
+        @media (max-width: 720px) {
+          .dashboard-page .hero.section {
+            padding: 18px 14px;
+          }
+          .dashboard-page .card {
+            border-radius: 18px;
+          }
         }
       `}</style>
 
@@ -29,7 +173,7 @@ export default function Dashboard() {
                 GodwitCare provides instant, reliable medical advice and consultations via WhatsApp,
                 ensuring your health is never compromised, no matter where you are in the world.
               </p>
-              <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
                 <Link className="btn" to="/register/1">Register</Link>
                 <Link className="btn secondary" to="/login">Login</Link>
               </div>
