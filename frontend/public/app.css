@@ -483,3 +483,33 @@ html { scroll-behavior: smooth; }
 /* in app.css (optional, for consistent error color) */
 .help.error { color: #e11d48; }
 
+.social-icons {
+  display: flex;
+  gap: 12px;
+}
+
+.social-icons a {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.social-icons a:hover {
+  background: rgba(99, 102, 241, 0.22);
+  transform: translateY(-2px);
+}
+
+.social-icons svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: #4f46e5;
+  stroke-width: 2;
+}
+
+

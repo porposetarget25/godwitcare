@@ -331,10 +331,48 @@ export default function Dashboard() {
       {/* Footer: compact, no logo, no extra spacing */}
       <footer style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', background: '#fff' }}>
         <div className="container" style={{ maxWidth: '1100px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
             <div className="muted">© 2024 GodwitCare. All rights reserved.</div>
-            <div className="muted">Privacy · Terms · Cookie Policy</div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div className="muted">Privacy · Terms · Cookie Policy</div>
+
+              {/* Social Icons */}
+              <div className="social-icons">
+                <a href="#" aria-label="Twitter" title="Twitter">
+                  {/* Twitter */}
+                  <svg viewBox="0 0 24 24">
+                    <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53A4.48 4.48 0 0 0 12 8v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" />
+                  </svg>
+                </a>
+
+                <a href="#" aria-label="Facebook" title="Facebook">
+                  {/* Facebook */}
+                  <svg viewBox="0 0 24 24">
+                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+                  </svg>
+                </a>
+
+                <a href="#" aria-label="Instagram" title="Instagram">
+                  {/* Instagram */}
+                  <svg viewBox="0 0 24 24">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                    <path d="M16 11.37a4 4 0 1 1-7.87 1.26A4 4 0 0 1 16 11.37z" />
+                    <line x1="17.5" y1="6.5" x2="17.5" y2="6.5" />
+                  </svg>
+                </a>
+              </div>
+            </div>
           </div>
+
         </div>
       </footer>
     </div>
