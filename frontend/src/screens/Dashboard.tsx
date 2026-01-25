@@ -23,11 +23,12 @@ export default function Dashboard() {
   }
 
   .dashboard-page {
-    position: relative;
-    overflow: hidden;
-    background: #ffffff; /* FULL WHITE */
-    padding-top: 8px; /* a little breathing room */
-  }
+  position: relative;
+  background: #ffffff;          /* FULL WHITE */
+  padding-top: 22px;            /* gap below top banner - stable on refresh */
+  overflow: visible;            /* avoid clipping shadows/gaps */
+  display: flow-root;           /* prevents first-child margin collapse */
+}
 
   /* Make hash navigation safe (refresh / direct links / clicks) */
   .dashboard-page section[id] {
@@ -56,7 +57,7 @@ export default function Dashboard() {
 
   /* HERO spacing */
   .dashboard-page .hero.section {
-    margin-top: 18px;
+    margin-top: 0px;
     padding: 26px 22px;
   }
 
@@ -365,7 +366,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
         </div>
       </footer>
     </div>
