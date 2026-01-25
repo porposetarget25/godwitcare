@@ -166,9 +166,9 @@ header img.logo {
   font-weight: 700;
 }
 .btn.secondary {
-  background: #eaf3ff;
-  color: #0b1b2b;
-  border: 1px solid #d6e6ff;
+  background: #005eb8;
+  color: #fff;
+  border: 1px solid #005eb8;
 }
 .kicker {
   text-transform: uppercase;

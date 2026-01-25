@@ -170,7 +170,7 @@ export default function Dashboard() {
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
                 <Link className="btn" to="/register/1">Register</Link>
-                <Link className="btn secondary" to="/login">Login</Link>
+                <Link className="btn" to="/login">Login</Link>
               </div>
             </div>
             <img
