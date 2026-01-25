@@ -162,13 +162,14 @@ header img.logo {
   background: var(--brand);
   color: #fff;
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: 10px;
   font-weight: 700;
+  border: 1px solid #005eb8;
 }
 .btn.secondary {
-  background: #005eb8;
-  color: #fff;
-  border: 1px solid #005eb8;
+  background: #7ecde3;
+  color: #010213;
+  border: 1px solid #7ecde3;
 }
 .kicker {
   text-transform: uppercase;
