@@ -8,161 +8,155 @@ export default function Dashboard() {
     <div className="dashboardShell" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       {/* Page-scoped theme override (Dashboard only). No global CSS edits needed. */}
       <style>{`
-        /* ------------------------------
-           Dashboard Theme (page-scoped)
-           ------------------------------ */
+  /* ------------------------------
+     Dashboard Theme (WHITE)
+     ------------------------------ */
 
-        .dashboardShell {
-          /* soft purple/blue gradient like the reference */
-          background:
-            radial-gradient(1200px 700px at 15% 15%, rgba(145, 160, 255, .55) 0%, rgba(145, 160, 255, 0) 60%),
-            radial-gradient(900px 600px at 85% 20%, rgba(110, 231, 255, .35) 0%, rgba(110, 231, 255, 0) 55%),
-            linear-gradient(180deg, rgba(89, 102, 255, .15) 0%, rgba(255,255,255,1) 65%);
-        }
+  /* If your site header is fixed/sticky, this ensures hash-jumps (#how, #features...)
+     do not hide section titles under the header. Adjust the 96px if your header is taller/shorter. */
+  :root {
+    --header-offset: 96px;
+  }
 
-        .dashboard-page {
-          position: relative;
-          overflow: hidden;
-        }
+  .dashboardShell {
+    background: #ffffff; /* FULL WHITE */
+  }
 
-        .dashboard-page .section {
-          background: transparent;
-        }
+  .dashboard-page {
+    position: relative;
+    overflow: hidden;
+    background: #ffffff; /* FULL WHITE */
+    padding-top: 8px; /* a little breathing room */
+  }
 
-        /* "Glass" containers */
-        .dashboard-page .card,
-        .dashboard-page .heroGrid > img,
-        .dashboard-page .twoCol > img,
-        .dashboard-page footer,
-        .dashboard-page .hero.section {
-          border-radius: 22px;
-        }
+  /* Make hash navigation safe (refresh / direct links / clicks) */
+  .dashboard-page section[id] {
+    scroll-margin-top: var(--header-offset);
+  }
 
-        /* Buttons (more pill / modern) */
-        .dashboard-page .btn {
-          border-radius: 999px !important;
-          padding: 10px 16px !important;
-          box-shadow: 0 10px 30px rgba(49, 46, 129, .12);
-          border: 1px solid rgba(99, 102, 241, .18);
-          backdrop-filter: blur(10px);
-        }
-        .dashboard-page .btn.secondary {
-          background: rgba(255,255,255,.7) !important;
-          border: 1px solid rgba(17, 24, 39, .10) !important;
-          box-shadow: 0 10px 30px rgba(17, 24, 39, .08);
-        }
+  /* If your header is fixed, the content can sit under it on initial load.
+     This guarantees the top content is visible even after refresh with a hash. */
+  .dashboard-page {
+    padding-top: calc(var(--header-offset) * 0.15);
+  }
 
-        /* HERO: glass panel + gentle gradient border */
-        .dashboard-page .hero.section {
-          margin-top: 18px;
-          padding: 26px 22px;
-          background: rgba(255,255,255,.55);
-          border: 1px solid rgba(99,102,241,.18);
-          box-shadow: 0 18px 50px rgba(49, 46, 129, .12);
-          backdrop-filter: blur(14px);
-        }
+  .dashboard-page .section {
+    background: transparent;
+  }
 
-        /* Hero title/subtitle: more premium feel */
-        .dashboard-page .hero.section h2 {
-          font-size: clamp(28px, 3vw, 44px);
-          line-height: 1.08;
-          letter-spacing: -0.02em;
-          margin-bottom: 10px;
-          color: #0f172a;
-        }
-        .dashboard-page .hero.section p {
-          font-size: 15px;
-          line-height: 1.55;
-          color: rgba(15, 23, 42, .72);
-          max-width: 58ch;
-        }
+  /* Cards / panels: solid white, subtle shadows */
+  .dashboard-page .hero.section,
+  .dashboard-page .card,
+  .dashboard-page .cta.section {
+    background: #ffffff !important;
+    border: 1px solid rgba(2, 6, 23, 0.08) !important;
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    border-radius: 22px;
+  }
 
-        /* Hero image: glass frame */
-        .dashboard-page .heroGrid > img {
-          border: 1px solid rgba(99,102,241,.16) !important;
-          box-shadow: 0 18px 50px rgba(49, 46, 129, .12);
-        }
+  /* HERO spacing */
+  .dashboard-page .hero.section {
+    margin-top: 18px;
+    padding: 26px 22px;
+  }
 
-        /* Section headers */
-        .dashboard-page .kicker {
-          letter-spacing: .12em;
-          text-transform: uppercase;
-          font-weight: 700;
-          color: rgba(79, 70, 229, .85);
-        }
-        .dashboard-page .h2 {
-          letter-spacing: -0.015em;
-          color: #0f172a;
-        }
+  /* Title sizing (also addresses your earlier request to keep it a bit smaller) */
+  .dashboard-page .hero.section h2 {
+    font-size: clamp(24px, 2.6vw, 38px);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+    color: #0f172a;
+  }
 
-        /* Cards: glassmorphism */
-        .dashboard-page .card {
-          background: rgba(255,255,255,.60) !important;
-          border: 1px solid rgba(99,102,241,.14) !important;
-          box-shadow: 0 14px 40px rgba(49, 46, 129, .10);
-          backdrop-filter: blur(14px);
-          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-        }
-        .dashboard-page .card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 18px 55px rgba(49, 46, 129, .14);
-          border-color: rgba(99,102,241,.22) !important;
-        }
+  .dashboard-page .hero.section p {
+    font-size: 15px;
+    line-height: 1.55;
+    color: rgba(15, 23, 42, .72);
+    max-width: 62ch;
+  }
 
-        /* Icons inside cards: give them a soft "badge" */
-        .dashboard-page .how-card svg,
-        .dashboard-page .feature-card svg {
-          filter: drop-shadow(0 10px 22px rgba(49, 46, 129, .14));
-        }
+  /* Images: keep clean */
+  .dashboard-page .heroGrid > img,
+  .dashboard-page .twoCol > img {
+    border-radius: 16px !important;
+    border: 1px solid rgba(2, 6, 23, 0.08) !important;
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    background: #fff;
+  }
 
-        /* Features section "band": make it glass instead of flat */
-        .dashboard-page #features.section {
-          background: rgba(255,255,255,.45) !important;
-          border-top: 1px solid rgba(99,102,241,.12) !important;
-          border-bottom: 1px solid rgba(99,102,241,.12) !important;
-          backdrop-filter: blur(14px);
-        }
+  /* Buttons: keep your existing theme, just ensure consistency */
+  .dashboard-page .btn {
+    border-radius: 999px !important;
+    padding: 10px 16px !important;
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.10);
+    border: 1px solid rgba(2, 6, 23, 0.10);
+  }
 
-        /* CTA section: stronger gradient glass */
-        .dashboard-page .cta.section {
-          background:
-            radial-gradient(700px 300px at 20% 10%, rgba(99,102,241,.25) 0%, rgba(99,102,241,0) 60%),
-            radial-gradient(700px 300px at 80% 40%, rgba(56,189,248,.18) 0%, rgba(56,189,248,0) 55%),
-            rgba(255,255,255,.55) !important;
-          border: 1px solid rgba(99,102,241,.16) !important;
-          box-shadow: 0 18px 55px rgba(49, 46, 129, .12);
-          border-radius: 22px;
-          backdrop-filter: blur(14px);
-        }
+  .dashboard-page .btn.secondary {
+    background: #ffffff !important;
+    border: 1px solid rgba(2, 6, 23, 0.12) !important;
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.06);
+  }
 
-        /* Footer: glass + compact */
-        .dashboardShell footer {
-          background: rgba(255,255,255,.65) !important;
-          border-top: 1px solid rgba(99,102,241,.12) !important;
-          backdrop-filter: blur(14px);
-        }
+  /* Section headers */
+  .dashboard-page .kicker {
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: rgba(2, 94, 184, 0.95); /* align with your primary #005eb8 */
+  }
 
-        /* Remove any trailing space below the last section on this page only */
-        .dashboard-page main > section:last-of-type {
-          margin-bottom: 0 !important;
-          padding-bottom: 0 !important;
-        }
-        /* Be conservative and also trim the CTA since it’s usually the last block */
-        .dashboard-page .cta.section {
-          margin-bottom: 0 !important;
-          padding-bottom: 0 !important;
-        }
+  .dashboard-page .h2 {
+    letter-spacing: -0.015em;
+    color: #0f172a;
+  }
 
-        /* Small screens: keep spacing pleasant */
-        @media (max-width: 720px) {
-          .dashboard-page .hero.section {
-            padding: 18px 14px;
-          }
-          .dashboard-page .card {
-            border-radius: 18px;
-          }
-        }
-      `}</style>
+  /* Features band: keep it white instead of colored */
+  .dashboard-page #features.section {
+    background: #ffffff !important;
+    border-top: 1px solid rgba(2, 6, 23, 0.08) !important;
+    border-bottom: 1px solid rgba(2, 6, 23, 0.08) !important;
+  }
+
+  /* Testimonials top border stays subtle */
+  .dashboard-page #testimonials.section {
+    border-top: 1px solid rgba(2, 6, 23, 0.08) !important;
+  }
+
+  /* CTA: still white */
+  .dashboard-page .cta.section {
+    border-radius: 22px;
+  }
+
+  /* Remove trailing space below last section */
+  .dashboard-page main > section:last-of-type {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .dashboard-page .cta.section {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Small screens */
+  @media (max-width: 720px) {
+    :root { --header-offset: 120px; } /* mobile header is often taller */
+
+    .dashboard-page .hero.section {
+      padding: 18px 14px;
+    }
+
+    .dashboard-page .card {
+      border-radius: 18px;
+    }
+
+    .dashboard-page .hero.section h2 {
+      font-size: 26px;
+    }
+  }
+`}</style>
+
 
       <main className="dashboard-page" style={{ flex: 1 }}>
         {/* HERO (add id="top" so Home can jump here) */}
@@ -190,14 +184,13 @@ export default function Dashboard() {
 
         {/* HOW IT WORKS */}
         <section id="how" className="section">
-          <div className="kicker">How it works</div>
           <h2 className="h2">Connect · Consult · Recover</h2>
           <div className="cards">
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" stroke="#0ea5e9" strokeWidth="2" />
-                <path d="M5.1 13.7a9.99 9.99 0 0 1 13.8 0" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
-                <path d="M2 10a14 14 0 0 1 20 0" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" stroke="#005eb8" strokeWidth="2" />
+                <path d="M5.1 13.7a9.99 9.99 0 0 1 13.8 0" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <path d="M2 10a14 14 0 0 1 20 0" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>Connect</strong>
@@ -207,8 +200,8 @@ export default function Dashboard() {
 
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M7 11h6M7 7h10" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
-                <path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" stroke="#0ea5e9" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M7 11h6M7 7h10" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" stroke="#005eb8" strokeWidth="2" strokeLinejoin="round" />
               </svg>
               <div>
                 <strong>Consult</strong>
@@ -218,7 +211,7 @@ export default function Dashboard() {
 
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M12.1 21s-7-4.3-9.1-8.1a5.4 5.4 0 0 1 8-7.2l1.1 1.1 1.1-1.1a5.4 5.4 0 0 1 8 7.2c-2.1 3.8-9.1 8.1-9.1 8.1Z" stroke="#0ea5e9" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M12.1 21s-7-4.3-9.1-8.1a5.4 5.4 0 0 1 8-7.2l1.1 1.1 1.1-1.1a5.4 5.4 0 0 1 8 7.2c-2.1 3.8-9.1 8.1-9.1 8.1Z" stroke="#005eb8" strokeWidth="2" strokeLinejoin="round" />
               </svg>
               <div>
                 <strong>Recover</strong>
@@ -238,8 +231,8 @@ export default function Dashboard() {
           <div className="cards">
             <div className="card feature-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#0ea5e9" strokeWidth="2" />
-                <path d="M12 7v5l3 2" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="9" stroke="#005eb8" strokeWidth="2" />
+                <path d="M12 7v5l3 2" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>24/7 Availability</strong>
@@ -249,10 +242,10 @@ export default function Dashboard() {
 
             <div className="card feature-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="18" cy="6" r="3" stroke="#0ea5e9" strokeWidth="2" />
-                <path d="M18 9v3a4 4 0 0 1-8 0V5" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
-                <circle cx="8" cy="19" r="3" stroke="#0ea5e9" strokeWidth="2" />
-                <path d="M11 19h4a3 3 0 0 0 3-3v-4" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="18" cy="6" r="3" stroke="#005eb8" strokeWidth="2" />
+                <path d="M18 9v3a4 4 0 0 1-8 0V5" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="8" cy="19" r="3" stroke="#005eb8" strokeWidth="2" />
+                <path d="M11 19h4a3 3 0 0 0 3-3v-4" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>Expert Doctors</strong>
@@ -262,8 +255,8 @@ export default function Dashboard() {
 
             <div className="card feature-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#0ea5e9" strokeWidth="2" />
-                <path d="M3 12h18M12 3c3 3.5 3 14 0 18M8 3c-1.5 3 0 14 4 18M16 3c1.5 3 0 14-4 18" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="9" stroke="#005eb8" strokeWidth="2" />
+                <path d="M3 12h18M12 3c3 3.5 3 14 0 18M8 3c-1.5 3 0 14 4 18M16 3c1.5 3 0 14-4 18" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>Global Coverage</strong>

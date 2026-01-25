@@ -4,9 +4,9 @@
   --text:#0f172a;
   --muted:#475569;
 
-  --brand:#6366f1;        /* Indigo */
-  --brand-dark:#4338ca;
-  --line:#e0e7ff;
+  --brand: #005eb8;        /* primary */
+  --brand-dark: #004a91;   /* darker for hover/active */
+  --line: #d6e6ff;   
 }
 
 
@@ -37,9 +37,7 @@ header {
   z-index: 20;
   background: linear-gradient(
     135deg,
-    #6366f1 0%,
-    #8b5cf6 50%,
-    #3b82f6 100%
+    #005eb8 100%
   );
 }
 
@@ -167,7 +165,11 @@ header img.logo {
   border-radius: 12px;
   font-weight: 700;
 }
-.btn.secondary { background: #e2e8f0; color: #111827 }
+.btn.secondary {
+  background: #eaf3ff;
+  color: #0b1b2b;
+  border: 1px solid #d6e6ff;
+}
 .kicker {
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -521,7 +523,7 @@ html { scroll-behavior: smooth; }
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(0, 94, 184, 0.12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -529,7 +531,7 @@ html { scroll-behavior: smooth; }
 }
 
 .social-icons a:hover {
-  background: rgba(99, 102, 241, 0.22);
+  background: rgba(0, 94, 184, 0.22);
   transform: translateY(-2px);
 }
 
@@ -537,7 +539,7 @@ html { scroll-behavior: smooth; }
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: #4f46e5;
+  stroke: #005eb8;
   stroke-width: 2;
 }
 
