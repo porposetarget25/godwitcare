@@ -72,13 +72,23 @@ header img.logo {
   padding: 6px 10px;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 10.5px;
   color: #0f172a;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: 0 8px 24px rgba(2, 8, 23, 0.12);
   white-space: nowrap;
 }
+.logoBadge {
+  background: #ffffff;
+  border-radius: 50%;
+  padding: 4px;               /* VERY IMPORTANT: minimal padding */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
 
 /* Right-side navigation links */
 .navlinks {
@@ -235,85 +245,112 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
 /* =========================
    MOBILE HEADER REFINEMENT
    ========================= */
-@media (max-width: 900px) {
 
-  /* Header container */
-  .topbar,
-  .header,
-  .navbar {
-    padding: 8px 12px;
-    height: auto;
+/* =========================
+   MOBILE (single breakpoint)
+   ========================= */
+@media (max-width: 768px) {
+
+  /* ---------- HEADER / NAV ---------- */
+
+  header {
+    position: sticky;
+    top: 0;
   }
 
-  /* Left brand container (logo + text) */
-  .brand,
-  .logo-wrap {
+  .nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  /* Logo + environment badge */
+  .nav-left {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-shrink: 0;
+    min-width: unset;
   }
 
-  /* Logo size – visible but compact */
-  .brand img,
-  .logo-wrap img {
-    height: 32px;
-    width: auto;
+  .logoBadge {
+    padding: 4px;               /* tight white circle */
+    border-radius: 50%;
   }
 
-  /* GodwitCare – Test Environment pill */
-  .env-badge,
-  .brand-badge {
-    font-size: 13px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    white-space: nowrap;
+  header img.logo {
+    height: 40px;               /* smaller but clear */
   }
 
-  /* Right-side navigation container */
-  .nav-links,
-  .nav {
+  .envBadge {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Right-side nav links */
+  .navlinks {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 14px;
     margin-top: 6px;
   }
 
-  /* Hyperlink font size reduced */
-  .nav-links a,
-  .nav a {
-    font-size: 14px;
-    line-height: 1.2;
+  .navlinks a {
+    font-size: 12px;
     padding: 2px 0;
   }
-  .nav-links {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 10px 16px;
-  }
+
+  /* ---------- HERO ---------- */
+
   .heroGrid {
     grid-template-columns: 1fr;
     grid-template-areas:
       "media"
       "copy";
+    gap: 16px;
   }
 
-  /* Optional: make the image feel “hero-like” on mobile */
   .heroGrid > img {
     width: 100%;
-    max-width: 520px;
+    max-width: 360px;
     justify-self: center;
   }
-}
 
-
-@media (max-width: 600px) {
+  .hero h1,
   .hero h2 {
     font-size: 28px;
     line-height: 1.15;
   }
+
+  .hero p {
+    font-size: 14px;
+  }
+
+  /* ---------- CARDS / GRIDS ---------- */
+
+  .cards,
+  .twoCol,
+  .offers,
+  .quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* ---------- BUTTONS ---------- */
+
+  .btn.block {
+    width: 100%;
+  }
+
+  /* ---------- SOCIAL ICONS ---------- */
+
+  .social-icons {
+    justify-content: center;
+    margin-top: 12px;
+  }
 }
+
+
 @media (min-width: 860px) {
   .form .two { grid-template-columns: 1fr 1fr; gap: 16px }
   .btn.block { width: auto }
@@ -406,9 +443,6 @@ html { scroll-behavior: smooth; }
 .small { font-size: 13px; }
 
 /* Make the submit button full width on small screens */
-@media (max-width: 520px) {
-  .btn.block { width: 100%; }
-}
 
 /* ---------- Home (My Travel Package) ---------- */
 .page-head { max-width: 980px; margin: 0 auto 14px; padding: 0 4px; }
@@ -473,12 +507,7 @@ html { scroll-behavior: smooth; }
   padding: 12px 14px; font-weight: 700; color: #0b1b2b;
 }
 
-/* responsive */
-@media (max-width: 900px) {
-  .page-title { font-size: 30px; }
-  .offers { grid-template-columns: 1fr; }
-  .quick-grid { grid-template-columns: 1fr; }
-}
+
 
 /* in app.css (optional, for consistent error color) */
 .help.error { color: #e11d48; }

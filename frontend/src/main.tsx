@@ -27,13 +27,15 @@ import { AuthProvider, useAuth } from './state/auth';
 
 // ---------- Shell layout ----------
 function Shell({ children }: { children: React.ReactNode }) {
-  const logoSrc = `${import.meta.env.BASE_URL}assets/logo1.png`;
+  const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
   return (
     <div className="container">
       <header>
         <div className="nav">
           <div className="nav-left">
-            <img className="logo" src={logoSrc} alt="GodwitCare" />
+            <div className="logoBadge">
+              <img className="logo" src={logoSrc} alt="GodwitCare" />
+            </div>
             <span className="envBadge">GodwitCare - Test Environment</span>
           </div>
 
