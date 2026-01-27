@@ -105,7 +105,7 @@ export default function Dashboard() {
     letter-spacing: .12em;
     text-transform: uppercase;
     font-weight: 700;
-    color: rgba(2, 94, 184, 0.95); /* align with your primary #005eb8 */
+    color: #008080
   }
 
   .dashboard-page .h2 {
@@ -189,9 +189,9 @@ export default function Dashboard() {
           <div className="cards">
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" stroke="#005eb8" strokeWidth="2" />
-                <path d="M5.1 13.7a9.99 9.99 0 0 1 13.8 0" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
-                <path d="M2 10a14 14 0 0 1 20 0" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" stroke="#008080" strokeWidth="2" />
+                <path d="M5.1 13.7a9.99 9.99 0 0 1 13.8 0" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
+                <path d="M2 10a14 14 0 0 1 20 0" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>Connect</strong>
@@ -201,8 +201,8 @@ export default function Dashboard() {
 
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M7 11h6M7 7h10" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
-                <path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" stroke="#005eb8" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M7 11h6M7 7h10" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" stroke="#008080" strokeWidth="2" strokeLinejoin="round" />
               </svg>
               <div>
                 <strong>Consult</strong>
@@ -212,7 +212,7 @@ export default function Dashboard() {
 
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M12.1 21s-7-4.3-9.1-8.1a5.4 5.4 0 0 1 8-7.2l1.1 1.1 1.1-1.1a5.4 5.4 0 0 1 8 7.2c-2.1 3.8-9.1 8.1-9.1 8.1Z" stroke="#005eb8" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M12.1 21s-7-4.3-9.1-8.1a5.4 5.4 0 0 1 8-7.2l1.1 1.1 1.1-1.1a5.4 5.4 0 0 1 8 7.2c-2.1 3.8-9.1 8.1-9.1 8.1Z" stroke="#008080" strokeWidth="2" strokeLinejoin="round" />
               </svg>
               <div>
                 <strong>Recover</strong>
@@ -232,8 +232,8 @@ export default function Dashboard() {
           <div className="cards">
             <div className="card feature-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#005eb8" strokeWidth="2" />
-                <path d="M12 7v5l3 2" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="9" stroke="#008080" strokeWidth="2" />
+                <path d="M12 7v5l3 2" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>24/7 Availability</strong>
@@ -243,10 +243,10 @@ export default function Dashboard() {
 
             <div className="card feature-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="18" cy="6" r="3" stroke="#005eb8" strokeWidth="2" />
-                <path d="M18 9v3a4 4 0 0 1-8 0V5" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
-                <circle cx="8" cy="19" r="3" stroke="#005eb8" strokeWidth="2" />
-                <path d="M11 19h4a3 3 0 0 0 3-3v-4" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="18" cy="6" r="3" stroke="#008080" strokeWidth="2" />
+                <path d="M18 9v3a4 4 0 0 1-8 0V5" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="8" cy="19" r="3" stroke="#008080" strokeWidth="2" />
+                <path d="M11 19h4a3 3 0 0 0 3-3v-4" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>Expert Doctors</strong>
@@ -256,8 +256,8 @@ export default function Dashboard() {
 
             <div className="card feature-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#005eb8" strokeWidth="2" />
-                <path d="M3 12h18M12 3c3 3.5 3 14 0 18M8 3c-1.5 3 0 14 4 18M16 3c1.5 3 0 14-4 18" stroke="#005eb8" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="9" stroke="#008080" strokeWidth="2" />
+                <path d="M3 12h18M12 3c3 3.5 3 14 0 18M8 3c-1.5 3 0 14 4 18M16 3c1.5 3 0 14-4 18" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div>
                 <strong>Global Coverage</strong>

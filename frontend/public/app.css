@@ -4,7 +4,7 @@
   --text:#0f172a;
   --muted:#475569;
 
-  --brand: #005eb8;        /* primary */
+  --brand: #008080;        /* primary */
   --brand-dark: #004a91;   /* darker for hover/active */
   --line: #d6e6ff;   
 }
@@ -37,7 +37,7 @@ header {
   z-index: 20;
   background: linear-gradient(
     135deg,
-    #005eb8 100%
+    #008080 100%
   );
 }
 
