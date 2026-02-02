@@ -180,12 +180,23 @@ export default function Dashboard() {
               src={doctorSrc}
             />
 
-          </div>  
+          </div>
         </section>
 
         {/* HOW IT WORKS */}
         <section id="how" className="section">
-          <h2 className="h2">Connect · Consult · Recover</h2>
+         <h2 className="h2">How It Works</h2>
+          <p
+            className="muted"
+            style={{
+              textAlign: 'center',
+              marginTop: 6,
+              fontWeight: 700,
+              color: '#008080',
+            }}
+          >
+            Connect · Consult · Continue
+          </p>
           <div className="cards">
             <div className="card how-card">
               <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
@@ -211,14 +222,28 @@ export default function Dashboard() {
             </div>
 
             <div className="card how-card">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <path d="M12.1 21s-7-4.3-9.1-8.1a5.4 5.4 0 0 1 8-7.2l1.1 1.1 1.1-1.1a5.4 5.4 0 0 1 8 7.2c-2.1 3.8-9.1 8.1-9.1 8.1Z" stroke="#008080" strokeWidth="2" strokeLinejoin="round" />
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M2.5 19.5h19"
+                  stroke="#008080"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M3.5 15.5l6.5-2.2 4.2 4.2 1.8-.6-3.2-5.2 4.8-1.6c1.1-.4 1.6-1.6 1.2-2.7-.4-1.1-1.6-1.6-2.7-1.2L12.3 7.8 7.1 4.6 5.3 5.2l4.2 4.2-2.2 6.5"
+                  stroke="#008080"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
+
               <div>
-                <strong>Recover</strong>
-                <p className="muted">Receive timely advice and feel confident in your health journey.</p>
+                <strong>Continue</strong>
+                <p className="muted">Receive timely advice, recover and feel confident to your continue journey.</p>
               </div>
             </div>
+
           </div>
         </section>
 
@@ -226,46 +251,245 @@ export default function Dashboard() {
         <section
           id="features"
           className="section"
-          style={{ background: 'var(--surface)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}
+          style={{
+            background: 'var(--surface)',
+            borderTop: '1px solid var(--line)',
+            borderBottom: '1px solid var(--line)',
+          }}
         >
           <h2 className="h2">Key Features</h2>
-          <div className="cards">
-            <div className="card feature-card">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#008080" strokeWidth="2" />
-                <path d="M12 7v5l3 2" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <div>
-                <strong>24/7 Availability</strong>
-                <p className="muted">Access medical advice around the clock, no matter your time zone.</p>
-              </div>
-            </div>
+          <p
+            className="muted"
+            style={{
+              textAlign: 'center',
+              marginTop: 6,
+              fontWeight: 700,
+              color: '#008080',
+            }}
+          >
+            12 Reasons to Join GodwitCare
+          </p>
 
-            <div className="card feature-card">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="18" cy="6" r="3" stroke="#008080" strokeWidth="2" />
-                <path d="M18 9v3a4 4 0 0 1-8 0V5" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
-                <circle cx="8" cy="19" r="3" stroke="#008080" strokeWidth="2" />
-                <path d="M11 19h4a3 3 0 0 0 3-3v-4" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <div>
-                <strong>Expert Doctors</strong>
-                <p className="muted">Consult with licensed and experienced healthcare professionals.</p>
-              </div>
-            </div>
 
-            <div className="card feature-card">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#008080" strokeWidth="2" />
-                <path d="M3 12h18M12 3c3 3.5 3 14 0 18M8 3c-1.5 3 0 14 4 18M16 3c1.5 3 0 14-4 18" stroke="#008080" strokeWidth="2" strokeLinecap="round" />
+          {/** Simple inline icon set (closest to your reference) */}
+          {(() => {
+            const stroke = '#008080';
+
+            const Icon = ({ children }) => (
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                {children}
               </svg>
-              <div>
-                <strong>Global Coverage</strong>
-                <p className="muted">Our network ensures you get care wherever your travels take you.</p>
+            );
+
+            const Icons = {
+              heart: (
+                <Icon>
+                  <path
+                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Icon>
+              ),
+
+
+              badge: (
+                <Icon>
+                  <path
+                    d="M12 2l2.2 2.2 3.1.4-.4 3.1L19 10l-2.1 2.3.4 3.1-3.1.4L12 18l-2.2-2.2-3.1-.4.4-3.1L5 10l2.1-2.3-.4-3.1 3.1-.4L12 2z"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.5 10.5l1.8 1.8 3.2-3.2"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Icon>
+              ),
+              globe: (
+                <Icon>
+                  <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="2" />
+                  <path
+                    d="M3 12h18M12 3c3 3.5 3 14 0 18M8 3c-1.5 3 0 14 4 18M16 3c1.5 3 0 14-4 18"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </Icon>
+              ),
+              sliders: (
+                <Icon>
+                  <path d="M4 6h10M4 18h10M14 6h6M14 18h6" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="14" cy="6" r="2" stroke={stroke} strokeWidth="2" />
+                  <circle cx="14" cy="18" r="2" stroke={stroke} strokeWidth="2" />
+                </Icon>
+              ),
+              users: (
+                <Icon>
+                  <path
+                    d="M16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zM8 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3z"
+                    stroke={stroke}
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M2.5 20c.8-3 3.1-5 5.5-5s4.7 2 5.5 5M11 20c.7-2.5 2.7-4 5-4 2.4 0 4.2 1.5 5 4"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </Icon>
+              ),
+              phone: (
+                <Icon>
+                  <rect x="7" y="2.5" width="10" height="19" rx="2" stroke={stroke} strokeWidth="2" />
+                  <path d="M11 18h2" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                </Icon>
+              ),
+              tag: (
+                <Icon>
+                  <path
+                    d="M20 13l-7 7-11-11V2h7l11 11z"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="7.5" cy="7.5" r="1.5" stroke={stroke} strokeWidth="2" />
+                </Icon>
+              ),
+              ban: (
+                <Icon>
+                  <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="2" />
+                  <path d="M7 7l10 10" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                </Icon>
+              ),
+              shield: (
+                <Icon>
+                  <path
+                    d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M9.5 12l1.7 1.7L15.5 9.5" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                </Icon>
+              ),
+              card: (
+                <Icon>
+                  <rect x="3" y="6" width="18" height="12" rx="2" stroke={stroke} strokeWidth="2" />
+                  <path d="M3 10h18" stroke={stroke} strokeWidth="2" />
+                  <path d="M7 15h4" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                </Icon>
+              ),
+              calendar: (
+                <Icon>
+                  <rect x="3" y="5" width="18" height="16" rx="2" stroke={stroke} strokeWidth="2" />
+                  <path d="M7 3v4M17 3v4M3 9h18" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                  <path d="M8 13h4" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                </Icon>
+              ),
+              clipboard: (
+                <Icon>
+                  <path
+                    d="M9 4h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+                    stroke={stroke}
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M9 4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"
+                    stroke={stroke}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path d="M9.5 10h5M9.5 14h5" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+                </Icon>
+              ),
+            };
+
+            const FEATURES = [
+              {
+                icon: Icons.heart,
+                title: '9 to 5 Availability',
+                desc: 'Medical advice accessible anytime, from any time zone.',
+              },
+              {
+                icon: Icons.badge,
+                title: 'Certified Experts',
+                desc: 'Connect with licensed and experienced healthcare professionals.',
+              },
+              {
+                icon: Icons.globe,
+                title: 'Worldwide Access',
+                desc: 'Receive care globally, ensuring support wherever you are.',
+              },
+              {
+                icon: Icons.sliders,
+                title: 'Personalized Plans',
+                desc: 'Flexible plans tailored to your specific health needs.',
+              },
+              {
+                icon: Icons.users,
+                title: 'Inclusive for All Ages',
+                desc: 'Fair pricing with no age-linked costs or restrictions.',
+              },
+              {
+                icon: Icons.phone,
+                title: 'Effortless Digital Experience',
+                desc: 'No reimbursements; manage everything digitally with ease.',
+              },
+              {
+                icon: Icons.tag,
+                title: 'Transparent Pricing',
+                desc: 'Full outpatient coverage with no hidden fees.',
+              },
+              {
+                icon: Icons.ban,
+                title: 'Cancel Anytime',
+                desc: 'Freedom to cancel your plan without penalties.',
+              },
+              {
+                icon: Icons.shield,
+                title: 'Comprehensive Coverage',
+                desc: 'Full support, even for pre-existing conditions.',
+              },
+              {
+                icon: Icons.card,
+                title: 'Zero Excess Fees',
+                desc: 'No additional costs applied to your medical care.',
+              },
+              {
+                icon: Icons.calendar,
+                title: 'Flexible Start',
+                desc: 'Begin your coverage even after your journey has commenced.',
+              },
+              {
+                icon: Icons.clipboard,
+                title: 'Pre-Existing Conditions Welcome',
+                desc: 'Coverage thoughtfully designed for pre-existing conditions.',
+              },
+            ];
+
+            return (
+              <div className="cards">
+                {FEATURES.map((f) => (
+                  <div key={f.title} className="card feature-card">
+                    {f.icon}
+                    <div>
+                      <strong>{f.title}</strong>
+                      <p className="muted">{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </section>
+
 
         {/* SEAMLESS CONSULTATIONS */}
         <section className="section">
