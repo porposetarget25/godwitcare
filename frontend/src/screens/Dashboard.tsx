@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-const doctorSrc = `${import.meta.env.BASE_URL}assets/doctor6.png`; // change filename as per your actual file
+const doctorSrc = `${import.meta.env.BASE_URL}assets/doctor9.png`;
+const consultSrc = `${import.meta.env.BASE_URL}assets/consultation.png`; // change filename as per your actual file
 
 export default function Dashboard() {
   return (
@@ -497,7 +498,7 @@ export default function Dashboard() {
             <img
               alt="WhatsApp"
               style={{ width: '100%', borderRadius: 16, border: '1px solid var(--line)' }}
-              src="https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?q=80&w=1600&auto=format&fit=crop"
+              src={consultSrc}
             />
             <div>
               <h2 className="h2" style={{ textAlign: 'left' }}>Seamless Consultations, Anywhere, Anytime</h2>
