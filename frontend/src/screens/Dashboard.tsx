@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-const doctorSrc = `${import.meta.env.BASE_URL}assets/doctor9.png`;
+const doctorSrc = `${import.meta.env.BASE_URL}assets/nish.jpg`;
 const consultSrc = `${import.meta.env.BASE_URL}assets/consultation.png`; // change filename as per your actual file
 
 export default function Dashboard() {
