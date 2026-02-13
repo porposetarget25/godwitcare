@@ -179,7 +179,7 @@ export default function Dashboard() {
                 ensuring your health is never compromised, no matter where you are in the world.
               </p>
               <div className={`heroActions ${ctaReady ? 'isReady' : ''}`}>
-                <Link to="/register" className="btn heroBtn">
+                <Link to="/register/1" className="btn heroBtn">
                   Register
                 </Link>
                 <Link to="/login" className="btn heroBtn">
