@@ -384,7 +384,7 @@ html { scroll-behavior: smooth; }
 /* in app.css */
 .navlinks a { font-size: 14px; }
 @media (max-width: 600px) {
-  .navlinks a { font-size: 12px; margin: 0 6px; }
+  .navlinks a { font-size: 12px; margin: 0 1px; }
   .navcta { padding: 8px 12px; }
   .heroBtn{ width:100%; justify-content:center; }
 }
