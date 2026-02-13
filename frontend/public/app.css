@@ -270,6 +270,16 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
 @media (max-width: 768px) {
 
   /* ---------- HEADER / NAV ---------- */
+  .heroGrid h2{
+    margin-bottom: 0px;   /* reduce space under title */
+  }
+
+  .heroGrid p{
+    margin-top: 0;        /* remove extra space above description */
+  }
+.heroGrid p{
+    margin-bottom: 0;        /* remove extra space above description */
+  }
 
   header {
     position: sticky;
@@ -322,13 +332,42 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
 
   /* ---------- HERO ---------- */
 
-  .heroGrid {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "media"
-      "copy";
-    gap: 16px;
-  }
+  .heroGrid{
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "title"
+    "desc"
+    "media"
+    "actions";
+  gap: 16px;
+}
+
+/* Let the children of the first div participate in the grid (mobile only) */
+.heroGrid > div{
+  display: contents;
+}
+
+.heroGrid h2{
+  grid-area: title;
+  margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.05 !important;
+}
+
+.heroGrid p{
+  grid-area: desc;
+  margin: 6px 0 0 0 !important;  /* only a small gap from the title */
+    padding: 0 !important;
+    line-height: 1.4;
+}
+
+.heroGrid > img{
+  grid-area: media;
+}
+
+.heroActions{
+  grid-area: actions;
+}
 
   .heroGrid > img {
     width: 100%;
