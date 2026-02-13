@@ -1,9 +1,17 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-const doctorSrc = `${import.meta.env.BASE_URL}assets/nish.jpg`;
+const doctorSrc = `${import.meta.env.BASE_URL}assets/doctor9.png`;
 const consultSrc = `${import.meta.env.BASE_URL}assets/consultation.png`; // change filename as per your actual file
 
 export default function Dashboard() {
+  const [ctaReady, setCtaReady] = useState(false)
+
+  useEffect(() => {
+  const id = requestAnimationFrame(() => setCtaReady(true))
+  return () => cancelAnimationFrame(id)
+}, [])
+
+
   return (
     // Flex layout: footer sits flush without extra whitespace
     <div className="dashboardShell" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -170,9 +178,13 @@ export default function Dashboard() {
                 GodwitCare provides instant, reliable medical advice and consultations via WhatsApp,
                 ensuring your health is never compromised, no matter where you are in the world.
               </p>
-              <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-                <Link className="btn" to="/register/1">Register</Link>
-                <Link className="btn" to="/login">Login</Link>
+              <div className={`heroActions ${ctaReady ? 'isReady' : ''}`}>
+                <Link to="/register" className="btn heroBtn">
+                  Register
+                </Link>
+                <Link to="/login" className="btn heroBtn">
+                  Login
+                </Link>
               </div>
             </div>
             <img
@@ -186,7 +198,7 @@ export default function Dashboard() {
 
         {/* HOW IT WORKS */}
         <section id="how" className="section">
-         <h2 className="h2">How It Works</h2>
+          <h2 className="h2">How It Works</h2>
           <p
             className="muted"
             style={{
@@ -541,7 +553,7 @@ export default function Dashboard() {
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <Link className="btn" to="/register/1">Register Now</Link>
+              <Link className="btn_big heroBtn" to="/register/1">Register Now</Link>
             </div>
           </div>
         </section>

@@ -96,15 +96,16 @@ header img.logo {
   margin-left: auto;         /* push links to the right */
 }
 
-.navlinks a {
-  position: relative;
-  font-size: 15px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  letter-spacing: 0.2px;
-  padding: 6px 2px;
-  transition: color 0.2s ease;
+.navlinks a{
+  color:#eaf2ff;
+  text-decoration:none;
+  font-size:20px;          /* was 14px */
+  font-weight:700;         /* makes it clearer */
+  padding:8px 10px;
+  border-radius:999px;
+  transition:background .2s ease, transform .2s ease;
 }
+
 
 /* underline animation */
 .navlinks a::after {
@@ -171,6 +172,20 @@ header img.logo {
   color: #010213;
   border: 1px solid #7ecde3;
 }
+.btn_big{
+  display: inline-block;
+  background: var(--brand);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 1px solid #005eb8;
+
+  width: 260px;          /* 👈 make it longer */
+  text-align: center;    /* 👈 center text */
+}
+
+
 .kicker {
   text-transform: uppercase;
   letter-spacing: .1em;
@@ -300,9 +315,10 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   }
 
   .navlinks a {
-    font-size: 12px;
-    padding: 2px 0;
-  }
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
 
   /* ---------- HERO ---------- */
 
@@ -370,6 +386,7 @@ html { scroll-behavior: smooth; }
 @media (max-width: 600px) {
   .navlinks a { font-size: 12px; margin: 0 6px; }
   .navcta { padding: 8px 12px; }
+  .heroBtn{ width:100%; justify-content:center; }
 }
 
 /* ---------- Auth (Login) ---------- */
@@ -544,4 +561,38 @@ html { scroll-behavior: smooth; }
   stroke-width: 2;
 }
 
+/* ---- Dashboard hero CTA (Register/Login) ---- */
+.heroActions{
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
 
+.heroActions .heroBtn{
+  padding: 14px 26px;      /* bigger buttons */
+  font-size: 18px;
+  border-radius: 999px;
+  font-weight: 800;
+  line-height: 1;
+  min-width: 140px;
+  text-align: center;
+
+  /* slide-in animation on every refresh */
+  animation: heroCtaSlideIn 650ms ease both;
+}
+
+.heroActions .heroBtn:nth-child(2){
+  animation-delay: 120ms;
+}
+
+@keyframes heroCtaSlideIn{
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .heroActions .heroBtn{ animation: none; }
+}
