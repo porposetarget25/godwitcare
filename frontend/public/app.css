@@ -635,3 +635,19 @@ html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce){
   .heroActions .heroBtn{ animation: none; }
 }
+
+/* iOS Safari only fixes */
+@supports (-webkit-touch-callout: none) {
+
+  /* Make sticky header respect the notch / safe area */
+  header {
+    top: env(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Ensure sections don’t get hidden under sticky header on iOS */
+  .section {
+    scroll-margin-top: calc(80px + env(safe-area-inset-top));
+  }
+}
+

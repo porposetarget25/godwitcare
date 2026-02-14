@@ -33,21 +33,16 @@ export default function Dashboard() {
 
   .dashboard-page {
   position: relative;
-  background: #ffffff;          /* FULL WHITE */
-  padding-top: 22px;            /* gap below top banner - stable on refresh */
-  overflow: visible;            /* avoid clipping shadows/gaps */
-  display: flow-root;           /* prevents first-child margin collapse */
+  background: #ffffff;
+  padding-top: calc(var(--header-offset) * 0.15); /* base top gap */
+  overflow: visible;
+  display: flow-root;
 }
+
 
   /* Make hash navigation safe (refresh / direct links / clicks) */
   .dashboard-page section[id] {
     scroll-margin-top: var(--header-offset);
-  }
-
-  /* If your header is fixed, the content can sit under it on initial load.
-     This guarantees the top content is visible even after refresh with a hash. */
-  .dashboard-page {
-    padding-top: calc(var(--header-offset) * 0.15);
   }
 
   .dashboard-page .section {
@@ -164,6 +159,13 @@ export default function Dashboard() {
     .dashboard-page .hero.section h2 {
       font-size: 26px;
     }
+     /* iOS Safari only: add extra top offset so hero never tucks under the sticky header */
+    @supports (-webkit-touch-callout: none) {
+     .dashboard-page {
+      padding-top: calc(var(--header-offset) * 0.35 + env(safe-area-inset-top)) !important;
+  }
+}
+  
   }
 `}</style>
 
