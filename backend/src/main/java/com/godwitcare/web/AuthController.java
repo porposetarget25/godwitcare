@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -57,6 +58,8 @@ public class AuthController {
      * Frontend can continue sending {email,password}; this will still work.
      */
     public record LoginReq(String identifier, String username, @Email String email, @NotBlank String password) {}
+    public record ForgotPasswordReq(String identifier) {}
+    public record ResetPasswordReq(@NotBlank String token, @NotBlank String newPassword) {}
 
     public record UserDto(Long id,
                           String firstName,
@@ -196,5 +199,45 @@ public class AuthController {
         users.save(u);
 
         return ResponseEntity.ok(toDto(u));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordReq req) {
+        if (req == null || req.identifier() == null || req.identifier().isBlank()) {
+            return ResponseEntity.badRequest().body("Username or email is required");
+        }
+
+        Optional<User> ou = findByIdentifier(req.identifier().trim());
+        if (ou.isPresent()) {
+            User u = ou.get();
+            String token = UUID.randomUUID().toString();
+            u.setResetPasswordToken(token);
+            u.setResetPasswordExpiresAt(java.time.Instant.now().plusSeconds(30 * 60));
+            users.save(u);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Password reset token generated",
+                    "resetToken", token
+            ));
+        }
+
+        return ResponseEntity.ok(Map.of("message", "If the account exists, reset instructions were generated."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordReq req) {
+        Optional<User> ou = users.findByResetPasswordToken(req.token());
+        if (ou.isEmpty()) return ResponseEntity.badRequest().body("Invalid or expired token");
+
+        User u = ou.get();
+        if (u.getResetPasswordExpiresAt() == null || u.getResetPasswordExpiresAt().isBefore(java.time.Instant.now())) {
+            return ResponseEntity.badRequest().body("Invalid or expired token");
+        }
+
+        u.setPassword(encoder.encode(req.newPassword()));
+        u.setResetPasswordToken(null);
+        u.setResetPasswordExpiresAt(null);
+        users.save(u);
+        return ResponseEntity.ok(Map.of("message", "Password reset successful"));
     }
 }

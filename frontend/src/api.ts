@@ -49,6 +49,8 @@ export type UserDto = {
   firstName: string
   lastName: string
   email: string
+  username?: string
+  photoUrl?: string
   roles?: string[] 
 }
 
@@ -424,6 +426,57 @@ export async function getMe(): Promise<UserDto | null> {
   return res.json() as Promise<UserDto>;
 }
 
+export async function getMyProfile(): Promise<UserDto> {
+  return request<UserDto>('/users/me', { method: 'GET', credentials: 'include' });
+}
+
+export async function updateMyProfile(payload: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  username: string;
+}) {
+  return request('/users/me', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadMyPhoto(file: File) {
+  const fd = new FormData();
+  fd.append('file', file);
+  return request('/users/me/photo', {
+    method: 'POST',
+    credentials: 'include',
+    body: fd,
+  });
+}
+
+export async function deleteMyPhoto() {
+  return request('/users/me/photo', { method: 'DELETE', credentials: 'include' });
+}
+
+export async function deleteMyAccount() {
+  return request('/users/me', { method: 'DELETE', credentials: 'include' });
+}
+
+export async function forgotPassword(identifier: string): Promise<{message: string; resetToken?: string}> {
+  return request('/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier }),
+  });
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{message: string}> {
+  return request('/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
 
 
 

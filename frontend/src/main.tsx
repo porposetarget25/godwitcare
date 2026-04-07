@@ -21,6 +21,9 @@ import DoctorConsultationDetails from './screens/DoctorConsultationDetails';
 import { RequireRole } from './screens/RequireRole';
 import CareHistory from './screens/CareHistory';
 import ReferralLetter from './screens/ReferralLetter';
+import Profile from './screens/Profile';
+import ForgotPassword from './screens/ForgotPassword';
+import ResetPassword from './screens/ResetPassword';
 
 // NEW: shared auth context
 import { AuthProvider, useAuth } from './state/auth';
@@ -143,6 +146,9 @@ function AppRoutes() {
           </Shell>
         }
       />
+      <Route path="/profile" element={<Shell><Profile /></Shell>} />
+      <Route path="/forgot-password" element={<Shell><ForgotPassword /></Shell>} />
+      <Route path="/reset-password" element={<Shell><ResetPassword /></Shell>} />
       <Route
         path="/doctor/referral/:id"
         element={
