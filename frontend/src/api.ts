@@ -61,6 +61,29 @@ export type DocSummary = {
   createdAt: string
 }
 
+export type RegistrationApi = {
+  id: number
+  firstName?: string
+  middleName?: string
+  lastName?: string
+  dateOfBirth?: string
+  gender?: string
+  primaryWhatsAppNumber?: string
+  carerSecondaryWhatsAppNumber?: string
+  emailAddress?: string
+  longTermMedication?: boolean
+  healthCondition?: boolean
+  allergies?: boolean
+  fitToFlyCertificate?: boolean
+  travellingFrom?: string
+  travellingTo?: string
+  travelStartDate?: string
+  travelEndDate?: string
+  packageDays?: number
+  documentFileName?: string
+  travelers?: Traveler[]
+}
+
 // --- Consultations (shared types) ---
 export type ConsultationCreate = {
   currentLocation: string
@@ -206,6 +229,29 @@ export async function uploadDocument(id: number, file: File) {
 export async function listDocuments(registrationId: number): Promise<DocSummary[]> {
   return request<DocSummary[]>(`/registrations/${registrationId}/documents`, {
     method: 'GET',
+  })
+}
+
+export async function getLatestRegistrationByEmail(email: string): Promise<RegistrationApi | null> {
+  const res = await fetch(`${API_BASE}/registrations?email=${encodeURIComponent(email)}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
+  })
+  if (res.status === 204) return null
+  if (!res.ok) throw new Error(`Failed to load registration (HTTP ${res.status})`)
+  const data = await res.json()
+  if (Array.isArray(data)) return data.length ? (data[data.length - 1] as RegistrationApi) : null
+  return (data ?? null) as RegistrationApi | null
+}
+
+export async function updateRegistrationById(id: number, payload: RegistrationApi) {
+  return request<RegistrationApi>(`/registrations/${id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   })
 }
 
@@ -477,7 +523,6 @@ export async function resetPassword(token: string, newPassword: string): Promise
     body: JSON.stringify({ token, newPassword }),
   });
 }
-
 
 
 
