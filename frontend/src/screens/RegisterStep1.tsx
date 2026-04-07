@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { checkAuthAvailability } from '../api'
 import { useReg } from '../state/registration'
 
 type Errors = Partial<Record<
@@ -288,10 +289,69 @@ export default function Step1() {
     if (email && !isValidEmail(email)) {
       next.email = 'Please enter a valid email address.'
     }
+    if (!next.primary && errors.primary) next.primary = errors.primary
+    if (!next.email && errors.email) next.email = errors.email
 
     setErrors(next)
     return Object.keys(next).length === 0
   }
+
+  useEffect(() => {
+    const rawEmail = (draft['Email Address'] || '').trim()
+    if (!rawEmail) {
+      setErrors(prev => ({ ...prev, email: undefined }))
+      return
+    }
+    if (!isValidEmail(rawEmail)) return
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkAuthAvailability(rawEmail, undefined)
+        if (cancelled) return
+        setErrors(prev => ({
+          ...prev,
+          email: result.emailRegistered ? 'This email is already registered.' : undefined,
+        }))
+      } catch {
+        // keep UX non-blocking if validation API fails
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [draft['Email Address']])
+
+  useEffect(() => {
+    const primaryDial = draft.primaryDial || defaultPrimaryDial
+    const digits = normalizeDigits(draft['Primary WhatsApp Number'] || '')
+    if (!digits) {
+      setErrors(prev => ({ ...prev, primary: undefined }))
+      return
+    }
+
+    const fullPrimary = `${primaryDial}${digits}`
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkAuthAvailability(undefined, fullPrimary)
+        if (cancelled) return
+        setErrors(prev => ({
+          ...prev,
+          primary: result.whatsAppRegistered ? "This what'sapp number is already registered" : undefined,
+        }))
+      } catch {
+        // keep UX non-blocking if validation API fails
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [draft['Primary WhatsApp Number'], draft.primaryDial, defaultPrimaryDial])
 
   function next(e: React.FormEvent) {
     e.preventDefault()
@@ -412,7 +472,12 @@ export default function Step1() {
                 <input
                   placeholder="1234567890"
                   value={draft['Primary WhatsApp Number'] || ''}
-                  onChange={(e) => setDraft({ ...draft, ['Primary WhatsApp Number']: e.target.value })}
+                  onChange={(e) => {
+                    setDraft({ ...draft, ['Primary WhatsApp Number']: e.target.value })
+                    if (errors.primary === 'Required') {
+                      setErrors(prev => ({ ...prev, primary: undefined }))
+                    }
+                  }}
                   aria-invalid={!!errors.primary}
                 />
               </div>

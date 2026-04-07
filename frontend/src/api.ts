@@ -54,6 +54,11 @@ export type UserDto = {
   roles?: string[] 
 }
 
+export type AuthAvailability = {
+  emailRegistered: boolean
+  whatsAppRegistered: boolean
+}
+
 export type DocSummary = {
   id: number
   fileName: string
@@ -345,6 +350,20 @@ export async function registerAuthUser(
   return res.json() as Promise<UserDto>
 }
 
+export async function checkAuthAvailability(email?: string, username?: string): Promise<AuthAvailability> {
+  const params = new URLSearchParams()
+  if (email?.trim()) params.set('email', email.trim())
+  if (username?.trim()) params.set('username', username.trim())
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/auth/availability${qs ? `?${qs}` : ''}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error('Failed to validate registration fields')
+  return res.json() as Promise<AuthAvailability>
+}
+
 
 // ---------- Consultations (patient) ----------
 export async function createConsultation(payload: ConsultationCreate) {
@@ -529,5 +548,4 @@ export async function resetPassword(token: string, newPassword: string): Promise
     body: JSON.stringify({ token, newPassword }),
   });
 }
-
 

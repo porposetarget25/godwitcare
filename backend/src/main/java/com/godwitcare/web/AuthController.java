@@ -67,6 +67,7 @@ public class AuthController {
                           String email,     // may be null
                           String username,  // always present
                           List<String> roles) {}
+    public record AvailabilityDto(boolean emailRegistered, boolean whatsAppRegistered) {}
 
     private UserDto toDto(User u) {
         return new UserDto(
@@ -123,6 +124,24 @@ public class AuthController {
         users.save(u);
 
         return ResponseEntity.ok(toDto(u));
+    }
+
+    @GetMapping("/availability")
+    public ResponseEntity<AvailabilityDto> availability(
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "username", required = false) String username
+    ) {
+        String normalizedEmail = email == null ? null : email.trim();
+        String normalizedUsername = username == null ? null : username.trim();
+
+        boolean emailRegistered = normalizedEmail != null
+                && !normalizedEmail.isBlank()
+                && users.existsByEmail(normalizedEmail);
+        boolean whatsAppRegistered = normalizedUsername != null
+                && !normalizedUsername.isBlank()
+                && users.existsByUsername(normalizedUsername);
+
+        return ResponseEntity.ok(new AvailabilityDto(emailRegistered, whatsAppRegistered));
     }
 
     @PostMapping("/login")
