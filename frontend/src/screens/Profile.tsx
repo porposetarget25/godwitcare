@@ -1,5 +1,39 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+
+
+type Person = { fullName: string; dateOfBirth: string };
+
+const ALL_COUNTRIES = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
+  'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
+  'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo (Republic)', 'Congo (DRC)', 'Costa Rica', 'Côte d’Ivoire', 'Croatia', 'Cuba', 'Cyprus', 'Czechia',
+  'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
+  'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia',
+  'Fiji', 'Finland', 'France',
+  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana',
+  'Haiti', 'Honduras', 'Hungary',
+  'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+  'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar',
+  'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
+  'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar',
+  'Romania', 'Russia', 'Rwanda',
+  'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'São Tomé and Príncipe', 'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
+  'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Venezuela', 'Vietnam',
+  'Yemen', 'Zambia', 'Zimbabwe'
+].sort((a, b) => a.localeCompare(b));
+
+const EUROPE_COUNTRIES = [
+  'Albania', 'Andorra', 'Armenia', 'Austria', 'Azerbaijan', 'Belarus', 'Belgium', 'Bosnia and Herzegovina', 'Bulgaria', 'Croatia', 'Cyprus', 'Czechia',
+  'Denmark', 'Estonia', 'Finland', 'France', 'Georgia', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland', 'Italy',
+  'Kazakhstan (European part)', 'Kosovo', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Malta', 'Moldova', 'Monaco', 'Montenegro',
+  'Netherlands', 'North Macedonia', 'Norway', 'Poland', 'Portugal', 'Romania', 'Russia (European part)', 'San Marino', 'Serbia',
+  'Slovakia', 'Slovenia', 'Spain', 'Sweden', 'Switzerland', 'Turkey (European part)', 'Ukraine', 'United Kingdom', 'Vatican City'
+].sort((a, b) => a.localeCompare(b));
+
 import {
   deleteMyAccount,
   getLatestRegistrationByEmail,
@@ -7,7 +41,6 @@ import {
   listDocuments,
   logout,
   type RegistrationApi,
-  type Traveler,
   type DocSummary,
   updateRegistrationById,
   updateMyProfile,
@@ -24,7 +57,8 @@ export default function Profile() {
   const [travellingTo, setTravellingTo] = useState('');
   const [travelStartDate, setTravelStartDate] = useState('');
   const [travelEndDate, setTravelEndDate] = useState('');
-  const [travelersText, setTravelersText] = useState('');
+  const [travelers, setTravelers] = useState<Person[]>([]);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [regId, setRegId] = useState<number | null>(null);
   const [latestReg, setLatestReg] = useState<RegistrationApi | null>(null);
   const [docs, setDocs] = useState<DocSummary[]>([]);
@@ -52,11 +86,10 @@ export default function Profile() {
             setTravellingTo(reg.travellingTo || '');
             setTravelStartDate(reg.travelStartDate || '');
             setTravelEndDate(reg.travelEndDate || '');
-            setTravelersText(
-              (reg.travelers || [])
-                .map(t => `${t.fullName || ''}, ${t.dateOfBirth || ''}`.trim())
-                .join('\n')
-            );
+            setTravelers((reg.travelers || []).map(t => ({
+              fullName: t.fullName || '',
+              dateOfBirth: t.dateOfBirth || '',
+            })));
             const existingDocs = await listDocuments(reg.id);
             setDocs(existingDocs || []);
           }
@@ -67,20 +100,24 @@ export default function Profile() {
     })();
   }, []);
 
-  function parseTravelers(): Traveler[] {
-    if (!travelersText.trim()) return [];
-    return travelersText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [fullName, dob] = line.split(',').map(v => v.trim());
-        if (!fullName || !dob) {
-          throw new Error('Each passenger must be on a new line: Full Name, YYYY-MM-DD');
-        }
-        return { fullName, dateOfBirth: dob };
-      });
+
+  const validTravelers = useMemo(
+    () => travelers.filter((t) => t.fullName.trim() && t.dateOfBirth),
+    [travelers]
+  );
+
+  function addPassenger() {
+    setTravelers((prev) => [...prev, { fullName: '', dateOfBirth: '' }]);
   }
+
+  function removePassenger(index: number) {
+    setTravelers((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  function updatePassenger(index: number, field: keyof Person, value: string) {
+    setTravelers((prev) => prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item)));
+  }
+
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -93,10 +130,7 @@ export default function Profile() {
     await updateMyProfile({ firstName, lastName, email, username });
     updatedFields.push('First Name', 'Last Name', 'Email', 'Phone / Username');
 
-    let parsedTravelers: Traveler[] = [];
     if (regId && prev) {
-      const travelers = parseTravelers();
-      parsedTravelers = travelers;
       const registrationPayload: RegistrationApi = {
         ...prev,
         id: regId,
@@ -109,7 +143,7 @@ export default function Profile() {
         travellingTo,
         travelStartDate,
         travelEndDate,
-        travelers,
+        travelers: validTravelers,
       };
 
       await updateRegistrationById(regId, registrationPayload);
@@ -121,12 +155,16 @@ export default function Profile() {
         updatedFields.push('Travel Dates');
       }
       const prevTravelers = JSON.stringify(prev.travelers || []);
-      const nextTravelers = JSON.stringify(travelers);
+      const nextTravelers = JSON.stringify(validTravelers);
       if (prevTravelers !== nextTravelers) updatedFields.push('Passenger Details');
     }
 
-    const fieldList = updatedFields.length ? Array.from(new Set(updatedFields)).join(', ') : 'No fields';
-    setMsg(`Success: The following fields have been updated: ${fieldList}.`);
+    const fieldList = updatedFields.length ? Array.from(new Set(updatedFields)).join(', ') : '';
+    setMsg(fieldList);
+    if (fieldList) {
+      setShowSuccessPopup(true);
+    }
+
     setLatestReg((prevReg) => prevReg ? ({
       ...prevReg,
       dateOfBirth,
@@ -134,7 +172,7 @@ export default function Profile() {
       travellingTo,
       travelStartDate,
       travelEndDate,
-      travelers: parsedTravelers,
+      travelers: validTravelers,
     }) : prevReg);
   }
 
@@ -162,7 +200,20 @@ export default function Profile() {
       <div className="auth-card">
         <h1 className="auth-title">My Profile</h1>
         {!!err && <p className="help" style={{ color: '#b91c1c' }}>{err}</p>}
-        {!!msg && <p className="help">{msg}</p>}
+        {!!msg && !showSuccessPopup && <p className="help">Updated fields: {msg}</p>}
+
+        {showSuccessPopup && (
+          <div className="theme-modal-overlay" role="dialog" aria-modal="true" aria-label="Profile update success">
+            <div className="theme-modal">
+              <button type="button" className="theme-modal-close" aria-label="Close popup" onClick={() => setShowSuccessPopup(false)}>×</button>
+              <h3>Success</h3>
+              <p>The passenger details have been updated.</p>
+              <div className="actions">
+                <button type="button" className="btn" onClick={() => setShowSuccessPopup(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <form className="auth-form" onSubmit={async (e) => {
           try {
@@ -180,13 +231,58 @@ export default function Profile() {
             <label>DOB</label>
             <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} />
           </div>
-          <div className="field"><label>Source</label><input value={travellingFrom} onChange={e => setTravellingFrom(e.target.value)} /></div>
-          <div className="field"><label>Destination</label><input value={travellingTo} onChange={e => setTravellingTo(e.target.value)} /></div>
+          <div className="field">
+            <label>Source</label>
+            <input
+              list="profile-country-from-list"
+              placeholder="Start typing to search…"
+              value={travellingFrom}
+              onChange={e => setTravellingFrom(e.target.value)}
+            />
+            <datalist id="profile-country-from-list">
+              {ALL_COUNTRIES.map(c => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+          <div className="field">
+            <label>Destination</label>
+            <input
+              list="profile-country-to-list"
+              placeholder="Start typing to search…"
+              value={travellingTo}
+              onChange={e => setTravellingTo(e.target.value)}
+            />
+            <datalist id="profile-country-to-list">
+              {EUROPE_COUNTRIES.map(c => <option key={c} value={c} />)}
+            </datalist>
+          </div>
           <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} /></div>
           <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} /></div>
           <div className="field">
-            <label>Passenger Details (one line per passenger: Full Name, YYYY-MM-DD)</label>
-            <textarea value={travelersText} onChange={e => setTravelersText(e.target.value)} rows={4} />
+            <label className="h3" style={{ display: 'block', marginBottom: 8 }}>Passenger Details</label>
+            <button type="button" className="btn" onClick={addPassenger}>+ Add Passenger</button>
+
+            {travelers.map((person, idx) => (
+              <div key={`p-${idx}`} className="card" style={{ marginTop: 10, padding: 12 }}>
+                <div className="grid two">
+                  <div className="field">
+                    <label>Full Name</label>
+                    <input
+                      value={person.fullName}
+                      onChange={(e) => updatePassenger(idx, 'fullName', e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={person.dateOfBirth}
+                      onChange={(e) => updatePassenger(idx, 'dateOfBirth', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <button type="button" className="btn secondary" onClick={() => removePassenger(idx)}>Remove</button>
+              </div>
+            ))}
           </div>
 
           <div className="field">
