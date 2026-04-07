@@ -221,84 +221,84 @@ export default function Profile() {
           <div className="field"><label>Email</label><input value={email} onChange={e => setEmail(e.target.value)} /></div>
           <div className="field"><label>Phone / Username</label><input value={username} onChange={e => setUsername(e.target.value)} required /></div>
 
-          <div className="field">
-            <label>DOB</label>
-            <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} disabled={isDoctor} />
-          </div>
-          <div className="field">
-            <label>Source</label>
-            <input
-              list="profile-country-from-list"
-              placeholder="Start typing to search…"
-              value={travellingFrom}
-              onChange={e => setTravellingFrom(e.target.value)}
-              disabled={isDoctor}
-            />
-            <datalist id="profile-country-from-list">
-              {ALL_COUNTRIES.map(c => <option key={c} value={c} />)}
-            </datalist>
-          </div>
-          <div className="field">
-            <label>Destination</label>
-            <input
-              list="profile-country-to-list"
-              placeholder="Start typing to search…"
-              value={travellingTo}
-              onChange={e => setTravellingTo(e.target.value)}
-              disabled={isDoctor}
-            />
-            <datalist id="profile-country-to-list">
-              {EUROPE_COUNTRIES.map(c => <option key={c} value={c} />)}
-            </datalist>
-          </div>
-          <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} disabled={isDoctor} /></div>
-          <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} disabled={isDoctor} /></div>
-          <div className="field profile-passenger-wrap">
-            <div className="profile-section-head">
-              <label className="h3">Passenger Details</label>
-              <button type="button" className="btn profile-add-passenger" onClick={addPassenger} disabled={isDoctor}>+ Add Passenger</button>
-            </div>
-
-            {travelers.map((person, idx) => (
-              <div key={`p-${idx}`} className="card profile-passenger-card">
-                <div className="grid two">
-                  <div className="field">
-                    <label>Full Name</label>
-                    <input
-                      value={person.fullName}
-                      onChange={(e) => updatePassenger(idx, 'fullName', e.target.value)}
-                      disabled={isDoctor}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Date of Birth</label>
-                    <input
-                      type="date"
-                      value={person.dateOfBirth}
-                      onChange={(e) => updatePassenger(idx, 'dateOfBirth', e.target.value)}
-                      disabled={isDoctor}
-                    />
-                  </div>
-                </div>
-                <button type="button" className="btn secondary profile-remove-passenger" onClick={() => removePassenger(idx)} disabled={isDoctor}>Remove</button>
+          {!isDoctor && (
+            <>
+              <div className="field">
+                <label>DOB</label>
+                <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} />
               </div>
-            ))}
-          </div>
+              <div className="field">
+                <label>Source</label>
+                <input
+                  list="profile-country-from-list"
+                  placeholder="Start typing to search…"
+                  value={travellingFrom}
+                  onChange={e => setTravellingFrom(e.target.value)}
+                />
+                <datalist id="profile-country-from-list">
+                  {ALL_COUNTRIES.map(c => <option key={c} value={c} />)}
+                </datalist>
+              </div>
+              <div className="field">
+                <label>Destination</label>
+                <input
+                  list="profile-country-to-list"
+                  placeholder="Start typing to search…"
+                  value={travellingTo}
+                  onChange={e => setTravellingTo(e.target.value)}
+                />
+                <datalist id="profile-country-to-list">
+                  {EUROPE_COUNTRIES.map(c => <option key={c} value={c} />)}
+                </datalist>
+              </div>
+              <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} /></div>
+              <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} /></div>
+              <div className="field profile-passenger-wrap">
+                <div className="profile-section-head">
+                  <label className="h3">Passenger Details</label>
+                  <button type="button" className="btn profile-add-passenger" onClick={addPassenger}>+ Add Passenger</button>
+                </div>
 
-          <div className="field profile-documents">
-            <label>Travel Document</label>
-            <input type="file" onChange={onUploadDocument} disabled={isDoctor} />
-            {docs.length > 0 && (
-              <ul className="profile-doc-list">
-                {docs.map((d) => (
-                  <li key={d.id} className="profile-doc-item">
-                    <span className="profile-doc-name">{d.fileName}</span>
-                    <button type="button" className="btn secondary profile-doc-remove" onClick={() => onDeleteDocument(d.id)} disabled={isDoctor}>Remove</button>
-                  </li>
+                {travelers.map((person, idx) => (
+                  <div key={`p-${idx}`} className="card profile-passenger-card">
+                    <div className="grid two">
+                      <div className="field">
+                        <label>Full Name</label>
+                        <input
+                          value={person.fullName}
+                          onChange={(e) => updatePassenger(idx, 'fullName', e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Date of Birth</label>
+                        <input
+                          type="date"
+                          value={person.dateOfBirth}
+                          onChange={(e) => updatePassenger(idx, 'dateOfBirth', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <button type="button" className="btn secondary profile-remove-passenger" onClick={() => removePassenger(idx)}>Remove</button>
+                  </div>
                 ))}
-              </ul>
-            )}
-          </div>
+              </div>
+
+              <div className="field profile-documents">
+                <label>Travel Document</label>
+                <input type="file" onChange={onUploadDocument} />
+                {docs.length > 0 && (
+                  <ul className="profile-doc-list">
+                    {docs.map((d) => (
+                      <li key={d.id} className="profile-doc-item">
+                        <span className="profile-doc-name">{d.fileName}</span>
+                        <button type="button" className="btn secondary profile-doc-remove" onClick={() => onDeleteDocument(d.id)}>Remove</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
 
           <button className="btn profile-submit" type="submit">Save Profile</button>
         </form>
