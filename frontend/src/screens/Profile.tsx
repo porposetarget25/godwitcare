@@ -47,8 +47,11 @@ import {
   updateMyProfile,
   uploadDocument,
 } from '../api';
+import { isDoctorUser, useAuth } from '../state/auth';
 
 export default function Profile() {
+  const { user } = useAuth();
+  const isDoctor = isDoctorUser(user);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -127,7 +130,7 @@ export default function Profile() {
 
     await updateMyProfile({ firstName, lastName, email, username });
 
-    if (regId && prev) {
+    if (!isDoctor && regId && prev) {
       const registrationPayload: RegistrationApi = {
         ...prev,
         id: regId,
@@ -198,7 +201,7 @@ export default function Profile() {
             <div className="theme-modal">
               <button type="button" className="theme-modal-close" aria-label="Close popup" onClick={() => setShowSuccessPopup(false)}>×</button>
               <h3>Success</h3>
-              <p>The passenger details have been updated.</p>
+              <p>{isDoctor ? 'Your profile details have been updated.' : 'The passenger details have been updated.'}</p>
               <div className="actions">
                 <button type="button" className="btn" onClick={() => setShowSuccessPopup(false)}>Close</button>
               </div>
@@ -220,7 +223,7 @@ export default function Profile() {
 
           <div className="field">
             <label>DOB</label>
-            <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} />
+            <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} disabled={isDoctor} />
           </div>
           <div className="field">
             <label>Source</label>
@@ -229,6 +232,7 @@ export default function Profile() {
               placeholder="Start typing to search…"
               value={travellingFrom}
               onChange={e => setTravellingFrom(e.target.value)}
+              disabled={isDoctor}
             />
             <datalist id="profile-country-from-list">
               {ALL_COUNTRIES.map(c => <option key={c} value={c} />)}
@@ -241,17 +245,18 @@ export default function Profile() {
               placeholder="Start typing to search…"
               value={travellingTo}
               onChange={e => setTravellingTo(e.target.value)}
+              disabled={isDoctor}
             />
             <datalist id="profile-country-to-list">
               {EUROPE_COUNTRIES.map(c => <option key={c} value={c} />)}
             </datalist>
           </div>
-          <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} /></div>
-          <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} /></div>
+          <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} disabled={isDoctor} /></div>
+          <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} disabled={isDoctor} /></div>
           <div className="field profile-passenger-wrap">
             <div className="profile-section-head">
               <label className="h3">Passenger Details</label>
-              <button type="button" className="btn profile-add-passenger" onClick={addPassenger}>+ Add Passenger</button>
+              <button type="button" className="btn profile-add-passenger" onClick={addPassenger} disabled={isDoctor}>+ Add Passenger</button>
             </div>
 
             {travelers.map((person, idx) => (
@@ -262,6 +267,7 @@ export default function Profile() {
                     <input
                       value={person.fullName}
                       onChange={(e) => updatePassenger(idx, 'fullName', e.target.value)}
+                      disabled={isDoctor}
                     />
                   </div>
                   <div className="field">
@@ -270,30 +276,31 @@ export default function Profile() {
                       type="date"
                       value={person.dateOfBirth}
                       onChange={(e) => updatePassenger(idx, 'dateOfBirth', e.target.value)}
+                      disabled={isDoctor}
                     />
                   </div>
                 </div>
-                <button type="button" className="btn secondary profile-remove-passenger" onClick={() => removePassenger(idx)}>Remove</button>
+                <button type="button" className="btn secondary profile-remove-passenger" onClick={() => removePassenger(idx)} disabled={isDoctor}>Remove</button>
               </div>
             ))}
           </div>
 
           <div className="field profile-documents">
             <label>Travel Document</label>
-            <input type="file" onChange={onUploadDocument} />
+            <input type="file" onChange={onUploadDocument} disabled={isDoctor} />
             {docs.length > 0 && (
               <ul className="profile-doc-list">
                 {docs.map((d) => (
                   <li key={d.id} className="profile-doc-item">
                     <span className="profile-doc-name">{d.fileName}</span>
-                    <button type="button" className="btn secondary profile-doc-remove" onClick={() => onDeleteDocument(d.id)}>Remove</button>
+                    <button type="button" className="btn secondary profile-doc-remove" onClick={() => onDeleteDocument(d.id)} disabled={isDoctor}>Remove</button>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          <button className="btn profile-submit" type="submit">Edit Profile</button>
+          <button className="btn profile-submit" type="submit">Save Profile</button>
         </form>
 
         <div className="profile-bottom-actions">
