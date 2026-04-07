@@ -187,8 +187,8 @@ export default function Profile() {
   if (loading) return <section className="section"><p>Loading profile…</p></section>;
 
   return (
-    <section className="section auth">
-      <div className="auth-card">
+    <section className="section auth profile-page">
+      <div className="auth-card profile-card">
         <h1 className="auth-title">My Profile</h1>
         {!!err && <p className="help" style={{ color: '#b91c1c' }}>{err}</p>}
         {!!msg && !showSuccessPopup && <p className="help">{msg}</p>}
@@ -206,7 +206,7 @@ export default function Profile() {
           </div>
         )}
 
-        <form className="auth-form" onSubmit={async (e) => {
+        <form className="auth-form profile-form" onSubmit={async (e) => {
           try {
             await save(e);
           } catch (error: any) {
@@ -248,12 +248,14 @@ export default function Profile() {
           </div>
           <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} /></div>
           <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} /></div>
-          <div className="field">
-            <label className="h3" style={{ display: 'block', marginBottom: 8 }}>Passenger Details</label>
-            <button type="button" className="btn" onClick={addPassenger}>+ Add Passenger</button>
+          <div className="field profile-passenger-wrap">
+            <div className="profile-section-head">
+              <label className="h3">Passenger Details</label>
+              <button type="button" className="btn profile-add-passenger" onClick={addPassenger}>+ Add Passenger</button>
+            </div>
 
             {travelers.map((person, idx) => (
-              <div key={`p-${idx}`} className="card" style={{ marginTop: 10, padding: 12 }}>
+              <div key={`p-${idx}`} className="card profile-passenger-card">
                 <div className="grid two">
                   <div className="field">
                     <label>Full Name</label>
@@ -271,32 +273,32 @@ export default function Profile() {
                     />
                   </div>
                 </div>
-                <button type="button" className="btn secondary" onClick={() => removePassenger(idx)}>Remove</button>
+                <button type="button" className="btn secondary profile-remove-passenger" onClick={() => removePassenger(idx)}>Remove</button>
               </div>
             ))}
           </div>
 
-          <div className="field">
+          <div className="field profile-documents">
             <label>Travel Document</label>
             <input type="file" onChange={onUploadDocument} />
             {docs.length > 0 && (
-              <ul style={{ marginTop: 8 }}>
+              <ul className="profile-doc-list">
                 {docs.map((d) => (
-                  <li key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>{d.fileName}</span>
-                    <button type="button" className="btn secondary" onClick={() => onDeleteDocument(d.id)}>Remove</button>
+                  <li key={d.id} className="profile-doc-item">
+                    <span className="profile-doc-name">{d.fileName}</span>
+                    <button type="button" className="btn secondary profile-doc-remove" onClick={() => onDeleteDocument(d.id)}>Remove</button>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          <button className="btn" type="submit">Edit Profile</button>
+          <button className="btn profile-submit" type="submit">Edit Profile</button>
         </form>
 
-        <div style={{ marginTop: 12, display: 'flex', gap: 12 }}>
+        <div className="profile-bottom-actions">
           <Link className="btn secondary" to="/home">Back</Link>
-          <button type="button" className="btn" style={{ background: '#b91c1c', borderColor: '#b91c1c' }} onClick={onDeleteAccount}>
+          <button type="button" className="btn profile-delete-account" onClick={onDeleteAccount}>
             Delete Account
           </button>
         </div>
