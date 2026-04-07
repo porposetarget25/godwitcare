@@ -32,6 +32,12 @@ public class User {
     @Column(nullable = false)
     private String password; // BCrypt hash
 
+    private String profilePhotoFileName;
+
+    private String resetPasswordToken;
+
+    private java.time.Instant resetPasswordExpiresAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.USER; // default
@@ -68,6 +74,15 @@ public class User {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+    public String getProfilePhotoFileName() { return profilePhotoFileName; }
+    public void setProfilePhotoFileName(String profilePhotoFileName) { this.profilePhotoFileName = profilePhotoFileName; }
+
+    public String getResetPasswordToken() { return resetPasswordToken; }
+    public void setResetPasswordToken(String resetPasswordToken) { this.resetPasswordToken = resetPasswordToken; }
+
+    public java.time.Instant getResetPasswordExpiresAt() { return resetPasswordExpiresAt; }
+    public void setResetPasswordExpiresAt(java.time.Instant resetPasswordExpiresAt) { this.resetPasswordExpiresAt = resetPasswordExpiresAt; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
