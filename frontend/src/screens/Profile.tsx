@@ -35,6 +35,7 @@ const EUROPE_COUNTRIES = [
 ].sort((a, b) => a.localeCompare(b));
 
 import {
+  deleteDocument,
   deleteMyAccount,
   getLatestRegistrationByEmail,
   getMyProfile,
@@ -121,14 +122,10 @@ export default function Profile() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    setMsg('');
     setErr('');
-
-    const updatedFields: string[] = [];
     const prev = latestReg;
 
     await updateMyProfile({ firstName, lastName, email, username });
-    updatedFields.push('First Name', 'Last Name', 'Email', 'Phone / Username');
 
     if (regId && prev) {
       const registrationPayload: RegistrationApi = {
@@ -147,23 +144,8 @@ export default function Profile() {
       };
 
       await updateRegistrationById(regId, registrationPayload);
-
-      if ((prev.dateOfBirth || '') !== dateOfBirth) updatedFields.push('DOB');
-      if ((prev.travellingFrom || '') !== travellingFrom) updatedFields.push('Source');
-      if ((prev.travellingTo || '') !== travellingTo) updatedFields.push('Destination');
-      if ((prev.travelStartDate || '') !== travelStartDate || (prev.travelEndDate || '') !== travelEndDate) {
-        updatedFields.push('Travel Dates');
-      }
-      const prevTravelers = JSON.stringify(prev.travelers || []);
-      const nextTravelers = JSON.stringify(validTravelers);
-      if (prevTravelers !== nextTravelers) updatedFields.push('Passenger Details');
     }
-
-    const fieldList = updatedFields.length ? Array.from(new Set(updatedFields)).join(', ') : '';
-    setMsg(fieldList);
-    if (fieldList) {
-      setShowSuccessPopup(true);
-    }
+    setShowSuccessPopup(true);
 
     setLatestReg((prevReg) => prevReg ? ({
       ...prevReg,
@@ -186,6 +168,15 @@ export default function Profile() {
     setMsg('Travel document uploaded successfully.');
   }
 
+  async function onDeleteDocument(docId: number) {
+    if (!regId) return;
+    setErr('');
+    await deleteDocument(regId, docId);
+    const existingDocs = await listDocuments(regId);
+    setDocs(existingDocs || []);
+    setMsg('Travel document deleted successfully.');
+  }
+
   async function onDeleteAccount() {
     if (!confirm('Are you sure? This deletes your account.')) return;
     await deleteMyAccount();
@@ -200,7 +191,7 @@ export default function Profile() {
       <div className="auth-card">
         <h1 className="auth-title">My Profile</h1>
         {!!err && <p className="help" style={{ color: '#b91c1c' }}>{err}</p>}
-        {!!msg && !showSuccessPopup && <p className="help">Updated fields: {msg}</p>}
+        {!!msg && !showSuccessPopup && <p className="help">{msg}</p>}
 
         {showSuccessPopup && (
           <div className="theme-modal-overlay" role="dialog" aria-modal="true" aria-label="Profile update success">
@@ -291,13 +282,16 @@ export default function Profile() {
             {docs.length > 0 && (
               <ul style={{ marginTop: 8 }}>
                 {docs.map((d) => (
-                  <li key={d.id}>{d.fileName}</li>
+                  <li key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>{d.fileName}</span>
+                    <button type="button" className="btn secondary" onClick={() => onDeleteDocument(d.id)}>Remove</button>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
 
-          <button className="btn" type="submit">Save Changes</button>
+          <button className="btn" type="submit">Edit Profile</button>
         </form>
 
         <div style={{ marginTop: 12, display: 'flex', gap: 12 }}>

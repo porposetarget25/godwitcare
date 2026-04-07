@@ -232,6 +232,12 @@ export async function listDocuments(registrationId: number): Promise<DocSummary[
   })
 }
 
+export async function deleteDocument(registrationId: number, docId: number): Promise<void> {
+  await request<void>(`/registrations/${registrationId}/documents/${docId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function getLatestRegistrationByEmail(email: string): Promise<RegistrationApi | null> {
   const res = await fetch(`${API_BASE}/registrations?email=${encodeURIComponent(email)}`, {
     method: 'GET',
@@ -523,6 +529,5 @@ export async function resetPassword(token: string, newPassword: string): Promise
     body: JSON.stringify({ token, newPassword }),
   });
 }
-
 
 
