@@ -87,9 +87,10 @@ export default function Login() {
             <label className="chk">
               <input type="checkbox" /> Remember me
             </label>
-            <Link to="/register/1" className="muted small">
-              New here? Register
-            </Link>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Link to="/forgot-password" className="muted small">Forgot password?</Link>
+              <Link to="/register/1" className="muted small">New here? Register</Link>
+            </div>
           </div>
 
           <button type="submit" className="btn block" disabled={loading}>

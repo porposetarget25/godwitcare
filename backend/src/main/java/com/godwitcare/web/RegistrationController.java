@@ -125,6 +125,20 @@ public class RegistrationController {
         return ResponseEntity.ok(list);
     }
 
+    @DeleteMapping("/registrations/{regId}/documents/{docId}")
+    public ResponseEntity<Void> deleteDoc(
+            @PathVariable Long regId,
+            @PathVariable Long docId
+    ) {
+        return docs.findById(docId)
+                .filter(d -> Objects.equals(d.getRegistration().getId(), regId))
+                .map(d -> {
+                    docs.delete(d);
+                    return ResponseEntity.noContent().<Void>build();
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     /** Legacy: forces download (Content-Disposition: attachment). */
     @GetMapping(value = "/registrations/{regId}/documents/{docId}")
     public ResponseEntity<byte[]> downloadLegacy(

@@ -210,6 +210,7 @@ export default function Home() {
             <button className="btn secondary" onClick={onLogout}>
               Logout
             </button>
+            <Link to="/profile" className="btn">Update Profile</Link>
           </div>
         </div>
 
@@ -258,6 +259,7 @@ export default function Home() {
           <button className="btn secondary" onClick={onLogout}>
             Logout
           </button>
+          <Link to="/profile" className="btn">Update Profile</Link>
         </div>
       </div>
 
