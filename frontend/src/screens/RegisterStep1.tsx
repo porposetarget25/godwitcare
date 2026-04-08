@@ -256,6 +256,7 @@ export default function Step1() {
   const { draft, setDraft } = useReg()
   const nav = useNavigate()
   const [errors, setErrors] = useState<Errors>({})
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
 
   // sensible defaults
   const defaultPrimaryDial = useMemo(
@@ -353,15 +354,38 @@ export default function Step1() {
     }
   }, [draft['Primary WhatsApp Number'], draft.primaryDial, defaultPrimaryDial])
 
-  function next(e: React.FormEvent) {
+  async function next(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) return
 
-    // Compose full international numbers before proceeding
+    // Final availability guard on submit (must block navigation if already registered)
+    const email = (draft['Email Address'] || '').trim()
     const primaryDial = draft.primaryDial || defaultPrimaryDial
+    const primaryDigits = normalizeDigits(draft['Primary WhatsApp Number'] || '')
+    const primaryFull = `${primaryDial}${primaryDigits}`
+    try {
+      setIsCheckingAvailability(true)
+      const result = await checkAuthAvailability(email || undefined, primaryFull)
+      const emailError = result.emailRegistered ? 'This email is already registered.' : undefined
+      const primaryError = result.whatsAppRegistered ? "This what'sapp number is already registered" : undefined
+
+      if (emailError || primaryError) {
+        setErrors(prev => ({
+          ...prev,
+          email: emailError,
+          primary: primaryError,
+        }))
+        return
+      }
+    } catch {
+      // keep UX non-blocking if validation API fails
+    } finally {
+      setIsCheckingAvailability(false)
+    }
+
+    // Compose full international numbers before proceeding
     const secondaryDial = draft.secondaryDial || defaultSecondaryDial
 
-    const primaryFull = `${primaryDial}${normalizeDigits(draft['Primary WhatsApp Number'] || '')}`
     const secondaryRaw = normalizeDigits(draft['Carer/Secondary WhatsApp Number'] || '')
     const secondaryFull = secondaryRaw ? `${secondaryDial}${secondaryRaw}` : ''
 
@@ -552,7 +576,9 @@ export default function Step1() {
           </div>
 
           <div className="actions">
-            <button className="btn block">Save Information &amp; Continue</button>
+            <button className="btn block" disabled={isCheckingAvailability}>
+              {isCheckingAvailability ? 'Checking details...' : 'Save Information & Continue'}
+            </button>
           </div>
         </form>
       </div>
