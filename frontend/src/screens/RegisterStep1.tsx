@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { checkAuthAvailability } from '../api'
 import { useReg } from '../state/registration'
 
 type Errors = Partial<Record<
@@ -255,6 +256,7 @@ export default function Step1() {
   const { draft, setDraft } = useReg()
   const nav = useNavigate()
   const [errors, setErrors] = useState<Errors>({})
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
 
   // sensible defaults
   const defaultPrimaryDial = useMemo(
@@ -288,20 +290,102 @@ export default function Step1() {
     if (email && !isValidEmail(email)) {
       next.email = 'Please enter a valid email address.'
     }
+    if (!next.primary && errors.primary) next.primary = errors.primary
+    if (!next.email && errors.email) next.email = errors.email
 
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
-  function next(e: React.FormEvent) {
+  useEffect(() => {
+    const rawEmail = (draft['Email Address'] || '').trim()
+    if (!rawEmail) {
+      setErrors(prev => ({ ...prev, email: undefined }))
+      return
+    }
+    if (!isValidEmail(rawEmail)) return
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkAuthAvailability(rawEmail, undefined)
+        if (cancelled) return
+        setErrors(prev => ({
+          ...prev,
+          email: result.emailRegistered ? 'This email is already registered.' : undefined,
+        }))
+      } catch {
+        // keep UX non-blocking if validation API fails
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [draft['Email Address']])
+
+  useEffect(() => {
+    const primaryDial = draft.primaryDial || defaultPrimaryDial
+    const digits = normalizeDigits(draft['Primary WhatsApp Number'] || '')
+    if (!digits) {
+      setErrors(prev => ({ ...prev, primary: undefined }))
+      return
+    }
+
+    const fullPrimary = `${primaryDial}${digits}`
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const result = await checkAuthAvailability(undefined, fullPrimary)
+        if (cancelled) return
+        setErrors(prev => ({
+          ...prev,
+          primary: result.whatsAppRegistered ? "This what'sapp number is already registered" : undefined,
+        }))
+      } catch {
+        // keep UX non-blocking if validation API fails
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [draft['Primary WhatsApp Number'], draft.primaryDial, defaultPrimaryDial])
+
+  async function next(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) return
 
-    // Compose full international numbers before proceeding
+    // Final availability guard on submit (must block navigation if already registered)
+    const email = (draft['Email Address'] || '').trim()
     const primaryDial = draft.primaryDial || defaultPrimaryDial
+    const primaryDigits = normalizeDigits(draft['Primary WhatsApp Number'] || '')
+    const primaryFull = `${primaryDial}${primaryDigits}`
+    try {
+      setIsCheckingAvailability(true)
+      const result = await checkAuthAvailability(email || undefined, primaryFull)
+      const emailError = result.emailRegistered ? 'This email is already registered.' : undefined
+      const primaryError = result.whatsAppRegistered ? "This what'sapp number is already registered" : undefined
+
+      if (emailError || primaryError) {
+        setErrors(prev => ({
+          ...prev,
+          email: emailError,
+          primary: primaryError,
+        }))
+        return
+      }
+    } catch {
+      // keep UX non-blocking if validation API fails
+    } finally {
+      setIsCheckingAvailability(false)
+    }
+
+    // Compose full international numbers before proceeding
     const secondaryDial = draft.secondaryDial || defaultSecondaryDial
 
-    const primaryFull = `${primaryDial}${normalizeDigits(draft['Primary WhatsApp Number'] || '')}`
     const secondaryRaw = normalizeDigits(draft['Carer/Secondary WhatsApp Number'] || '')
     const secondaryFull = secondaryRaw ? `${secondaryDial}${secondaryRaw}` : ''
 
@@ -412,7 +496,12 @@ export default function Step1() {
                 <input
                   placeholder="1234567890"
                   value={draft['Primary WhatsApp Number'] || ''}
-                  onChange={(e) => setDraft({ ...draft, ['Primary WhatsApp Number']: e.target.value })}
+                  onChange={(e) => {
+                    setDraft({ ...draft, ['Primary WhatsApp Number']: e.target.value })
+                    if (errors.primary === 'Required') {
+                      setErrors(prev => ({ ...prev, primary: undefined }))
+                    }
+                  }}
                   aria-invalid={!!errors.primary}
                 />
               </div>
@@ -487,7 +576,9 @@ export default function Step1() {
           </div>
 
           <div className="actions">
-            <button className="btn block">Save Information &amp; Continue</button>
+            <button className="btn block" disabled={isCheckingAvailability}>
+              {isCheckingAvailability ? 'Checking details...' : 'Save Information & Continue'}
+            </button>
           </div>
         </form>
       </div>

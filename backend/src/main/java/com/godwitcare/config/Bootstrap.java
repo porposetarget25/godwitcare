@@ -1,3 +1,4 @@
+/*
 package com.godwitcare.config;
 
 import com.godwitcare.entity.Role;
@@ -29,3 +30,4 @@ public class Bootstrap {
         };
     }
 }
+*/
