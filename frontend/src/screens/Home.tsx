@@ -253,14 +253,11 @@ export default function Home() {
   if (isDoctor) {
     return (
       <section className="section home">
-        <div
-          className="page-head"
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
-        >
+        <div className="page-head page-head--split">
           <h1 className="page-title">Doctor Console</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div className="page-head-actions">
             {!checking && user && (
-              <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
+              <div className="signed-in-block">
                 {fullName && <div style={{ fontWeight: 700 }}>{fullName}</div>}
                 <div className="muted" style={{ fontSize: 14 }}>
                   Signed in as <strong>{user.email}</strong>
@@ -294,14 +291,11 @@ export default function Home() {
   return (
     <section className="section home">
       {/* Header with user + logout */}
-      <div
-        className="page-head"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
-      >
+      <div className="page-head page-head--split">
         <h1 className="page-title">My Travel Package</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="page-head-actions">
           {!checking && user && (
-            <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
+            <div className="signed-in-block">
               {fullName && <div style={{ fontWeight: 700 }}>{fullName}</div>}
               <div className="muted" style={{ fontSize: 14 }}>
                 Signed in as <strong>{user.email}</strong>
@@ -432,7 +426,7 @@ export default function Home() {
             const isPreviewable = /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.fileName || '')
             return (
               <div key={d.id} className="card" style={{ marginTop: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div className="doc-head">
                   <div>
                     <div className="strong">{d.fileName}</div>
                     <div className="muted small">
@@ -460,15 +454,7 @@ export default function Home() {
       {/* Quick Links */}
       <div className="ql-head">Quick Links</div>
 
-      <div
-        className="quick-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(120px, 1fr))',
-          gap: 20,
-          alignItems: 'stretch',
-        }}
-      >
+      <div className="quick-grid">
         {/* Care History — enabled only if prescription exists */}
         {rxUrl ? (
           <Link
