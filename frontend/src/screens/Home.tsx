@@ -1,7 +1,7 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { me, logout, type UserDto } from '../api'
+import { createPayment, me, logout, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -52,12 +52,25 @@ export default function Home() {
   const [docs, setDocs] = useState<DocInfo[]>([])
   const [loadingReg, setLoadingReg] = useState(false)
   const [loadingDocs, setLoadingDocs] = useState(false)
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false)
+  const [selectedMethod, setSelectedMethod] = useState<'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET'>('CARD')
+  const [amount, setAmount] = useState('49.99')
+  const [currency, setCurrency] = useState('GBP')
+  const [cardNumber, setCardNumber] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [cvv, setCvv] = useState('')
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
 
   const navigate = useNavigate()
 
   const isDoctor = !!user?.roles?.some?.(
   r => typeof r === 'string' && r.toUpperCase().includes('DOCTOR')
    )
+  const isTravelerUser = !!user?.roles?.some?.(
+    r => typeof r === 'string' && r.toUpperCase().includes('USER')
+  )
 
   useEffect(() => {
     let alive = true
@@ -127,6 +140,53 @@ export default function Home() {
     if (!user) return ''
     return [user.firstName, user.lastName].filter(Boolean).join(' ')
   }, [user])
+
+  async function submitPayment() {
+    setPaymentError(null)
+    setPaymentSuccess(null)
+
+    const parsedAmount = Number(amount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setPaymentError('Please enter a valid amount.')
+      return
+    }
+
+    if (selectedMethod === 'CARD') {
+      const cleanCard = cardNumber.replace(/\s+/g, '')
+      if (!/^\d{16}$/.test(cleanCard)) {
+        setPaymentError('Card number must be exactly 16 digits.')
+        return
+      }
+      if (!expiryDate.trim()) {
+        setPaymentError('Please provide an expiry date.')
+        return
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate.trim())) {
+        setPaymentError('Expiry date must be in MM/YY format.')
+        return
+      }
+    }
+
+    setPaymentLoading(true)
+    try {
+      await createPayment({
+        method: selectedMethod,
+        amount: parsedAmount,
+        currency,
+        cardNumber: selectedMethod === 'CARD' ? cardNumber : undefined,
+        expiryDate: selectedMethod === 'CARD' ? expiryDate : undefined,
+        cvv: selectedMethod === 'CARD' ? cvv : undefined,
+      })
+      setPaymentSuccess(`Payment completed via ${selectedMethod.replace('_', ' ').toLowerCase()}.`)
+      setCardNumber('')
+      setExpiryDate('')
+      setCvv('')
+    } catch (err: any) {
+      setPaymentError(err?.message || 'Payment failed. Please try again.')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
 
 
   // Latest prescription URL (if exists)
@@ -260,6 +320,11 @@ export default function Home() {
             Logout
           </button>
           <Link to="/profile" className="btn">Update Profile</Link>
+          {isTravelerUser && (
+            <button className="btn" onClick={() => setShowPaymentsModal(true)}>
+              Payments
+            </button>
+          )}
         </div>
       </div>
 
@@ -667,6 +732,109 @@ export default function Home() {
           <div className="offer-title">Accommodation</div>
         </a>
       </div>
+
+      {showPaymentsModal && (
+        <div className="payment-modal-backdrop" onClick={() => setShowPaymentsModal(false)}>
+          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="payment-modal-header">
+              <h3>Complete Payment</h3>
+              <button className="payment-close-btn" onClick={() => setShowPaymentsModal(false)} aria-label="Close payments">
+                ✕
+              </button>
+            </div>
+
+            <p className="payment-subtitle">Select a payment method and proceed securely.</p>
+
+            <div className="payment-methods">
+              {[
+                { code: 'CARD', label: 'Card' },
+                { code: 'EFT', label: 'EFT' },
+                { code: 'BANK_TRANSFER', label: 'Bank Transfer' },
+                { code: 'DIGITAL_WALLET', label: 'Digital Wallet' },
+              ].map((m) => (
+                <button
+                  key={m.code}
+                  type="button"
+                  className={`payment-method-chip ${selectedMethod === m.code ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedMethod(m.code as 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET')
+                    setPaymentError(null)
+                    setPaymentSuccess(null)
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="payment-form-grid">
+              <div className="field">
+                <label>Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="49.99"
+                />
+              </div>
+              <div className="field">
+                <label>Currency</label>
+                <input
+                  type="text"
+                  value={currency}
+                  maxLength={3}
+                  onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                  placeholder="GBP"
+                />
+              </div>
+            </div>
+
+            {selectedMethod === 'CARD' && (
+              <div className="payment-form-grid">
+                <div className="field">
+                  <label>Card Number</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(e.target.value)}
+                    placeholder="1234 5678 9012 3456"
+                  />
+                </div>
+                <div className="field">
+                  <label>Expiry (MM/YY)</label>
+                  <input
+                    type="text"
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                    placeholder="08/29"
+                  />
+                </div>
+                <div className="field">
+                  <label>CVV</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    value={cvv}
+                    onChange={(e) => setCvv(e.target.value)}
+                    maxLength={4}
+                    placeholder="***"
+                  />
+                </div>
+              </div>
+            )}
+
+            {paymentError && <div className="payment-error">{paymentError}</div>}
+            {paymentSuccess && <div className="payment-success">{paymentSuccess}</div>}
+
+            <button className="btn block" onClick={submitPayment} disabled={paymentLoading}>
+              {paymentLoading ? 'Processing…' : 'Proceed to Pay'}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
