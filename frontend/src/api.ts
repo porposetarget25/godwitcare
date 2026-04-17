@@ -124,6 +124,17 @@ export type ConsultationDetails = ConsultationSummary & {
   notes?: string
 }
 
+export type PaymentMethod = 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET'
+
+export type CreatePaymentPayload = {
+  method: PaymentMethod
+  amount: number
+  currency?: string
+  cardNumber?: string
+  expiryDate?: string
+  cvv?: string
+}
+
 // ---------- Model -> Backend payload mapper ----------
 function toBackend(r: Registration | any) {
   const base = {
@@ -549,3 +560,11 @@ export async function resetPassword(token: string, newPassword: string): Promise
   });
 }
 
+export async function createPayment(payload: CreatePaymentPayload) {
+  return request('/payments', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
