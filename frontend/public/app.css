@@ -646,7 +646,24 @@ html { scroll-behavior: smooth; }
 
 /* ---------- Home (My Travel Package) ---------- */
 .page-head { max-width: 980px; margin: 0 auto 14px; padding: 0 4px; }
+.page-head--split {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
 .page-title { font-size: 38px; line-height: 1.2; margin: 0 0 10px; }
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.signed-in-block {
+  text-align: right;
+  line-height: 1.2;
+}
 
 .package-card {
   max-width: 980px;
@@ -673,7 +690,7 @@ html { scroll-behavior: smooth; }
 .ql-head { max-width: 980px; margin: 6px auto 10px; font-weight: 700; }
 .quick-grid {
   max-width: 980px; margin: 0 auto 26px;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 .quick {
@@ -705,6 +722,12 @@ html { scroll-behavior: smooth; }
 .offer-card:hover img { transform: scale(1.04); }
 .offer-title {
   padding: 12px 14px; font-weight: 700; color: #0b1b2b;
+}
+.doc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 
@@ -930,6 +953,41 @@ html { scroll-behavior: smooth; }
 }
 
 @media (max-width: 768px) {
+  .page-head--split {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .page-title {
+    font-size: clamp(36px, 10vw, 46px);
+    line-height: 1.05;
+    margin-bottom: 0;
+  }
+  .page-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .page-head-actions > .btn,
+  .page-head-actions > .btn.secondary {
+    width: 100%;
+    justify-content: center;
+  }
+  .signed-in-block {
+    width: 100%;
+    text-align: left;
+  }
+  .quick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .doc-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .doc-head .btn {
+    width: 100%;
+    justify-content: center;
+  }
   .payment-form-grid {
     grid-template-columns: 1fr;
   }
