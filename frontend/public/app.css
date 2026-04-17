@@ -660,6 +660,28 @@ html { scroll-behavior: smooth; }
   flex-wrap: wrap;
   gap: 12px;
 }
+.consultation-step-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.consultation-step-row--center {
+  align-items: center;
+}
+.consultation-step-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.consultation-step-actions--tight .btn {
+  min-width: 130px;
+  justify-content: center;
+}
+.consultation-action-main {
+  white-space: nowrap;
+}
 .signed-in-block {
   text-align: right;
   line-height: 1.2;
@@ -953,6 +975,30 @@ html { scroll-behavior: smooth; }
 }
 
 @media (max-width: 768px) {
+  .consultation-journey-title {
+    font-size: clamp(30px, 9vw, 40px);
+    line-height: 1.1;
+  }
+  .consultation-step-row,
+  .consultation-step-row--center {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .consultation-step-actions,
+  .consultation-step-actions--tight {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .consultation-step-actions > .btn,
+  .consultation-step-actions > a.btn,
+  .consultation-step-actions--tight > .btn,
+  .consultation-step-actions--tight > a.btn,
+  .consultation-action-main {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+  }
   .page-head--split {
     flex-direction: column;
     align-items: flex-start;

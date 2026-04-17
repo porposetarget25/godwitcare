@@ -483,13 +483,15 @@ export default function ConsultationTracker() {
   return (
     <section className="section">
       {/* Header */}
-      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 className="page-title" style={{ marginBottom: 0 }}>
+      <div className="page-head page-head--split consultation-journey-head">
+        <h1 className="page-title consultation-journey-title" style={{ marginBottom: 0 }}>
           Your Consultation Journey
         </h1>
-        <Link to="/home" className="btn secondary">
-          Back to Home
-        </Link>
+        <div className="page-head-actions">
+          <Link to="/home" className="btn secondary">
+            Back to Home
+          </Link>
+        </div>
       </div>
 
       {/* Toast */}
@@ -532,7 +534,7 @@ export default function ConsultationTracker() {
 
       {/* Step 1 */}
       <div style={step1CardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+        <div className="consultation-step-row consultation-step-row--center">
           <div>
             <div style={titleStyle}>Step 1: Complete Pre-Consultation Checklist</div>
             <div style={textStyle}>
@@ -542,7 +544,7 @@ export default function ConsultationTracker() {
           </div>
 
           {isStep1Done ? (
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="consultation-step-actions consultation-step-actions--tight">
               <button className="btn secondary" type="button" disabled>
                 Submitted
               </button>
@@ -551,7 +553,7 @@ export default function ConsultationTracker() {
               </Link>
             </div>
           ) : (
-            <Link to="/consultation/questionnaire" className="btn">
+            <Link to="/consultation/questionnaire" className="btn consultation-action-main">
               Submit Details
             </Link>
           )}
@@ -560,7 +562,7 @@ export default function ConsultationTracker() {
 
       {/* Step 2 */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div className="consultation-step-row">
           <div>
             <div style={titleStyle}>Step 2: Notify GodwitCare</div>
             <div style={textStyle}>
@@ -571,7 +573,7 @@ export default function ConsultationTracker() {
 
           <button
             type="button"
-            className="btn"
+            className="btn consultation-action-main"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             onClick={onNotifyClick}
           >
@@ -699,7 +701,7 @@ export default function ConsultationTracker() {
 
       {/* Step 3 */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div className="consultation-step-row">
           <div>
             <div style={titleStyle}>Step 3: Receive a call from Clinician</div>
             <div style={textStyle}>
@@ -707,7 +709,7 @@ export default function ConsultationTracker() {
               medical advice.
             </div>
           </div>
-          <Link to="/consultation/details" className="btn secondary">
+          <Link to="/consultation/details" className="btn secondary consultation-action-main">
             Upcoming
           </Link>
         </div>
@@ -715,7 +717,7 @@ export default function ConsultationTracker() {
 
       {/* Step 4 — dynamic based on rxUrl */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div className="consultation-step-row">
           <div>
             <div style={titleStyle}>Step 4: Prescription Issued</div>
             <div style={textStyle}>
@@ -723,11 +725,11 @@ export default function ConsultationTracker() {
             </div>
           </div>
           {rxUrl ? (
-            <a className="btn" href={rxUrl} target="_blank" rel="noreferrer">
+            <a className="btn consultation-action-main" href={rxUrl} target="_blank" rel="noreferrer">
               View Prescription
             </a>
           ) : (
-            <button className="btn secondary" type="button" disabled>
+            <button className="btn secondary consultation-action-main" type="button" disabled>
               Upcoming
             </button>
           )}
@@ -736,7 +738,7 @@ export default function ConsultationTracker() {
 
       {/* Step 5 */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div className="consultation-step-row">
           <div>
             <div style={titleStyle}>Step 5: Locate Pharmacy</div>
             <div style={textStyle}>
@@ -745,11 +747,11 @@ export default function ConsultationTracker() {
           </div>
 
           {hasRxOrCompleted ? (
-            <button className="btn" type="button" onClick={openNearbyPharmacies} disabled={findingPharmacy}>
+            <button className="btn consultation-action-main" type="button" onClick={openNearbyPharmacies} disabled={findingPharmacy}>
               {findingPharmacy ? 'Finding…' : 'Find Nearby Pharmacies'}
             </button>
           ) : (
-            <button className="btn secondary" type="button" disabled>
+            <button className="btn secondary consultation-action-main" type="button" disabled>
               Upcoming
             </button>
           )}
