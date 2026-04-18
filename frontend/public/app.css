@@ -542,6 +542,17 @@ html { scroll-behavior: smooth; }
 .profile-form .field input {
   min-height: 44px;
 }
+.profile-boolean-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.profile-boolean-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
 
 .profile-passenger-wrap,
 .profile-documents {
@@ -1104,6 +1115,9 @@ html { scroll-behavior: smooth; }
   max-height: 90vh;
   overflow: auto;
 }
+.admin-modal .actions {
+  margin-top: 16px;
+}
 
 .admin-error {
   margin: 10px 0;
@@ -1165,6 +1179,9 @@ html { scroll-behavior: smooth; }
     justify-content: center;
   }
   .admin-bool-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-boolean-grid {
     grid-template-columns: 1fr;
   }
   .admin-travelers-head .btn {
