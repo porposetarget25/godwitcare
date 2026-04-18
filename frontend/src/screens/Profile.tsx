@@ -219,11 +219,6 @@ export default function Profile() {
     navigate('/dashboard');
   }
 
-  async function onLogout() {
-    await logout();
-    navigate('/dashboard');
-  }
-
   if (loading) return <section className="section"><p>Loading profile…</p></section>;
 
   return (
@@ -364,9 +359,6 @@ export default function Profile() {
 
         <div className="profile-bottom-actions">
           <Link className="btn secondary" to="/home">Back</Link>
-          <button type="button" className="btn secondary" onClick={onLogout}>
-            Logout
-          </button>
           <button type="button" className="btn profile-delete-account" onClick={onDeleteAccount}>
             Delete Account
           </button>
