@@ -9,8 +9,12 @@ import {
   adminGetUserDetails,
   adminUpdateDoctor,
   adminUpdateUser,
+  deleteDocument,
+  listDocuments,
   logout,
+  uploadDocument,
   type AdminListItem,
+  type DocSummary,
   type AdminUserInput,
 } from '../api';
 
@@ -55,6 +59,10 @@ export default function AdminDashboard() {
   const [selected, setSelected] = React.useState<AdminListItem | null>(null);
   const [form, setForm] = React.useState<AdminUserInput>(EMPTY_FORM);
   const [travelers, setTravelers] = React.useState<TravelerForm[]>([]);
+  const [editingRegistrationId, setEditingRegistrationId] = React.useState<number | null>(null);
+  const [documents, setDocuments] = React.useState<DocSummary[]>([]);
+  const [docError, setDocError] = React.useState<string | null>(null);
+  const [docBusy, setDocBusy] = React.useState(false);
 
   async function load() {
     setLoading(true);
@@ -78,6 +86,10 @@ export default function AdminDashboard() {
     setMode(nextMode);
     setSelected(item || null);
     setTravelers([]);
+    setEditingRegistrationId(null);
+    setDocuments([]);
+    setDocError(null);
+    setDocBusy(false);
     setForm(item ? {
       ...EMPTY_FORM,
       firstName: item.firstName || '',
@@ -125,6 +137,7 @@ export default function AdminDashboard() {
     setSelected(item);
     setMode('editUser');
     setTravelers(nextTravelers);
+    setDocError(null);
     setForm({
       ...EMPTY_FORM,
       firstName: item.firstName || '',
@@ -150,6 +163,21 @@ export default function AdminDashboard() {
       cardExpiry: latestPayment?.cardExpiry || '',
       password: '',
     });
+
+    const regId = Number(latestReg?.id);
+    if (Number.isFinite(regId) && regId > 0) {
+      setEditingRegistrationId(regId);
+      try {
+        const docs = await listDocuments(regId);
+        setDocuments(Array.isArray(docs) ? docs : []);
+      } catch (e: any) {
+        setDocuments([]);
+        setDocError(e?.message || 'Failed to load documents');
+      }
+    } else {
+      setEditingRegistrationId(null);
+      setDocuments([]);
+    }
   }
 
   async function onSubmitForm(e: React.FormEvent) {
@@ -175,6 +203,45 @@ export default function AdminDashboard() {
   async function onLogout() {
     await logout();
     navigate('/dashboard');
+  }
+
+  async function refreshDocuments(registrationId: number) {
+    const docs = await listDocuments(registrationId);
+    setDocuments(Array.isArray(docs) ? docs : []);
+  }
+
+  async function onUploadDocumentForUser(file: File) {
+    if (!editingRegistrationId) {
+      setDocError('No registration found to attach this document.');
+      return;
+    }
+    setDocBusy(true);
+    setDocError(null);
+    try {
+      await uploadDocument(editingRegistrationId, file);
+      await refreshDocuments(editingRegistrationId);
+    } catch (e: any) {
+      setDocError(e?.message || 'Failed to upload document');
+    } finally {
+      setDocBusy(false);
+    }
+  }
+
+  async function onDeleteDocumentForUser(docId: number) {
+    if (!editingRegistrationId) {
+      setDocError('No registration found for deleting documents.');
+      return;
+    }
+    setDocBusy(true);
+    setDocError(null);
+    try {
+      await deleteDocument(editingRegistrationId, docId);
+      await refreshDocuments(editingRegistrationId);
+    } catch (e: any) {
+      setDocError(e?.message || 'Failed to delete document');
+    } finally {
+      setDocBusy(false);
+    }
   }
 
   return (
@@ -324,6 +391,47 @@ export default function AdminDashboard() {
                   <div className="field"><label>Payment Amount</label><input type="number" step="0.01" min={0} value={form.paymentAmount ?? ''} onChange={(e) => setForm({ ...form, paymentAmount: e.target.value ? Number(e.target.value) : undefined })} /></div>
                   <div className="field"><label>Payment Currency</label><input value={form.paymentCurrency || ''} onChange={(e) => setForm({ ...form, paymentCurrency: e.target.value })} placeholder="GBP" /></div>
                   <div className="field"><label>Card Expiry</label><input value={form.cardExpiry || ''} onChange={(e) => setForm({ ...form, cardExpiry: e.target.value })} placeholder="MM/YY" /></div>
+
+                  {mode === 'editUser' && (
+                    <div className="field admin-documents">
+                      <h4 className="admin-section-title">Travel Documents</h4>
+                      {editingRegistrationId ? (
+                        <>
+                          <input
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) onUploadDocumentForUser(file);
+                              e.currentTarget.value = '';
+                            }}
+                            disabled={docBusy}
+                          />
+                          {documents.length > 0 ? (
+                            <ul className="admin-doc-list">
+                              {documents.map((d) => (
+                                <li key={`doc-${d.id}`} className="admin-doc-item">
+                                  <span>{d.fileName}</span>
+                                  <button
+                                    type="button"
+                                    className="btn secondary"
+                                    disabled={docBusy}
+                                    onClick={() => onDeleteDocumentForUser(d.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="muted">No documents uploaded yet.</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="muted">No registration is available for document management.</p>
+                      )}
+                      {docError && <p className="help error">{docError}</p>}
+                    </div>
+                  )}
                 </>
               )}
 
