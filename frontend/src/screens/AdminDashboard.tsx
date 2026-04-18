@@ -286,10 +286,10 @@ export default function AdminDashboard() {
             <tbody>
               {users.map((u) => (
                 <tr key={`u-${u.id}`}>
-                  <td>{u.firstName} {u.lastName}</td>
-                  <td>{u.email || '—'}</td>
-                  <td>{u.username}</td>
-                  <td className="admin-actions admin-actions-cell">
+                  <td data-label="Name">{u.firstName} {u.lastName}</td>
+                  <td data-label="Email">{u.email || '—'}</td>
+                  <td data-label="Username">{u.username}</td>
+                  <td data-label="Actions" className="admin-actions admin-actions-cell">
                     <button className="btn secondary" onClick={() => onView(u)}>View</button>
                     <button className="btn" onClick={() => onEditUser(u)}>Edit</button>
                     <button className="btn secondary" onClick={() => onDelete(u)}>Delete</button>
@@ -310,10 +310,10 @@ export default function AdminDashboard() {
             <tbody>
               {doctors.map((d) => (
                 <tr key={`d-${d.id}`}>
-                  <td>{d.firstName} {d.lastName}</td>
-                  <td>{d.email || '—'}</td>
-                  <td>{d.username}</td>
-                  <td className="admin-actions admin-actions-cell">
+                  <td data-label="Name">{d.firstName} {d.lastName}</td>
+                  <td data-label="Email">{d.email || '—'}</td>
+                  <td data-label="Username (WhatsApp)">{d.username}</td>
+                  <td data-label="Actions" className="admin-actions admin-actions-cell">
                     <button className="btn secondary" onClick={() => onView(d)}>View</button>
                     <button className="btn" onClick={() => openForm('editDoctor', d)}>Edit</button>
                     <button className="btn secondary" onClick={() => onDelete(d)}>Delete</button>
