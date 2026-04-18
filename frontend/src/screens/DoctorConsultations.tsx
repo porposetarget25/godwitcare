@@ -48,22 +48,20 @@ export default function DoctorConsultations() {
 
   return (
     <section className="section">
-      <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+      <div className="page-head doctor-consult-head">
         <h1 className="page-title">Consultation Requests</h1>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <nav className="tabs" style={{ display:'flex', gap:8 }}>
-            {TABS.map(t => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => selectTab(t)}
-                className={'btn ' + (tab === t ? '' : 'secondary')}
-              >
-                {t}
-              </button>
-            ))}
-          </nav>
-        </div>
+        <nav className="tabs doctor-consult-tabs">
+          {TABS.map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => selectTab(t)}
+              className={'btn ' + (tab === t ? '' : 'secondary')}
+            >
+              {t}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {loading && <div className="muted">Loading…</div>}
@@ -78,14 +76,14 @@ export default function DoctorConsultations() {
         const dt = new Date(it.createdAt)
         const when = `${dt.toLocaleDateString()} ${dt.toLocaleTimeString()}`
         return (
-          <div key={it.id} className="card" style={{ marginTop: 12, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div>
+          <div key={it.id} className="card doctor-consult-card" style={{ marginTop: 12 }}>
+            <div className="doctor-consult-card-content">
               <div style={{ fontWeight: 700 }}>{it.patientName || it.patientEmail}</div>
               <div className="muted small">
                 #{it.id} • {when} • {it.status}
               </div>
             </div>
-            <Link to={`/doctor/consultations/${it.id}`} className="btn">Open</Link>
+            <Link to={`/doctor/consultations/${it.id}`} className="btn doctor-consult-open-btn">Open</Link>
           </div>
         )
       })}
