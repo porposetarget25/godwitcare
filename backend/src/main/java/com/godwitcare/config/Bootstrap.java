@@ -17,7 +17,7 @@ public class Bootstrap {
         return args -> {
             ensureUsersRoleConstraintSupportsAdmin(jdbcTemplate);
 
-            if (repo.findByEmail("doctor@godwitcare.com").isEmpty()) {
+            /*if (repo.findByEmail("doctor@godwitcare.com").isEmpty()) {
                 User doctor = new User();
                 doctor.setUsername("12345");
                 doctor.setFirstName("Doctor");
@@ -27,7 +27,7 @@ public class Bootstrap {
                 doctor.setRole(Role.DOCTOR);
                 repo.save(doctor);
             }
-
+*/
             if (repo.findByEmail("admin@godwitcare.com").isEmpty()) {
                 User admin = new User();
                 admin.setUsername("007");
