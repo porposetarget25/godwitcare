@@ -56,11 +56,19 @@ export default function Profile() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [middleName, setMiddleName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('');
+  const [secondaryWhatsAppNumber, setSecondaryWhatsAppNumber] = useState('');
   const [travellingFrom, setTravellingFrom] = useState('');
   const [travellingTo, setTravellingTo] = useState('');
   const [travelStartDate, setTravelStartDate] = useState('');
   const [travelEndDate, setTravelEndDate] = useState('');
+  const [packageDays, setPackageDays] = useState(0);
+  const [longTermMedication, setLongTermMedication] = useState(false);
+  const [healthCondition, setHealthCondition] = useState(false);
+  const [allergies, setAllergies] = useState(false);
+  const [fitToFlyCertificate, setFitToFlyCertificate] = useState(false);
   const [travelers, setTravelers] = useState<Person[]>([]);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [regId, setRegId] = useState<number | null>(null);
@@ -85,11 +93,19 @@ export default function Profile() {
           setLatestReg(reg);
           if (reg?.id) {
             setRegId(reg.id);
+            setMiddleName(reg.middleName || '');
             setDateOfBirth(reg.dateOfBirth || '');
+            setGender(reg.gender || '');
+            setSecondaryWhatsAppNumber(reg.carerSecondaryWhatsAppNumber || '');
             setTravellingFrom(reg.travellingFrom || '');
             setTravellingTo(reg.travellingTo || '');
             setTravelStartDate(reg.travelStartDate || '');
             setTravelEndDate(reg.travelEndDate || '');
+            setPackageDays(reg.packageDays || 0);
+            setLongTermMedication(!!reg.longTermMedication);
+            setHealthCondition(!!reg.healthCondition);
+            setAllergies(!!reg.allergies);
+            setFitToFlyCertificate(!!reg.fitToFlyCertificate);
             setTravelers((reg.travelers || []).map(t => ({
               fullName: t.fullName || '',
               dateOfBirth: t.dateOfBirth || '',
@@ -135,14 +151,22 @@ export default function Profile() {
         ...prev,
         id: regId,
         firstName,
+        middleName,
         lastName,
         emailAddress: email,
         primaryWhatsAppNumber: username,
         dateOfBirth,
+        gender,
+        carerSecondaryWhatsAppNumber: secondaryWhatsAppNumber,
+        longTermMedication,
+        healthCondition,
+        allergies,
+        fitToFlyCertificate,
         travellingFrom,
         travellingTo,
         travelStartDate,
         travelEndDate,
+        packageDays: Number.isFinite(packageDays) ? packageDays : 0,
         travelers: validTravelers,
       };
 
@@ -152,11 +176,19 @@ export default function Profile() {
 
     setLatestReg((prevReg) => prevReg ? ({
       ...prevReg,
+      middleName,
       dateOfBirth,
+      gender,
+      carerSecondaryWhatsAppNumber: secondaryWhatsAppNumber,
+      longTermMedication,
+      healthCondition,
+      allergies,
+      fitToFlyCertificate,
       travellingFrom,
       travellingTo,
       travelStartDate,
       travelEndDate,
+      packageDays: Number.isFinite(packageDays) ? packageDays : 0,
       travelers: validTravelers,
     }) : prevReg);
   }
@@ -183,6 +215,11 @@ export default function Profile() {
   async function onDeleteAccount() {
     if (!confirm('Are you sure? This deletes your account.')) return;
     await deleteMyAccount();
+    await logout();
+    navigate('/dashboard');
+  }
+
+  async function onLogout() {
     await logout();
     navigate('/dashboard');
   }
@@ -228,6 +265,18 @@ export default function Profile() {
                 <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} />
               </div>
               <div className="field">
+                <label>Middle Name</label>
+                <input value={middleName} onChange={e => setMiddleName(e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Gender</label>
+                <input value={gender} onChange={e => setGender(e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Secondary WhatsApp Number</label>
+                <input value={secondaryWhatsAppNumber} onChange={e => setSecondaryWhatsAppNumber(e.target.value)} />
+              </div>
+              <div className="field">
                 <label>Source</label>
                 <input
                   list="profile-country-from-list"
@@ -253,6 +302,16 @@ export default function Profile() {
               </div>
               <div className="field"><label>Travel Start Date</label><input type="date" value={travelStartDate} onChange={e => setTravelStartDate(e.target.value)} /></div>
               <div className="field"><label>Travel End Date</label><input type="date" value={travelEndDate} onChange={e => setTravelEndDate(e.target.value)} /></div>
+              <div className="field">
+                <label>Package Days</label>
+                <input type="number" min={0} value={packageDays} onChange={e => setPackageDays(Number(e.target.value || 0))} />
+              </div>
+              <div className="profile-boolean-grid">
+                <label><input type="checkbox" checked={longTermMedication} onChange={(e) => setLongTermMedication(e.target.checked)} /> Long-term Medication</label>
+                <label><input type="checkbox" checked={healthCondition} onChange={(e) => setHealthCondition(e.target.checked)} /> Health Condition</label>
+                <label><input type="checkbox" checked={allergies} onChange={(e) => setAllergies(e.target.checked)} /> Allergies</label>
+                <label><input type="checkbox" checked={fitToFlyCertificate} onChange={(e) => setFitToFlyCertificate(e.target.checked)} /> Fit-to-fly Required</label>
+              </div>
               <div className="field profile-passenger-wrap">
                 <div className="profile-section-head">
                   <label className="h3">Passenger Details</label>
@@ -305,6 +364,9 @@ export default function Profile() {
 
         <div className="profile-bottom-actions">
           <Link className="btn secondary" to="/home">Back</Link>
+          <button type="button" className="btn secondary" onClick={onLogout}>
+            Logout
+          </button>
           <button type="button" className="btn profile-delete-account" onClick={onDeleteAccount}>
             Delete Account
           </button>

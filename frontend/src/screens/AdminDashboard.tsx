@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   adminCreateDoctor,
   adminCreateUser,
@@ -8,6 +9,7 @@ import {
   adminGetUserDetails,
   adminUpdateDoctor,
   adminUpdateUser,
+  logout,
   type AdminListItem,
   type AdminUserInput,
 } from '../api';
@@ -42,6 +44,7 @@ const EMPTY_FORM: AdminUserInput = {
 };
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [users, setUsers] = React.useState<AdminListItem[]>([]);
   const [doctors, setDoctors] = React.useState<AdminListItem[]>([]);
   const [details, setDetails] = React.useState<any | null>(null);
@@ -169,10 +172,22 @@ export default function AdminDashboard() {
     await load();
   }
 
+  async function onLogout() {
+    await logout();
+    navigate('/dashboard');
+  }
+
   return (
     <section className="section">
-      <h1 className="page-title">Admin Dashboard</h1>
-      <p className="muted">Manage users and doctors from one place.</p>
+      <div className="page-head page-head--split">
+        <div>
+          <h1 className="page-title">Admin Dashboard</h1>
+          <p className="muted">Manage users and doctors from one place.</p>
+        </div>
+        <div className="page-head-actions">
+          <button type="button" className="btn secondary" onClick={onLogout}>Logout</button>
+        </div>
+      </div>
 
       {error && <div className="admin-error">{error}</div>}
       {loading ? <div className="muted">Loading…</div> : null}
