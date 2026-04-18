@@ -188,6 +188,15 @@ header img.logo {
   color: #010213;
   border: 1px solid #7ecde3;
 }
+.btn.danger {
+  background: #b91c1c;
+  color: #fff;
+  border: 1px solid #b91c1c;
+}
+.btn.danger:hover {
+  background: #991b1b;
+  border-color: #991b1b;
+}
 .btn_big{
   display: inline-block;
   background: var(--brand);
@@ -1279,16 +1288,18 @@ html { scroll-behavior: smooth; }
     margin-bottom: 4px;
   }
   .admin-actions-cell {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
     min-width: 0;
   }
   .admin-actions-cell .btn {
-    flex: 1 1 calc(33.333% - 7px);
+    width: 100%;
     min-width: 0;
     padding: 10px 8px;
     font-size: 13px;
+    justify-content: center;
+    white-space: nowrap;
   }
   .admin-footer-btn {
     justify-content: stretch;
