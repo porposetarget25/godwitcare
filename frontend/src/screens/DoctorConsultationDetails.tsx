@@ -1,13 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
-import { doctorCreatePrescription, doctorDownloadPrescriptionPdf, doctorLatestPrescriptionMeta, logout } from '../api'
+import { doctorCreatePrescription, doctorDownloadPrescriptionPdf, doctorLatestPrescriptionMeta } from '../api'
 import { resolveApiUrl } from '../api'
 
 export default function DoctorConsultationDetails() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [data, setData] = useState<any>(null)
 
   // ---- NEW: prescription state
@@ -180,18 +179,12 @@ export default function DoctorConsultationDetails() {
     }
   }
 
-  async function onLogout() {
-    await logout()
-    navigate('/dashboard')
-  }
-
   return (
     <section className="section">
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Consultation -{data.id}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link className="btn secondary" to="/doctor/consultations">Back</Link>
-          <button type="button" className="btn secondary" onClick={onLogout}>Logout</button>
         </div>
       </div>
 

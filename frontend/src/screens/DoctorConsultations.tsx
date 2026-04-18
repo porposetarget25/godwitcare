@@ -1,7 +1,7 @@
 // src/screens/DoctorConsultations.tsx
 import React from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { API_BASE_URL, logout } from '../api'
+import { API_BASE_URL } from '../api'
 
 type Item = {
   id: number
@@ -46,11 +46,6 @@ export default function DoctorConsultations() {
     navigate(`/doctor/consultations?status=${t}`, { replace: true })
   }
 
-  async function onLogout() {
-    await logout()
-    navigate('/dashboard')
-  }
-
   return (
     <section className="section">
       <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -68,7 +63,6 @@ export default function DoctorConsultations() {
               </button>
             ))}
           </nav>
-          <button type="button" className="btn secondary" onClick={onLogout}>Logout</button>
         </div>
       </div>
 
