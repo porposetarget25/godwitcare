@@ -13,6 +13,7 @@ import {
 } from '../api';
 
 type Mode = 'addUser' | 'addDoctor' | 'editUser' | 'editDoctor' | null;
+type TravelerForm = { fullName: string; dateOfBirth: string };
 
 const EMPTY_FORM: AdminUserInput = {
   firstName: '',
@@ -20,6 +21,24 @@ const EMPTY_FORM: AdminUserInput = {
   email: '',
   username: '',
   password: '',
+  middleName: '',
+  dateOfBirth: '',
+  gender: '',
+  carerSecondaryWhatsAppNumber: '',
+  travellingFrom: '',
+  travellingTo: '',
+  travelStartDate: '',
+  travelEndDate: '',
+  packageDays: 0,
+  longTermMedication: false,
+  healthCondition: false,
+  allergies: false,
+  fitToFlyCertificate: false,
+  travelers: [],
+  paymentMethod: '',
+  paymentAmount: undefined,
+  paymentCurrency: '',
+  cardExpiry: '',
 };
 
 export default function AdminDashboard() {
@@ -32,6 +51,7 @@ export default function AdminDashboard() {
   const [mode, setMode] = React.useState<Mode>(null);
   const [selected, setSelected] = React.useState<AdminListItem | null>(null);
   const [form, setForm] = React.useState<AdminUserInput>(EMPTY_FORM);
+  const [travelers, setTravelers] = React.useState<TravelerForm[]>([]);
 
   async function load() {
     setLoading(true);
@@ -54,7 +74,9 @@ export default function AdminDashboard() {
   function openForm(nextMode: Mode, item?: AdminListItem) {
     setMode(nextMode);
     setSelected(item || null);
+    setTravelers([]);
     setForm(item ? {
+      ...EMPTY_FORM,
       firstName: item.firstName || '',
       lastName: item.lastName || '',
       email: item.email || '',
@@ -71,6 +93,12 @@ export default function AdminDashboard() {
     await load();
   }
 
+  function toDateInput(v?: string) {
+    if (!v) return '';
+    if (v.includes('T')) return v.slice(0, 10);
+    return v;
+  }
+
   async function onView(item: AdminListItem) {
     if (item.role === 'DOCTOR') {
       setDetails({ user: item, note: 'Doctor details view is intentionally minimal.' });
@@ -80,17 +108,64 @@ export default function AdminDashboard() {
     setDetails(d);
   }
 
+  async function onEditUser(item: AdminListItem) {
+    const d = await adminGetUserDetails(item.id);
+    const latestReg = d?.registrationDetails?.[0] || {};
+    const latestPayment = d?.paymentHistory?.[0] || {};
+    const nextTravelers: TravelerForm[] = Array.isArray(latestReg?.travelers)
+      ? latestReg.travelers.map((t: any) => ({
+          fullName: t?.fullName || '',
+          dateOfBirth: toDateInput(t?.dateOfBirth),
+        }))
+      : [];
+
+    setSelected(item);
+    setMode('editUser');
+    setTravelers(nextTravelers);
+    setForm({
+      ...EMPTY_FORM,
+      firstName: item.firstName || '',
+      lastName: item.lastName || '',
+      email: item.email || '',
+      username: item.username || '',
+      middleName: latestReg?.middleName || '',
+      dateOfBirth: toDateInput(latestReg?.dateOfBirth),
+      gender: latestReg?.gender || '',
+      carerSecondaryWhatsAppNumber: latestReg?.carerSecondaryWhatsAppNumber || '',
+      travellingFrom: latestReg?.travellingFrom || '',
+      travellingTo: latestReg?.travellingTo || '',
+      travelStartDate: toDateInput(latestReg?.travelStartDate),
+      travelEndDate: toDateInput(latestReg?.travelEndDate),
+      packageDays: latestReg?.packageDays || 0,
+      longTermMedication: !!latestReg?.longTermMedication,
+      healthCondition: !!latestReg?.healthCondition,
+      allergies: !!latestReg?.allergies,
+      fitToFlyCertificate: !!latestReg?.fitToFlyCertificate,
+      paymentMethod: latestPayment?.method || '',
+      paymentAmount: latestPayment?.amount != null ? Number(latestPayment.amount) : undefined,
+      paymentCurrency: latestPayment?.currency || '',
+      cardExpiry: latestPayment?.cardExpiry || '',
+      password: '',
+    });
+  }
+
   async function onSubmitForm(e: React.FormEvent) {
     e.preventDefault();
 
-    if (mode === 'addUser') await adminCreateUser(form);
-    if (mode === 'addDoctor') await adminCreateDoctor(form);
-    if (mode === 'editUser' && selected) await adminUpdateUser(selected.id, form);
-    if (mode === 'editDoctor' && selected) await adminUpdateDoctor(selected.id, form);
+    const payload: AdminUserInput = {
+      ...form,
+      travelers: travelers.filter((t) => t.fullName.trim() && t.dateOfBirth),
+    };
+
+    if (mode === 'addUser') await adminCreateUser(payload);
+    if (mode === 'addDoctor') await adminCreateDoctor(payload);
+    if (mode === 'editUser' && selected) await adminUpdateUser(selected.id, payload);
+    if (mode === 'editDoctor' && selected) await adminUpdateDoctor(selected.id, payload);
 
     setMode(null);
     setSelected(null);
     setForm(EMPTY_FORM);
+    setTravelers([]);
     await load();
   }
 
@@ -115,9 +190,9 @@ export default function AdminDashboard() {
                   <td>{u.firstName} {u.lastName}</td>
                   <td>{u.email || '—'}</td>
                   <td>{u.username}</td>
-                  <td className="admin-actions">
+                  <td className="admin-actions admin-actions-cell">
                     <button className="btn secondary" onClick={() => onView(u)}>View</button>
-                    <button className="btn" onClick={() => openForm('editUser', u)}>Edit</button>
+                    <button className="btn" onClick={() => onEditUser(u)}>Edit</button>
                     <button className="btn secondary" onClick={() => onDelete(u)}>Delete</button>
                   </td>
                 </tr>
@@ -139,7 +214,7 @@ export default function AdminDashboard() {
                   <td>{d.firstName} {d.lastName}</td>
                   <td>{d.email || '—'}</td>
                   <td>{d.username}</td>
-                  <td className="admin-actions">
+                  <td className="admin-actions admin-actions-cell">
                     <button className="btn secondary" onClick={() => onView(d)}>View</button>
                     <button className="btn" onClick={() => openForm('editDoctor', d)}>Edit</button>
                     <button className="btn secondary" onClick={() => onDelete(d)}>Delete</button>
@@ -188,6 +263,55 @@ export default function AdminDashboard() {
               <div className="field"><label>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div className="field"><label>Username (WhatsApp number)</label><input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required /></div>
               <div className="field"><label>Password (optional while editing)</label><input type="password" value={form.password || ''} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+
+              {(mode === 'editUser' || mode === 'addUser') && (
+                <>
+                  <h4 className="admin-section-title">Profile / Travel Details</h4>
+                  <div className="field"><label>Middle Name</label><input value={form.middleName || ''} onChange={(e) => setForm({ ...form, middleName: e.target.value })} /></div>
+                  <div className="field"><label>Date of Birth</label><input type="date" value={form.dateOfBirth || ''} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} /></div>
+                  <div className="field"><label>Gender</label><input value={form.gender || ''} onChange={(e) => setForm({ ...form, gender: e.target.value })} /></div>
+                  <div className="field"><label>Secondary WhatsApp Number</label><input value={form.carerSecondaryWhatsAppNumber || ''} onChange={(e) => setForm({ ...form, carerSecondaryWhatsAppNumber: e.target.value })} /></div>
+                  <div className="field"><label>Travelling From</label><input value={form.travellingFrom || ''} onChange={(e) => setForm({ ...form, travellingFrom: e.target.value })} /></div>
+                  <div className="field"><label>Travelling To</label><input value={form.travellingTo || ''} onChange={(e) => setForm({ ...form, travellingTo: e.target.value })} /></div>
+                  <div className="field"><label>Travel Start Date</label><input type="date" value={form.travelStartDate || ''} onChange={(e) => setForm({ ...form, travelStartDate: e.target.value })} /></div>
+                  <div className="field"><label>Travel End Date</label><input type="date" value={form.travelEndDate || ''} onChange={(e) => setForm({ ...form, travelEndDate: e.target.value })} /></div>
+                  <div className="field"><label>Package Days</label><input type="number" min={0} value={form.packageDays || 0} onChange={(e) => setForm({ ...form, packageDays: Number(e.target.value || 0) })} /></div>
+
+                  <div className="admin-bool-grid">
+                    <label><input type="checkbox" checked={!!form.longTermMedication} onChange={(e) => setForm({ ...form, longTermMedication: e.target.checked })} /> Long-term Medication</label>
+                    <label><input type="checkbox" checked={!!form.healthCondition} onChange={(e) => setForm({ ...form, healthCondition: e.target.checked })} /> Health Condition</label>
+                    <label><input type="checkbox" checked={!!form.allergies} onChange={(e) => setForm({ ...form, allergies: e.target.checked })} /> Allergies</label>
+                    <label><input type="checkbox" checked={!!form.fitToFlyCertificate} onChange={(e) => setForm({ ...form, fitToFlyCertificate: e.target.checked })} /> Fit-to-fly Required</label>
+                  </div>
+
+                  <div className="admin-travelers-wrap">
+                    <div className="admin-travelers-head">
+                      <h4 className="admin-section-title">Passenger Details</h4>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setTravelers((prev) => [...prev, { fullName: '', dateOfBirth: '' }])}
+                      >
+                        + Add Passenger
+                      </button>
+                    </div>
+                    {travelers.map((traveler, idx) => (
+                      <div key={`traveler-${idx}`} className="admin-traveler-card">
+                        <div className="field"><label>Full Name</label><input value={traveler.fullName} onChange={(e) => setTravelers((prev) => prev.map((item, i) => i === idx ? { ...item, fullName: e.target.value } : item))} /></div>
+                        <div className="field"><label>Date of Birth</label><input type="date" value={traveler.dateOfBirth} onChange={(e) => setTravelers((prev) => prev.map((item, i) => i === idx ? { ...item, dateOfBirth: e.target.value } : item))} /></div>
+                        <button type="button" className="btn secondary" onClick={() => setTravelers((prev) => prev.filter((_, i) => i !== idx))}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <h4 className="admin-section-title">Latest Payment Details</h4>
+                  <div className="field"><label>Payment Method</label><input value={form.paymentMethod || ''} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} placeholder="CARD / EFT / BANK_TRANSFER / DIGITAL_WALLET" /></div>
+                  <div className="field"><label>Payment Amount</label><input type="number" step="0.01" min={0} value={form.paymentAmount ?? ''} onChange={(e) => setForm({ ...form, paymentAmount: e.target.value ? Number(e.target.value) : undefined })} /></div>
+                  <div className="field"><label>Payment Currency</label><input value={form.paymentCurrency || ''} onChange={(e) => setForm({ ...form, paymentCurrency: e.target.value })} placeholder="GBP" /></div>
+                  <div className="field"><label>Card Expiry</label><input value={form.cardExpiry || ''} onChange={(e) => setForm({ ...form, cardExpiry: e.target.value })} placeholder="MM/YY" /></div>
+                </>
+              )}
+
               <div className="actions">
                 <button className="btn" type="submit">Save</button>
                 <button className="btn secondary" type="button" onClick={() => setMode(null)}>Cancel</button>

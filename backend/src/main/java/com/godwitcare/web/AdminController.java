@@ -7,6 +7,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 
 @RestController
@@ -38,7 +40,33 @@ public class AdminController {
         this.encoder = encoder;
     }
 
-    public record AdminUserReq(String firstName, String lastName, String email, String username, String password) {}
+    public record TravelerReq(String fullName, LocalDate dateOfBirth) {}
+
+    public record AdminUserReq(
+            String firstName,
+            String lastName,
+            String email,
+            String username,
+            String password,
+            LocalDate dateOfBirth,
+            String travellingFrom,
+            String travellingTo,
+            LocalDate travelStartDate,
+            LocalDate travelEndDate,
+            String middleName,
+            String gender,
+            String carerSecondaryWhatsAppNumber,
+            Boolean longTermMedication,
+            Boolean healthCondition,
+            Boolean allergies,
+            Boolean fitToFlyCertificate,
+            Integer packageDays,
+            List<TravelerReq> travelers,
+            String paymentMethod,
+            BigDecimal paymentAmount,
+            String paymentCurrency,
+            String cardExpiry
+    ) {}
 
     private Map<String, Object> toUserRow(User u) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -141,6 +169,8 @@ public class AdminController {
             m.put("method", p.getMethod().name());
             m.put("amount", p.getAmount());
             m.put("currency", p.getCurrency());
+            m.put("cardLast4", p.getCardLast4());
+            m.put("cardExpiry", p.getCardExpiry());
             m.put("createdAt", p.getCreatedAt());
             return m;
         }).toList();
@@ -200,6 +230,75 @@ public class AdminController {
         }
 
         users.save(entity);
+        if (role == Role.USER) {
+            syncLatestRegistrationAndPayment(entity, req);
+        }
         return ResponseEntity.ok(toUserRow(entity));
+    }
+
+    private void syncLatestRegistrationAndPayment(User entity, AdminUserReq req) {
+        if (entity.getEmail() != null && !entity.getEmail().isBlank()) {
+            Registration registration = registrations.findTopByEmailAddressOrderByIdDesc(entity.getEmail())
+                    .orElseGet(Registration::new);
+
+            registration.setEmailAddress(entity.getEmail());
+            registration.setFirstName(entity.getFirstName());
+            registration.setLastName(entity.getLastName());
+            registration.setPrimaryWhatsAppNumber(entity.getUsername());
+            registration.setMiddleName(req.middleName());
+            registration.setDateOfBirth(req.dateOfBirth());
+            registration.setGender(req.gender());
+            registration.setCarerSecondaryWhatsAppNumber(req.carerSecondaryWhatsAppNumber());
+            registration.setLongTermMedication(req.longTermMedication());
+            registration.setHealthCondition(req.healthCondition());
+            registration.setAllergies(req.allergies());
+            registration.setFitToFlyCertificate(req.fitToFlyCertificate());
+            registration.setTravellingFrom(req.travellingFrom());
+            registration.setTravellingTo(req.travellingTo());
+            registration.setTravelStartDate(req.travelStartDate());
+            registration.setTravelEndDate(req.travelEndDate());
+            registration.setPackageDays(req.packageDays());
+
+            List<Traveler> travelerEntities = new ArrayList<>();
+            if (req.travelers() != null) {
+                for (TravelerReq t : req.travelers()) {
+                    if (t == null || t.fullName() == null || t.fullName().isBlank() || t.dateOfBirth() == null) {
+                        continue;
+                    }
+                    Traveler traveler = new Traveler();
+                    traveler.setRegistration(registration);
+                    traveler.setFullName(t.fullName().trim());
+                    traveler.setDateOfBirth(t.dateOfBirth());
+                    travelerEntities.add(traveler);
+                }
+            }
+            registration.getTravelers().clear();
+            registration.getTravelers().addAll(travelerEntities);
+            registrations.save(registration);
+        }
+
+        boolean hasPaymentPatch = req.paymentMethod() != null
+                || req.paymentAmount() != null
+                || req.paymentCurrency() != null
+                || req.cardExpiry() != null;
+
+        if (!hasPaymentPatch) return;
+
+        Payment payment = payments.findByUserIdOrderByIdDesc(entity.getId()).stream().findFirst().orElse(null);
+        if (payment == null) return;
+
+        if (req.paymentMethod() != null && !req.paymentMethod().isBlank()) {
+            try {
+                payment.setMethod(PaymentMethod.valueOf(req.paymentMethod().trim().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                // keep existing payment method when an invalid value is sent
+            }
+        }
+        if (req.paymentAmount() != null) payment.setAmount(req.paymentAmount());
+        if (req.paymentCurrency() != null && !req.paymentCurrency().isBlank()) {
+            payment.setCurrency(req.paymentCurrency().trim().toUpperCase(Locale.ROOT));
+        }
+        if (req.cardExpiry() != null) payment.setCardExpiry(req.cardExpiry().trim());
+        payments.save(payment);
     }
 }

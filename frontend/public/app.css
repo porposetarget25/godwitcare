@@ -116,6 +116,10 @@ header img.logo {
   border-radius:999px;
   transition:background .2s ease, transform .2s ease;
 }
+.nav-logout-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+}
 
 
 /* underline animation */
@@ -1071,6 +1075,10 @@ html { scroll-behavior: smooth; }
   gap: 8px;
   flex-wrap: wrap;
 }
+.admin-actions-cell .btn {
+  min-width: 88px;
+  justify-content: center;
+}
 
 .admin-footer-btn {
   display: flex;
@@ -1093,6 +1101,8 @@ html { scroll-behavior: smooth; }
   background: #fff;
   border-radius: 14px;
   padding: 18px;
+  max-height: 90vh;
+  overflow: auto;
 }
 
 .admin-error {
@@ -1102,4 +1112,63 @@ html { scroll-behavior: smooth; }
   border: 1px solid #fecaca;
   border-radius: 10px;
   padding: 8px 10px;
+}
+.admin-section-title {
+  margin: 16px 0 8px;
+}
+.admin-bool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.admin-bool-grid label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.admin-travelers-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.admin-travelers-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.admin-traveler-card {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+@media (max-width: 768px) {
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+  }
+  .admin-actions-cell {
+    min-width: 220px;
+  }
+  .admin-actions-cell .btn {
+    flex: 1 1 calc(50% - 6px);
+  }
+  .admin-footer-btn {
+    justify-content: stretch;
+  }
+  .admin-footer-btn .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .admin-bool-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-travelers-head .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }

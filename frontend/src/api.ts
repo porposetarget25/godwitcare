@@ -69,6 +69,24 @@ export type AdminUserInput = {
   email: string
   username: string
   password?: string
+  dateOfBirth?: string
+  travellingFrom?: string
+  travellingTo?: string
+  travelStartDate?: string
+  travelEndDate?: string
+  middleName?: string
+  gender?: string
+  carerSecondaryWhatsAppNumber?: string
+  longTermMedication?: boolean
+  healthCondition?: boolean
+  allergies?: boolean
+  fitToFlyCertificate?: boolean
+  packageDays?: number
+  travelers?: Traveler[]
+  paymentMethod?: string
+  paymentAmount?: number
+  paymentCurrency?: string
+  cardExpiry?: string
 }
 
 export type AuthAvailability = {
