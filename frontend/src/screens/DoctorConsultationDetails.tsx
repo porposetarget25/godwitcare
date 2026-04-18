@@ -183,7 +183,9 @@ export default function DoctorConsultationDetails() {
     <section className="section">
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Consultation -{data.id}</h1>
-        <Link className="btn secondary" to="/doctor/consultations">Back</Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link className="btn secondary" to="/doctor/consultations">Back</Link>
+        </div>
       </div>
 
       {/* Patient summary card (unchanged) */}

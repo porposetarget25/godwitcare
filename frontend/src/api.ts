@@ -54,6 +54,41 @@ export type UserDto = {
   roles?: string[] 
 }
 
+export type AdminListItem = {
+  id: number
+  firstName: string
+  lastName: string
+  email: string
+  username: string
+  role: 'USER' | 'DOCTOR' | 'ADMIN'
+}
+
+export type AdminUserInput = {
+  firstName: string
+  lastName: string
+  email: string
+  username: string
+  password?: string
+  dateOfBirth?: string
+  travellingFrom?: string
+  travellingTo?: string
+  travelStartDate?: string
+  travelEndDate?: string
+  middleName?: string
+  gender?: string
+  carerSecondaryWhatsAppNumber?: string
+  longTermMedication?: boolean
+  healthCondition?: boolean
+  allergies?: boolean
+  fitToFlyCertificate?: boolean
+  packageDays?: number
+  travelers?: Traveler[]
+  paymentMethod?: string
+  paymentAmount?: number
+  paymentCurrency?: string
+  cardExpiry?: string
+}
+
 export type AuthAvailability = {
   emailRegistered: boolean
   whatsAppRegistered: boolean
@@ -558,6 +593,58 @@ export async function resetPassword(token: string, newPassword: string): Promise
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, newPassword }),
   });
+}
+
+export async function adminDashboard(): Promise<{ users: AdminListItem[]; doctors: AdminListItem[] }> {
+  return request('/admin/dashboard', { method: 'GET', credentials: 'include' });
+}
+
+export async function adminGetUserDetails(id: number): Promise<any> {
+  return request(`/admin/users/${id}/details`, { method: 'GET', credentials: 'include' });
+}
+
+export async function adminCreateUser(payload: AdminUserInput): Promise<AdminListItem> {
+  return request('/admin/users', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminUpdateUser(id: number, payload: AdminUserInput): Promise<AdminListItem> {
+  return request(`/admin/users/${id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminDeleteUser(id: number): Promise<void> {
+  await request(`/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
+}
+
+export async function adminCreateDoctor(payload: AdminUserInput): Promise<AdminListItem> {
+  return request('/admin/doctors', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminUpdateDoctor(id: number, payload: AdminUserInput): Promise<AdminListItem> {
+  return request(`/admin/doctors/${id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminDeleteDoctor(id: number): Promise<void> {
+  await request(`/admin/doctors/${id}`, { method: 'DELETE', credentials: 'include' });
 }
 
 export async function createPayment(payload: CreatePaymentPayload) {

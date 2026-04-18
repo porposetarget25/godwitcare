@@ -13,6 +13,7 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
 
     // All registrations for an email (newest first)
     List<Registration> findByEmailAddressOrderByIdDesc(String emailAddress);
+    List<Registration> findByEmailAddressIgnoreCaseOrderByIdDesc(String emailAddress);
 
     @EntityGraph(attributePaths = "travelers")
     Optional<Registration> findTopByEmailAddressOrderByIdDesc(String emailAddress);
@@ -20,5 +21,4 @@ public interface RegistrationRepository extends JpaRepository<Registration, Long
     // Only the newest one (Top/First are synonyms)
     Optional<Registration> findFirstByEmailAddressOrderByIdDesc(String emailAddress);
 }
-
 

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -200,6 +201,7 @@ public class AuthController {
     }
 
     @PostMapping("/registerDoctor")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> registerDoctor(@RequestBody RegisterReq dto) {
         if (users.existsByUsername(dto.username())) {
             return ResponseEntity.badRequest().body("Username already registered");

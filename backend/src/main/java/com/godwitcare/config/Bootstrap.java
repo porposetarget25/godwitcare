@@ -1,4 +1,3 @@
-/*
 package com.godwitcare.config;
 
 import com.godwitcare.entity.Role;
@@ -7,27 +6,57 @@ import com.godwitcare.repo.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 public class Bootstrap {
 
     @Bean
-    CommandLineRunner initUsers(UserRepository repo, PasswordEncoder encoder) {
+    CommandLineRunner initUsers(UserRepository repo, PasswordEncoder encoder, JdbcTemplate jdbcTemplate) {
         return args -> {
+            ensureUsersRoleConstraintSupportsAdmin(jdbcTemplate);
+
             if (repo.findByEmail("doctor@godwitcare.com").isEmpty()) {
                 User doctor = new User();
                 doctor.setUsername("12345");
                 doctor.setFirstName("Doctor");
                 doctor.setLastName("GodwitCare");
-                doctor.setEmail("doctor@godwitcare.com"); // unique email
-                doctor.setPassword(encoder.encode("demo")); // hashed password
-                doctor.setRole(Role.DOCTOR); // <-- make sure you added role in User entity
+                doctor.setEmail("doctor@godwitcare.com");
+                doctor.setPassword(encoder.encode("demo"));
+                doctor.setRole(Role.DOCTOR);
                 repo.save(doctor);
+            }
 
-                System.out.println("✅ Doctor user created: doctor@godwitcare.com / demo");
+            if (repo.findByEmail("admin@godwitcare.com").isEmpty()) {
+                User admin = new User();
+                admin.setUsername("007");
+                admin.setFirstName("Faiz");
+                admin.setLastName("Ahamad");
+                admin.setEmail("admin@godwitcare.com");
+                admin.setPassword(encoder.encode("demo"));
+                admin.setRole(Role.ADMIN);
+                repo.save(admin);
             }
         };
     }
+
+    private void ensureUsersRoleConstraintSupportsAdmin(JdbcTemplate jdbcTemplate) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_name = 'users'
+                """,
+                Integer.class
+        );
+        if (count == null || count == 0) {
+            return;
+        }
+
+        jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+        jdbcTemplate.execute(
+                "ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('USER','DOCTOR','ADMIN'))"
+        );
+    }
 }
-*/

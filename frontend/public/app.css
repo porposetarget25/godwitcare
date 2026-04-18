@@ -116,6 +116,10 @@ header img.logo {
   border-radius:999px;
   transition:background .2s ease, transform .2s ease;
 }
+.nav-logout-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+}
 
 
 /* underline animation */
@@ -338,10 +342,11 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   }
 
   .navlinks a {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-}
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.1px;
+    padding: 6px 8px;
+  }
 
   /* ---------- HERO ---------- */
 
@@ -537,6 +542,17 @@ html { scroll-behavior: smooth; }
 
 .profile-form .field input {
   min-height: 44px;
+}
+.profile-boolean-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.profile-boolean-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
 
 .profile-passenger-wrap,
@@ -1036,5 +1052,183 @@ html { scroll-behavior: smooth; }
   }
   .payment-form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Admin dashboard */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.admin-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  padding: 8px 6px;
+  font-size: 14px;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.admin-actions-cell .btn {
+  min-width: 88px;
+  justify-content: center;
+}
+
+.admin-footer-btn {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.admin-modal {
+  width: min(640px, 92vw);
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  max-height: 90vh;
+  overflow: auto;
+}
+.admin-modal .actions {
+  margin-top: 16px;
+}
+
+.admin-error {
+  margin: 10px 0;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.admin-section-title {
+  margin: 16px 0 8px;
+}
+.admin-bool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.admin-bool-grid label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.admin-travelers-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.admin-travelers-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.admin-traveler-card {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+}
+.admin-documents input[type="file"] {
+  margin-top: 4px;
+}
+.admin-doc-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.admin-doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.admin-doc-item span {
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .admin-card {
+    padding: 12px;
+  }
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-table th,
+  .admin-table td {
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  .admin-actions-cell {
+    min-width: 220px;
+  }
+  .admin-actions-cell .btn {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+  .admin-footer-btn {
+    justify-content: stretch;
+  }
+  .admin-footer-btn .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .admin-bool-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-boolean-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-travelers-head .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .admin-doc-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-doc-item .btn {
+    width: 100%;
+    justify-content: center;
   }
 }

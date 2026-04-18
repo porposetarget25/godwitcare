@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface ConsultationRepository extends JpaRepository<Consultation, Long> {
     List<Consultation> findByUserEmailOrderByIdDesc(String email);
+    List<Consultation> findByUserIdOrderByIdDesc(Long userId);
 }

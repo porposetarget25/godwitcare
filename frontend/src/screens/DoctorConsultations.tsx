@@ -50,18 +50,20 @@ export default function DoctorConsultations() {
     <section className="section">
       <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <h1 className="page-title">Consultation Requests</h1>
-        <nav className="tabs" style={{ display:'flex', gap:8 }}>
-          {TABS.map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => selectTab(t)}
-              className={'btn ' + (tab === t ? '' : 'secondary')}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <nav className="tabs" style={{ display:'flex', gap:8 }}>
+            {TABS.map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => selectTab(t)}
+                className={'btn ' + (tab === t ? '' : 'secondary')}
+              >
+                {t}
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
       {loading && <div className="muted">Loading…</div>}

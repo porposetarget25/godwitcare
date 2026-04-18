@@ -1,7 +1,7 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { createPayment, me, logout, type UserDto } from '../api'
+import { Link } from 'react-router-dom'
+import { createPayment, me, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -63,7 +63,6 @@ export default function Home() {
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
 
-  const navigate = useNavigate()
 
   const isDoctor = !!user?.roles?.some?.(
   r => typeof r === 'string' && r.toUpperCase().includes('DOCTOR')
@@ -130,11 +129,6 @@ export default function Home() {
       alive = false
     }
   }, [])
-
-  async function onLogout() {
-    await logout()
-    navigate('/dashboard#top')
-  }
 
   const fullName = useMemo(() => {
     if (!user) return ''
@@ -264,9 +258,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <button className="btn secondary" onClick={onLogout}>
-              Logout
-            </button>
             <Link to="/profile" className="btn">Update Profile</Link>
           </div>
         </div>
@@ -310,9 +301,6 @@ export default function Home() {
               )}
             </div>
           )}
-          <button className="btn secondary" onClick={onLogout}>
-            Logout
-          </button>
           <Link to="/profile" className="btn">Update Profile</Link>
           {isTravelerUser && (
             <button className="btn" onClick={() => setShowPaymentsModal(true)}>
