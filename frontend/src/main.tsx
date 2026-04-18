@@ -1,7 +1,7 @@
 // src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 
 import Dashboard from './screens/Dashboard';
 import Login from './screens/Login';
@@ -28,10 +28,20 @@ import AdminDashboard from './screens/AdminDashboard';
 
 // NEW: shared auth context
 import { AuthProvider, useAuth } from './state/auth';
+import { logout } from './api';
 
 // ---------- Shell layout ----------
 function Shell({ children }: { children: React.ReactNode }) {
+  const { user, refresh } = useAuth();
+  const navigate = useNavigate();
   const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
+
+  async function handleLogout() {
+    await logout();
+    await refresh();
+    navigate('/dashboard');
+  }
+
   return (
     <div className="container">
       <header>
@@ -48,6 +58,11 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link to="/dashboard#how">How it Works</Link>
             <Link to="/dashboard#features">Features</Link>
             <Link to="/dashboard#testimonials">Testimonials</Link>
+            {user ? (
+              <button type="button" className="btn nav-logout-btn" onClick={handleLogout}>
+                Logout
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
