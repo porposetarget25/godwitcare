@@ -10,6 +10,7 @@ import {
   adminUpdateDoctor,
   adminUpdateUser,
   deleteDocument,
+  getLatestRegistrationByEmail,
   listDocuments,
   logout,
   uploadDocument,
@@ -17,6 +18,7 @@ import {
   type DocSummary,
   type AdminUserInput,
 } from '../api';
+import { COUNTRY_NAMES } from '../lib/countries';
 
 type Mode = 'addUser' | 'addDoctor' | 'editUser' | 'editDoctor' | null;
 type TravelerForm = { fullName: string; dateOfBirth: string };
@@ -61,6 +63,7 @@ export default function AdminDashboard() {
   const [travelers, setTravelers] = React.useState<TravelerForm[]>([]);
   const [editingRegistrationId, setEditingRegistrationId] = React.useState<number | null>(null);
   const [documents, setDocuments] = React.useState<DocSummary[]>([]);
+  const [pendingDocuments, setPendingDocuments] = React.useState<File[]>([]);
   const [docError, setDocError] = React.useState<string | null>(null);
   const [docBusy, setDocBusy] = React.useState(false);
 
@@ -88,6 +91,7 @@ export default function AdminDashboard() {
     setTravelers([]);
     setEditingRegistrationId(null);
     setDocuments([]);
+    setPendingDocuments([]);
     setDocError(null);
     setDocBusy(false);
     setForm(item ? {
@@ -137,6 +141,7 @@ export default function AdminDashboard() {
     setSelected(item);
     setMode('editUser');
     setTravelers(nextTravelers);
+    setPendingDocuments([]);
     setDocError(null);
     setForm({
       ...EMPTY_FORM,
@@ -182,6 +187,7 @@ export default function AdminDashboard() {
 
   async function onSubmitForm(e: React.FormEvent) {
     e.preventDefault();
+    setDocError(null);
 
     const payload: AdminUserInput = {
       ...form,
@@ -193,10 +199,27 @@ export default function AdminDashboard() {
     if (mode === 'editUser' && selected) await adminUpdateUser(selected.id, payload);
     if (mode === 'editDoctor' && selected) await adminUpdateDoctor(selected.id, payload);
 
+    if ((mode === 'addUser' || mode === 'editUser') && pendingDocuments.length > 0) {
+      let targetRegistrationId = editingRegistrationId;
+      if (!targetRegistrationId && payload.email) {
+        const latestRegistration = await getLatestRegistrationByEmail(payload.email);
+        targetRegistrationId = latestRegistration?.id ?? null;
+      }
+
+      if (!targetRegistrationId) {
+        throw new Error('Unable to upload travel documents because no registration was found for this user.');
+      }
+
+      for (const file of pendingDocuments) {
+        await uploadDocument(targetRegistrationId, file);
+      }
+    }
+
     setMode(null);
     setSelected(null);
     setForm(EMPTY_FORM);
     setTravelers([]);
+    setPendingDocuments([]);
     await load();
   }
 
@@ -242,6 +265,11 @@ export default function AdminDashboard() {
     } finally {
       setDocBusy(false);
     }
+  }
+
+  function onPickDocuments(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setPendingDocuments((prev) => [...prev, ...Array.from(files)]);
   }
 
   return (
@@ -353,8 +381,24 @@ export default function AdminDashboard() {
                   <div className="field"><label>Date of Birth</label><input type="date" value={form.dateOfBirth || ''} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} /></div>
                   <div className="field"><label>Gender</label><input value={form.gender || ''} onChange={(e) => setForm({ ...form, gender: e.target.value })} /></div>
                   <div className="field"><label>Secondary WhatsApp Number</label><input value={form.carerSecondaryWhatsAppNumber || ''} onChange={(e) => setForm({ ...form, carerSecondaryWhatsAppNumber: e.target.value })} /></div>
-                  <div className="field"><label>Travelling From</label><input value={form.travellingFrom || ''} onChange={(e) => setForm({ ...form, travellingFrom: e.target.value })} /></div>
-                  <div className="field"><label>Travelling To</label><input value={form.travellingTo || ''} onChange={(e) => setForm({ ...form, travellingTo: e.target.value })} /></div>
+                  <div className="field">
+                    <label>Travelling From</label>
+                    <select value={form.travellingFrom || ''} onChange={(e) => setForm({ ...form, travellingFrom: e.target.value })}>
+                      <option value="">Select country</option>
+                      {COUNTRY_NAMES.map((country) => (
+                        <option key={`from-${country}`} value={country}>{country}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Travelling To</label>
+                    <select value={form.travellingTo || ''} onChange={(e) => setForm({ ...form, travellingTo: e.target.value })}>
+                      <option value="">Select country</option>
+                      {COUNTRY_NAMES.map((country) => (
+                        <option key={`to-${country}`} value={country}>{country}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="field"><label>Travel Start Date</label><input type="date" value={form.travelStartDate || ''} onChange={(e) => setForm({ ...form, travelStartDate: e.target.value })} /></div>
                   <div className="field"><label>Travel End Date</label><input type="date" value={form.travelEndDate || ''} onChange={(e) => setForm({ ...form, travelEndDate: e.target.value })} /></div>
                   <div className="field"><label>Package Days</label><input type="number" min={0} value={form.packageDays || 0} onChange={(e) => setForm({ ...form, packageDays: Number(e.target.value || 0) })} /></div>
@@ -392,46 +436,70 @@ export default function AdminDashboard() {
                   <div className="field"><label>Payment Currency</label><input value={form.paymentCurrency || ''} onChange={(e) => setForm({ ...form, paymentCurrency: e.target.value })} placeholder="GBP" /></div>
                   <div className="field"><label>Card Expiry</label><input value={form.cardExpiry || ''} onChange={(e) => setForm({ ...form, cardExpiry: e.target.value })} placeholder="MM/YY" /></div>
 
-                  {mode === 'editUser' && (
-                    <div className="field admin-documents">
-                      <h4 className="admin-section-title">Travel Documents</h4>
-                      {editingRegistrationId ? (
-                        <>
-                          <input
-                            type="file"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) onUploadDocumentForUser(file);
-                              e.currentTarget.value = '';
-                            }}
-                            disabled={docBusy}
-                          />
-                          {documents.length > 0 ? (
-                            <ul className="admin-doc-list">
-                              {documents.map((d) => (
-                                <li key={`doc-${d.id}`} className="admin-doc-item">
-                                  <span>{d.fileName}</span>
-                                  <button
-                                    type="button"
-                                    className="btn secondary"
-                                    disabled={docBusy}
-                                    onClick={() => onDeleteDocumentForUser(d.id)}
-                                  >
-                                    Delete
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="muted">No documents uploaded yet.</p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="muted">No registration is available for document management.</p>
-                      )}
-                      {docError && <p className="help error">{docError}</p>}
-                    </div>
-                  )}
+                  <div className="field admin-documents">
+                    <h4 className="admin-section-title">Travel Documents</h4>
+                    {editingRegistrationId ? (
+                      <>
+                        <input
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) onUploadDocumentForUser(file);
+                            e.currentTarget.value = '';
+                          }}
+                          disabled={docBusy}
+                        />
+                        {documents.length > 0 ? (
+                          <ul className="admin-doc-list">
+                            {documents.map((d) => (
+                              <li key={`doc-${d.id}`} className="admin-doc-item">
+                                <span>{d.fileName}</span>
+                                <button
+                                  type="button"
+                                  className="btn secondary"
+                                  disabled={docBusy}
+                                  onClick={() => onDeleteDocumentForUser(d.id)}
+                                >
+                                  Delete
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted">No documents uploaded yet.</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="muted">Files added here will upload when you save the user.</p>
+                    )}
+
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => {
+                        onPickDocuments(e.target.files);
+                        e.currentTarget.value = '';
+                      }}
+                      disabled={docBusy}
+                    />
+                    {pendingDocuments.length > 0 && (
+                      <ul className="admin-doc-list">
+                        {pendingDocuments.map((file, idx) => (
+                          <li key={`pending-doc-${idx}-${file.name}`} className="admin-doc-item">
+                            <span>{file.name}</span>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              onClick={() => setPendingDocuments((prev) => prev.filter((_, i) => i !== idx))}
+                            >
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {docError && <p className="help error">{docError}</p>}
+                  </div>
                 </>
               )}
 
