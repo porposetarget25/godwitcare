@@ -1100,6 +1100,9 @@ html { scroll-behavior: smooth; }
   min-width: 88px;
   justify-content: center;
 }
+.admin-actions-cell .btn + .btn {
+  margin-left: 8px;
+}
 
 .admin-footer-btn {
   display: flex;
@@ -1302,6 +1305,9 @@ html { scroll-behavior: smooth; }
     border-radius: 8px;
     justify-content: center;
     white-space: nowrap;
+  }
+  .admin-actions-cell .btn + .btn {
+    margin-left: 6px;
   }
   .admin-footer-btn {
     justify-content: stretch;
