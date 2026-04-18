@@ -6,14 +6,17 @@ import com.godwitcare.repo.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 public class Bootstrap {
 
     @Bean
-    CommandLineRunner initUsers(UserRepository repo, PasswordEncoder encoder) {
+    CommandLineRunner initUsers(UserRepository repo, PasswordEncoder encoder, JdbcTemplate jdbcTemplate) {
         return args -> {
+            ensureUsersRoleConstraintSupportsAdmin(jdbcTemplate);
+
             if (repo.findByEmail("doctor@godwitcare.com").isEmpty()) {
                 User doctor = new User();
                 doctor.setUsername("12345");
@@ -36,5 +39,24 @@ public class Bootstrap {
                 repo.save(admin);
             }
         };
+    }
+
+    private void ensureUsersRoleConstraintSupportsAdmin(JdbcTemplate jdbcTemplate) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_name = 'users'
+                """,
+                Integer.class
+        );
+        if (count == null || count == 0) {
+            return;
+        }
+
+        jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+        jdbcTemplate.execute(
+                "ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('USER','DOCTOR','ADMIN'))"
+        );
     }
 }
