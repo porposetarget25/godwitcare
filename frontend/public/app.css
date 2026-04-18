@@ -188,6 +188,15 @@ header img.logo {
   color: #010213;
   border: 1px solid #7ecde3;
 }
+.btn.danger {
+  background: #b91c1c;
+  color: #fff;
+  border: 1px solid #b91c1c;
+}
+.btn.danger:hover {
+  background: #991b1b;
+  border-color: #991b1b;
+}
 .btn_big{
   display: inline-block;
   background: var(--brand);

@@ -292,7 +292,7 @@ export default function AdminDashboard() {
                   <td data-label="Actions" className="admin-actions admin-actions-cell">
                     <button className="btn secondary" onClick={() => onView(u)}>View</button>
                     <button className="btn" onClick={() => onEditUser(u)}>Edit</button>
-                    <button className="btn secondary" onClick={() => onDelete(u)}>Delete</button>
+                    <button className="btn danger" onClick={() => onDelete(u)}>Delete</button>
                   </td>
                 </tr>
               ))}
@@ -316,7 +316,7 @@ export default function AdminDashboard() {
                   <td data-label="Actions" className="admin-actions admin-actions-cell">
                     <button className="btn secondary" onClick={() => onView(d)}>View</button>
                     <button className="btn" onClick={() => openForm('editDoctor', d)}>Edit</button>
-                    <button className="btn secondary" onClick={() => onDelete(d)}>Delete</button>
+                    <button className="btn danger" onClick={() => onDelete(d)}>Delete</button>
                   </td>
                 </tr>
               ))}
@@ -445,7 +445,7 @@ export default function AdminDashboard() {
                                 <span>{d.fileName}</span>
                                 <button
                                   type="button"
-                                  className="btn secondary"
+                                  className="btn danger"
                                   disabled={docBusy}
                                   onClick={() => onDeleteDocumentForUser(d.id)}
                                 >
