@@ -18,10 +18,11 @@ export default function Login() {
     setLoading(true);
     try {
       // Use WhatsApp number as username
-      await login(username, password);
+      const u = await login(username, password);
       // Immediately refresh auth context (so useAuth() has the user)
       await refresh();
-      navigate('/home');
+      const isAdmin = !!u?.roles?.some((r) => typeof r === 'string' && r.toUpperCase().includes('ADMIN'));
+      navigate(isAdmin ? '/admin/dashboard' : '/home');
     } catch (err: any) {
       setError(err?.message || 'Login failed');
     } finally {
