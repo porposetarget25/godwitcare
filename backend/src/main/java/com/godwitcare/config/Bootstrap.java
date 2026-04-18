@@ -1,4 +1,3 @@
-/*
 package com.godwitcare.config;
 
 import com.godwitcare.entity.Role;
@@ -20,14 +19,22 @@ public class Bootstrap {
                 doctor.setUsername("12345");
                 doctor.setFirstName("Doctor");
                 doctor.setLastName("GodwitCare");
-                doctor.setEmail("doctor@godwitcare.com"); // unique email
-                doctor.setPassword(encoder.encode("demo")); // hashed password
-                doctor.setRole(Role.DOCTOR); // <-- make sure you added role in User entity
+                doctor.setEmail("doctor@godwitcare.com");
+                doctor.setPassword(encoder.encode("demo"));
+                doctor.setRole(Role.DOCTOR);
                 repo.save(doctor);
+            }
 
-                System.out.println("✅ Doctor user created: doctor@godwitcare.com / demo");
+            if (repo.findByEmail("admin@godwitcare.com").isEmpty()) {
+                User admin = new User();
+                admin.setUsername("007");
+                admin.setFirstName("Faiz");
+                admin.setLastName("Ahamad");
+                admin.setEmail("admin@godwitcare.com");
+                admin.setPassword(encoder.encode("demo"));
+                admin.setRole(Role.ADMIN);
+                repo.save(admin);
             }
         };
     }
 }
-*/

@@ -12,5 +12,6 @@ public interface ReferralLetterRepo extends JpaRepository<ReferralLetter, Long> 
     );
 
     Optional<ReferralLetter> findTopByConsultationIdOrderByIdDesc(Long consultationId);
+    java.util.List<ReferralLetter> findByConsultationUserIdOrderByIdDesc(Long userId);
 
 }

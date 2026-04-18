@@ -24,6 +24,7 @@ import ReferralLetter from './screens/ReferralLetter';
 import Profile from './screens/Profile';
 import ForgotPassword from './screens/ForgotPassword';
 import ResetPassword from './screens/ResetPassword';
+import AdminDashboard from './screens/AdminDashboard';
 
 // NEW: shared auth context
 import { AuthProvider, useAuth } from './state/auth';
@@ -160,6 +161,16 @@ function AppRoutes() {
 
       {/* ROUTES THAT NEED AUTH */}
 
+      <Route
+        path="/admin/dashboard"
+        element={
+          <Shell>
+            <RequireRole user={user} role="ADMIN" loading={loading}>
+              <AdminDashboard />
+            </RequireRole>
+          </Shell>
+        }
+      />
       <Route
         path="/home"
         element={
