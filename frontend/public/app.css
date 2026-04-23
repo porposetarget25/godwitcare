@@ -188,6 +188,26 @@ header img.logo {
   color: #010213;
   border: 1px solid #7ecde3;
 }
+.btn.btn-yes {
+  background: #16a34a;
+  color: #ffffff;
+  border: 1px solid #15803d;
+}
+.btn.btn-yes.secondary {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #9ca3af;
+}
+.btn.btn-no {
+  background: #16a34a;
+  color: #ffffff;
+  border: 1px solid #15803d;
+}
+.btn.btn-no.secondary {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #9ca3af;
+}
 .btn.danger {
   background: #b91c1c;
   color: #fff;
