@@ -385,6 +385,9 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   .nav-logout-btn {
     padding: 6px 10px;
     white-space: nowrap;
+    border-radius: 999px;
+    border-width: 1px;
+    flex-shrink: 0;
   }
 
   /* ---------- HERO ---------- */
@@ -397,6 +400,38 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     "media"
     "actions";
   gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .doctor-consultation-details-head {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  .doctor-consultation-details-head .page-title {
+    font-size: clamp(34px, 9vw, 44px);
+    line-height: 1.05;
+    margin-bottom: 0;
+  }
+
+  .doctor-consultation-details-head > div {
+    width: 100%;
+  }
+
+  .doctor-consultation-details-head .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .doctor-consultation-details .questionnaire-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .doctor-consultation-details .questionnaire-table {
+    min-width: 620px;
+  }
 }
 
 /* Let the children of the first div participate in the grid (mobile only) */
