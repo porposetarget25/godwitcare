@@ -276,6 +276,28 @@ public class ConsultationController {
         return ResponseEntity.ok(Map.of("id", p.getId()));
     }
 
+    @PutMapping("/doctor/consultations/{id}/complete")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<?> completeConsultation(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) throws Exception {
+        Consultation c = consultations.findById(id).orElse(null);
+        if (c == null) return ResponseEntity.notFound().build();
+
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        c.setAnswersJson(mapper.writeValueAsString(
+                body.getOrDefault("answers", Map.of())
+        ));
+        c.setDetailsByQuestionJson(mapper.writeValueAsString(
+                body.getOrDefault("detailsByQuestion", Map.of())
+        ));
+        c.setStatus(Consultation.Status.COMPLETED);
+
+        consultations.save(c);
+        return ResponseEntity.ok(Map.of("id", c.getId(), "status", c.getStatus().name(), "updated", true));
+    }
+
     // ---------- Doctor download any prescription by id ----------
     @GetMapping("/doctor/prescriptions/{pid}/pdf")
     @PreAuthorize("hasRole('DOCTOR')")
