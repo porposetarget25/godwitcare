@@ -316,7 +316,7 @@ export default function DoctorConsultationDetails() {
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           type="button"
-                          className={'btn ' + (ans === 'No' ? '' : 'secondary')}
+                          className={'btn btn-no ' + (ans === 'No' ? '' : 'secondary')}
                           onClick={() => setAnswer(qid, 'No')}
                           aria-pressed={ans === 'No'}
                         >
@@ -324,7 +324,7 @@ export default function DoctorConsultationDetails() {
                         </button>
                         <button
                           type="button"
-                          className={'btn ' + (ans === 'Yes' ? '' : 'secondary')}
+                          className={'btn btn-yes ' + (ans === 'Yes' ? '' : 'secondary')}
                           onClick={() => setAnswer(qid, 'Yes')}
                           aria-pressed={ans === 'Yes'}
                         >
