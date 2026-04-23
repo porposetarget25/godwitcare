@@ -194,19 +194,19 @@ header img.logo {
   border: 1px solid #15803d;
 }
 .btn.btn-yes.secondary {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #86efac;
-}
-.btn.btn-no {
   background: #ffffff;
   color: #111827;
   border: 1px solid #9ca3af;
 }
+.btn.btn-no {
+  background: #16a34a;
+  color: #ffffff;
+  border: 1px solid #15803d;
+}
 .btn.btn-no.secondary {
-  background: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #9ca3af;
 }
 .btn.danger {
   background: #b91c1c;
