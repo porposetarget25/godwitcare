@@ -41,7 +41,7 @@ function Toggle({
       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
         <button
           type="button"
-          className={'btn ' + (value === 'No' ? '' : 'secondary')}
+          className={'btn btn-no ' + (value === 'No' ? '' : 'secondary')}
           onClick={() => onChange('No')}
           aria-pressed={value === 'No'}
         >
@@ -49,7 +49,7 @@ function Toggle({
         </button>
         <button
           type="button"
-          className={'btn ' + (value === 'Yes' ? '' : 'secondary')}
+          className={'btn btn-yes ' + (value === 'Yes' ? '' : 'secondary')}
           onClick={() => onChange('Yes')}
           aria-pressed={value === 'Yes'}
         >
