@@ -237,8 +237,8 @@ export default function DoctorConsultationDetails() {
   }
 
   return (
-    <section className="section">
-      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <section className="section doctor-consultation-details">
+      <div className="page-head doctor-consultation-details-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Consultation -{data.id}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link className="btn secondary" to="/doctor/consultations">Back</Link>
@@ -291,7 +291,8 @@ export default function DoctorConsultationDetails() {
       <div className="card" style={{ marginTop: 12 }}>
         <div className="strong" style={{ marginBottom: 8 }}>Questionnaire</div>
         {answers && Object.keys(answers).length > 0 ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="questionnaire-table-wrap">
+            <table className="questionnaire-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
                 <th style={{ padding: '6px 8px' }}>Question ID</th>
@@ -346,7 +347,8 @@ export default function DoctorConsultationDetails() {
                 )
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         ) : <div className="muted">No answers</div>}
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button type="button" className="btn" onClick={completeConsultation} disabled={savingConsultation}>
