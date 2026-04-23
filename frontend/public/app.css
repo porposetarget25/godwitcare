@@ -364,17 +364,27 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   /* Right-side nav links */
   .navlinks {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px 14px;
-    margin-top: 6px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-top: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
   }
+  .navlinks::-webkit-scrollbar { display: none; }
 
   .navlinks a {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.1px;
-    padding: 6px 8px;
+    padding: 6px 7px;
+    white-space: nowrap;
+  }
+
+  .nav-logout-btn {
+    padding: 6px 10px;
+    white-space: nowrap;
   }
 
   /* ---------- HERO ---------- */
@@ -470,7 +480,7 @@ html { scroll-behavior: smooth; }
 /* in app.css */
 .navlinks a { font-size: 14px; }
 @media (max-width: 600px) {
-  .navlinks a { font-size: 12px; margin: 0 1px; }
+  .navlinks a { font-size: 13px; margin: 0; }
   .navcta { padding: 8px 12px; }
   .heroBtn{ width:100%; justify-content:center; }
   .profile-card {
