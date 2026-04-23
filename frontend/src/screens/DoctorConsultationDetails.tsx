@@ -8,6 +8,10 @@ import { resolveApiUrl } from '../api'
 export default function DoctorConsultationDetails() {
   const { id } = useParams()
   const [data, setData] = useState<any>(null)
+  const [answers, setAnswers] = useState<Record<string, 'Yes' | 'No'>>({})
+  const [detailsByQuestion, setDetailsByQuestion] = useState<Record<string, string>>({})
+  const [savingConsultation, setSavingConsultation] = useState(false)
+  const [consultationSaveErr, setConsultationSaveErr] = useState<string | null>(null)
 
   // ---- NEW: prescription state
   const [history, setHistory] = useState('')
@@ -37,6 +41,8 @@ export default function DoctorConsultationDetails() {
       try {
         const d = await doctorGetConsultation(Number(id))
         setData(d)
+        setAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
+        setDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
 
         // fetch latest RX for this consultation (if any)
         try {
@@ -118,6 +124,57 @@ export default function DoctorConsultationDetails() {
   }
   function removeMed(idx: number) {
     setMedicines(list => list.filter((_, i) => i !== idx))
+  }
+
+  function setAnswer(qid: string, value: 'Yes' | 'No') {
+    setAnswers(prev => ({ ...prev, [qid]: value }))
+    if (value === 'No') {
+      setDetailsByQuestion(prev => {
+        const next = { ...prev }
+        delete next[qid]
+        return next
+      })
+    }
+  }
+
+  function setDetail(qid: string, value: string) {
+    setDetailsByQuestion(prev => ({ ...prev, [qid]: value }))
+  }
+
+  async function completeConsultation() {
+    if (!data?.id || savingConsultation) return
+    setConsultationSaveErr(null)
+    setSavingConsultation(true)
+    try {
+      const cleanDetails: Record<string, string> = {}
+      for (const [qid, detail] of Object.entries(detailsByQuestion || {})) {
+        if ((answers?.[qid] || 'No') !== 'Yes') continue
+        const trimmed = (detail || '').trim()
+        if (trimmed) cleanDetails[qid] = trimmed
+      }
+
+      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/complete`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          answers,
+          detailsByQuestion: cleanDetails,
+        }),
+      })
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        throw new Error(t || `HTTP ${res.status}`)
+      }
+
+      setData((prev: any) => ({ ...prev, answers, detailsByQuestion: cleanDetails, status: 'COMPLETED' }))
+      setDetailsByQuestion(cleanDetails)
+    } catch (err: any) {
+      setConsultationSaveErr(err?.message || 'Failed to complete consultation')
+    } finally {
+      setSavingConsultation(false)
+    }
   }
 
   // ---- create prescription via API helpers
@@ -233,7 +290,7 @@ export default function DoctorConsultationDetails() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <div className="strong" style={{ marginBottom: 8 }}>Questionnaire</div>
-        {data.answers && Object.keys(data.answers).length > 0 ? (
+        {answers && Object.keys(answers).length > 0 ? (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
@@ -243,8 +300,8 @@ export default function DoctorConsultationDetails() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(data.answers).map(([qid, ans]) => {
-                const note = (data.detailsByQuestion || {})[qid]
+              {Object.entries(answers).map(([qid, ans]) => {
+                const note = (detailsByQuestion || {})[qid]
                 const isYes = String(ans).toLowerCase() === 'yes'
                 return (
                   <tr
@@ -255,9 +312,35 @@ export default function DoctorConsultationDetails() {
                     }}
                   >
                     <td style={{ padding: '6px 8px', fontSize: 13, fontWeight: 500 }}>{qid}</td>
-                    <td style={{ padding: '6px 8px' }}>{String(ans)}</td>
+                    <td style={{ padding: '6px 8px' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          className={'btn ' + (ans === 'No' ? '' : 'secondary')}
+                          onClick={() => setAnswer(qid, 'No')}
+                          aria-pressed={ans === 'No'}
+                        >
+                          No
+                        </button>
+                        <button
+                          type="button"
+                          className={'btn ' + (ans === 'Yes' ? '' : 'secondary')}
+                          onClick={() => setAnswer(qid, 'Yes')}
+                          aria-pressed={ans === 'Yes'}
+                        >
+                          Yes
+                        </button>
+                      </div>
+                    </td>
                     <td style={{ padding: '6px 8px', color: note ? '#374151' : '#9ca3af' }}>
-                      {note ? note : '—'}
+                      {ans === 'Yes' ? (
+                        <input
+                          value={note || ''}
+                          onChange={(e) => setDetail(qid, e.target.value)}
+                          placeholder="Describe briefly (optional)"
+                          style={{ width: '100%' }}
+                        />
+                      ) : '—'}
                     </td>
                   </tr>
                 )
@@ -265,6 +348,15 @@ export default function DoctorConsultationDetails() {
             </tbody>
           </table>
         ) : <div className="muted">No answers</div>}
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" className="btn" onClick={completeConsultation} disabled={savingConsultation}>
+            {savingConsultation ? 'Completing…' : 'Complete Consultation'}
+          </button>
+          {consultationSaveErr && <span className="muted small" style={{ color: '#b91c1c' }}>{consultationSaveErr}</span>}
+          {data?.status === 'COMPLETED' && !consultationSaveErr && (
+            <span className="muted small">Consultation completed.</span>
+          )}
+        </div>
       </div>
 
       {/* ===== NEW: Right column style stack (kept vertical so it fits your layout) ===== */}
