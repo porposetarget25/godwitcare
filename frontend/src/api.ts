@@ -51,7 +51,8 @@ export type UserDto = {
   email: string
   username?: string
   photoUrl?: string
-  roles?: string[] 
+  roles?: string[]
+  otpVerified?: boolean
 }
 
 export type AdminListItem = {
@@ -394,6 +395,24 @@ export async function registerAuthUser(
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<UserDto>
+}
+
+
+export async function sendOtpToWhatsApp(): Promise<{message: string}> {
+  return request('/auth/otp/send', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function verifyOtp(code: string): Promise<UserDto> {
+  return request<UserDto>('/auth/otp/verify', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
 }
 
 export async function checkAuthAvailability(email?: string, username?: string): Promise<AuthAvailability> {

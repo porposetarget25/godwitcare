@@ -289,7 +289,7 @@ export default function Step3() {
       }
 
       localStorage.removeItem('reg-draft')
-      nav('/home')
+      nav('/verify-otp')
     } catch (err) {
       console.error(err)
       alert('Failed to save. Please try again.')

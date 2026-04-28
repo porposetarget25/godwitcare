@@ -3,6 +3,7 @@ package com.godwitcare.web;
 import com.godwitcare.entity.Role;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.UserRepository;
+import com.godwitcare.service.OtpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Email;
@@ -31,13 +32,16 @@ public class AuthController {
     private final UserRepository users;
     private final PasswordEncoder encoder;
     private final SecurityContextRepository securityContextRepository;
+    private final OtpService otpService;
 
     public AuthController(UserRepository users,
                           PasswordEncoder encoder,
-                          SecurityContextRepository securityContextRepository) {
+                          SecurityContextRepository securityContextRepository,
+                          OtpService otpService) {
         this.users = users;
         this.encoder = encoder;
         this.securityContextRepository = securityContextRepository;
+        this.otpService = otpService;
     }
 
     // ---------- DTOs ----------
@@ -61,13 +65,15 @@ public class AuthController {
     public record LoginReq(String identifier, String username, @Email String email, @NotBlank String password) {}
     public record ForgotPasswordReq(String identifier) {}
     public record ResetPasswordReq(@NotBlank String token, @NotBlank String newPassword) {}
+    public record OtpVerifyReq(@NotBlank String code) {}
 
     public record UserDto(Long id,
                           String firstName,
                           String lastName,
-                          String email,     // may be null
-                          String username,  // always present
-                          List<String> roles) {}
+                          String email,
+                          String username,
+                          List<String> roles,
+                          boolean otpVerified) {}
     public record AvailabilityDto(boolean emailRegistered, boolean whatsAppRegistered) {}
 
     private UserDto toDto(User u) {
@@ -77,7 +83,8 @@ public class AuthController {
                 u.getLastName(),
                 u.getEmail(),
                 u.getUsername(),
-                List.of(u.getRole().name())
+                List.of(u.getRole().name()),
+                u.isOtpVerified()
         );
     }
 
@@ -102,6 +109,12 @@ public class AuthController {
         request.getSession(true);
     }
 
+    private Optional<User> currentUser(Authentication auth) {
+        if (auth == null || auth.getName() == null || auth.getName().isBlank()) return Optional.empty();
+        String username = auth.getName();
+        return users.findByUsername(username).or(() -> users.findByEmail(username));
+    }
+
     // ---------- Endpoints ----------
 
     @PostMapping("/register")
@@ -122,9 +135,45 @@ public class AuthController {
         u.setEmail((req.email() == null || req.email().isBlank()) ? null : req.email().trim());
         u.setPassword(encoder.encode(req.password()));
         u.setRole(Role.USER);
+        u.setOtpVerified(false);
         users.save(u);
 
         return ResponseEntity.ok(toDto(u));
+    }
+
+    @PostMapping("/otp/send")
+    public ResponseEntity<?> sendOtp(Authentication auth) {
+        Optional<User> userOpt = currentUser(auth);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        User user = userOpt.get();
+        try {
+            otpService.generateAndSendOtp(user);
+            users.save(user);
+            return ResponseEntity.ok(Map.of("message", "OTP sent to WhatsApp"));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(500).body(ex.getMessage());
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body("Failed to send OTP");
+        }
+    }
+
+    @PostMapping("/otp/verify")
+    public ResponseEntity<?> verifyOtp(@RequestBody OtpVerifyReq req, Authentication auth) {
+        Optional<User> userOpt = currentUser(auth);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        User user = userOpt.get();
+        if (!otpService.verifyOtp(user, req.code())) {
+            return ResponseEntity.badRequest().body("Invalid or expired OTP");
+        }
+
+        users.save(user);
+        return ResponseEntity.ok(toDto(user));
     }
 
     @GetMapping("/availability")
@@ -186,18 +235,10 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication auth) {
-        if (auth == null) return ResponseEntity.status(401).build();
+        Optional<User> u = currentUser(auth);
+        if (u.isEmpty()) return ResponseEntity.status(401).build();
 
-        // auth.getName() is the username we set in buildAuth (NOT email)
-        String username = auth.getName();
-        User u = users.findByUsername(username).orElse(null);
-        if (u == null) {
-            // Fallback: some older sessions may have email as principal
-            u = users.findByEmail(username).orElse(null);
-        }
-        if (u == null) return ResponseEntity.status(401).build();
-
-        return ResponseEntity.ok(toDto(u));
+        return ResponseEntity.ok(toDto(u.get()));
     }
 
     @PostMapping("/registerDoctor")
@@ -217,6 +258,7 @@ public class AuthController {
         u.setEmail((dto.email() == null || dto.email().isBlank()) ? null : dto.email().trim());
         u.setPassword(encoder.encode(dto.password()));
         u.setRole(Role.DOCTOR);
+        u.setOtpVerified(true);
         users.save(u);
 
         return ResponseEntity.ok(toDto(u));
