@@ -22,7 +22,11 @@ export default function Login() {
       // Immediately refresh auth context (so useAuth() has the user)
       await refresh();
       const isAdmin = !!u?.roles?.some((r) => typeof r === 'string' && r.toUpperCase().includes('ADMIN'));
-      navigate(isAdmin ? '/admin/dashboard' : '/home');
+      if (!isAdmin && !u?.otpVerified) {
+        navigate('/verify-otp');
+      } else {
+        navigate(isAdmin ? '/admin/dashboard' : '/home');
+      }
     } catch (err: any) {
       setError(err?.message || 'Login failed');
     } finally {
