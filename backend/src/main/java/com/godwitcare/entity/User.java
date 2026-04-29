@@ -42,7 +42,7 @@ public class User {
 
     private java.time.Instant otpExpiresAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean otpVerified = false;
 
     private java.time.Instant otpVerifiedAt;
