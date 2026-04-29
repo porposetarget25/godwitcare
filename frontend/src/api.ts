@@ -598,11 +598,22 @@ export async function deleteMyAccount() {
   return request('/users/me', { method: 'DELETE', credentials: 'include' });
 }
 
-export async function forgotPassword(identifier: string): Promise<{message: string; resetToken?: string}> {
+export async function forgotPassword(identifier: string): Promise<{message: string}> {
   return request('/auth/forgot-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identifier }),
+  });
+}
+
+export async function verifyForgotPasswordOtp(
+  identifier: string,
+  code: string
+): Promise<{message: string; resetToken: string}> {
+  return request('/auth/forgot-password/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier, code }),
   });
 }
 
