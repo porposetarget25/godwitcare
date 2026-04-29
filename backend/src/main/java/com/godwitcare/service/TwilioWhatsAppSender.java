@@ -3,11 +3,15 @@ package com.godwitcare.service;
 import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TwilioWhatsAppSender implements WhatsAppSender {
+
+    private static final Logger log = LoggerFactory.getLogger(TwilioWhatsAppSender.class);
 
     private final String accountSid;
     private final String authToken;
@@ -31,10 +35,34 @@ public class TwilioWhatsAppSender implements WhatsAppSender {
 
         Twilio.init(accountSid, authToken);
 
-        Message.creator(
-                new PhoneNumber("whatsapp:" + toPhoneNumber),
-                new PhoneNumber("whatsapp:" + fromNumber),
+        String normalizedTo = normalizeE164(toPhoneNumber);
+        String normalizedFrom = normalizeE164(fromNumber);
+
+        Message twilioMessage = Message.creator(
+                new PhoneNumber("whatsapp:" + normalizedTo),
+                new PhoneNumber("whatsapp:" + normalizedFrom),
                 message
         ).create();
+
+        log.info("Twilio WhatsApp OTP message created. sid={}, status={}, to={}",
+                twilioMessage.getSid(), twilioMessage.getStatus(), maskPhone(normalizedTo));
+    }
+
+    private String normalizeE164(String phone) {
+        String cleaned = phone == null ? "" : phone.trim();
+        if (cleaned.startsWith("whatsapp:")) {
+            cleaned = cleaned.substring("whatsapp:".length());
+        }
+        if (!cleaned.startsWith("+")) {
+            cleaned = "+" + cleaned;
+        }
+        return cleaned;
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 4) {
+            return "****";
+        }
+        return "***" + phone.substring(phone.length() - 4);
     }
 }
