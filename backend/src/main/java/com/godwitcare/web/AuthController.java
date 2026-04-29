@@ -65,6 +65,7 @@ public class AuthController {
     public record LoginReq(String identifier, String username, @Email String email, @NotBlank String password) {}
     public record ForgotPasswordReq(String identifier) {}
     public record ResetPasswordReq(@NotBlank String token, @NotBlank String newPassword) {}
+    public record ForgotPasswordOtpVerifyReq(@NotBlank String identifier, @NotBlank String code) {}
     public record OtpVerifyReq(@NotBlank String code) {}
 
     public record UserDto(Long id,
@@ -273,18 +274,34 @@ public class AuthController {
         Optional<User> ou = findByIdentifier(req.identifier().trim());
         if (ou.isPresent()) {
             User u = ou.get();
-            String token = UUID.randomUUID().toString();
-            u.setResetPasswordToken(token);
-            u.setResetPasswordExpiresAt(java.time.Instant.now().plusSeconds(30 * 60));
+            otpService.generateAndSendOtp(u);
             users.save(u);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Password reset token generated",
-                    "resetToken", token
-            ));
+            return ResponseEntity.ok(Map.of("message", "OTP sent for password reset"));
         }
 
-        return ResponseEntity.ok(Map.of("message", "If the account exists, reset instructions were generated."));
+        return ResponseEntity.ok(Map.of("message", "If the account exists, an OTP was sent."));
+    }
+
+    @PostMapping("/forgot-password/verify-otp")
+    public ResponseEntity<?> verifyForgotPasswordOtp(@RequestBody ForgotPasswordOtpVerifyReq req) {
+        Optional<User> ou = findByIdentifier(req.identifier().trim());
+        if (ou.isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid or expired OTP");
+        }
+
+        User u = ou.get();
+        if (!otpService.verifyOtp(u, req.code())) {
+            return ResponseEntity.badRequest().body("Invalid or expired OTP");
+        }
+
+        String token = UUID.randomUUID().toString();
+        u.setResetPasswordToken(token);
+        u.setResetPasswordExpiresAt(java.time.Instant.now().plusSeconds(30 * 60));
+        users.save(u);
+        return ResponseEntity.ok(Map.of(
+                "message", "OTP verified successfully",
+                "resetToken", token
+        ));
     }
 
     @PostMapping("/reset-password")
