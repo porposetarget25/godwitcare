@@ -18,7 +18,9 @@ export default function ResetPassword() {
     e.preventDefault();
     const r = await resetPassword(token, password);
     setMsg(r.message || 'Password reset successful');
-    setTimeout(() => navigate('/home'), 1000);
+    // Password reset does not establish an authenticated session.
+    // Send the user to login so auth context/session gets initialized correctly.
+    setTimeout(() => navigate('/login'), 1000);
   }
 
   return (
