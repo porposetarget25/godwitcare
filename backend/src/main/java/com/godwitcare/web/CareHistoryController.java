@@ -50,31 +50,41 @@ public class CareHistoryController {
         patient.put("patientId", Optional.ofNullable(latest.getPatientId()).orElse(""));
         patient.put("dob", latest.getDob() != null ? latest.getDob().toString() : "");
 
-        // Build timeline items where a Prescription exists
+        // Build timeline items where a Prescription exists OR a consultation was completed with no prescription
         List<Map<String, Object>> items = new ArrayList<>();
         for (Consultation c : list) {
             Optional<Prescription> maybeRx =
                     prescriptions.findTopByConsultationIdOrderByIdDesc(c.getId());
-
-            if (maybeRx.isEmpty()) continue; // show only consultations that have Rx
-
-            Prescription rx = maybeRx.get();
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("consultationId", c.getId());
             m.put("date", c.getCreatedAt()); // ISO instant
             // Location from Consultation
             m.put("locationTravellingTo", Optional.ofNullable(c.getCurrentLocation()).orElse(""));
-            // HOPC, Diagnosis, Medicines from Prescription
-            m.put("presentingComplaint", Optional.ofNullable(rx.getHistoryOfPresentingComplaint()).orElse(""));
-            m.put("diagnosis", Optional.ofNullable(rx.getDiagnosis()).orElse(""));
-            // You can keep this as a single string or split into a list on newline
-            m.put("medicines", Optional.ofNullable(rx.getMedicines()).orElse(""));
-            m.put("recommendations", Optional.ofNullable(rx.getRecommendations()).orElse(""));
+
+            if (maybeRx.isPresent()) {
+                Prescription rx = maybeRx.get();
+                m.put("presentingComplaint", Optional.ofNullable(rx.getHistoryOfPresentingComplaint()).orElse(""));
+                m.put("diagnosis", Optional.ofNullable(rx.getDiagnosis()).orElse(""));
+                m.put("medicines", Optional.ofNullable(rx.getMedicines()).orElse(""));
+                m.put("recommendations", Optional.ofNullable(rx.getRecommendations()).orElse(""));
+                items.add(m);
+                continue;
+            }
+
+            boolean noPrescriptionCompleted =
+                    c.getStatus() == Consultation.Status.COMPLETED
+                            && Boolean.FALSE.equals(c.getPrescriptionRequired());
+            if (!noPrescriptionCompleted) continue;
+
+            m.put("presentingComplaint", Optional.ofNullable(c.getHistoryOfPresentingComplaint()).orElse(""));
+            m.put("diagnosis", Optional.ofNullable(c.getDiagnosis()).orElse(""));
+            m.put("medicines", "");
+            m.put("recommendations", Optional.ofNullable(c.getRecommendations()).orElse(""));
             items.add(m);
         }
 
         if (items.isEmpty()) {
-            // No prescriptions yet -> keep Home button disabled by returning 204
+            // No prescription/no-prescription-completed history yet -> keep Home button disabled by returning 204
             return ResponseEntity.noContent().build();
         }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
-import { doctorCreatePrescription, doctorDownloadPrescriptionPdf, doctorLatestPrescriptionMeta } from '../api'
+import { doctorLatestPrescriptionMeta } from '../api'
 import { resolveApiUrl } from '../api'
 
 export default function DoctorConsultationDetails() {
@@ -12,6 +12,9 @@ export default function DoctorConsultationDetails() {
   const [detailsByQuestion, setDetailsByQuestion] = useState<Record<string, string>>({})
   const [savingConsultation, setSavingConsultation] = useState(false)
   const [consultationSaveErr, setConsultationSaveErr] = useState<string | null>(null)
+  const [prescriptionRequired, setPrescriptionRequired] = useState(true)
+  const [initialAnswers, setInitialAnswers] = useState<Record<string, 'Yes' | 'No'>>({})
+  const [initialDetailsByQuestion, setInitialDetailsByQuestion] = useState<Record<string, string>>({})
 
   // ---- NEW: prescription state
   const [history, setHistory] = useState('')
@@ -43,6 +46,12 @@ export default function DoctorConsultationDetails() {
         setData(d)
         setAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
         setDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
+        setInitialAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
+        setInitialDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
+        setHistory(d?.historyOfPresentingComplaint || '')
+        setDiagnosis(d?.diagnosis || '')
+        setRecommendations(d?.recommendations || '')
+        setPrescriptionRequired(d?.prescriptionRequired !== false)
 
         // fetch latest RX for this consultation (if any)
         try {
@@ -141,7 +150,7 @@ export default function DoctorConsultationDetails() {
     setDetailsByQuestion(prev => ({ ...prev, [qid]: value }))
   }
 
-  async function completeConsultation() {
+  async function saveQuestionnaire() {
     if (!data?.id || savingConsultation) return
     setConsultationSaveErr(null)
     setSavingConsultation(true)
@@ -153,13 +162,30 @@ export default function DoctorConsultationDetails() {
         if (trimmed) cleanDetails[qid] = trimmed
       }
 
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/complete`, {
+      const changedAnswers: Record<string, 'Yes' | 'No'> = {}
+      const changedDetails: Record<string, string> = {}
+      const keys = new Set([
+        ...Object.keys(initialAnswers || {}),
+        ...Object.keys(answers || {}),
+        ...Object.keys(initialDetailsByQuestion || {}),
+        ...Object.keys(cleanDetails || {}),
+      ])
+      keys.forEach((qid) => {
+        if ((initialAnswers?.[qid] || 'No') !== (answers?.[qid] || 'No')) {
+          changedAnswers[qid] = answers?.[qid] || 'No'
+        }
+        if ((initialDetailsByQuestion?.[qid] || '') !== (cleanDetails?.[qid] || '')) {
+          if (cleanDetails?.[qid]) changedDetails[qid] = cleanDetails[qid]
+        }
+      })
+
+      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/save-questionnaire`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          answers,
-          detailsByQuestion: cleanDetails,
+          answers: changedAnswers,
+          detailsByQuestion: changedDetails,
         }),
       })
 
@@ -168,8 +194,35 @@ export default function DoctorConsultationDetails() {
         throw new Error(t || `HTTP ${res.status}`)
       }
 
-      setData((prev: any) => ({ ...prev, answers, detailsByQuestion: cleanDetails, status: 'COMPLETED' }))
+      setData((prev: any) => ({ ...prev, answers, detailsByQuestion: cleanDetails }))
+      setInitialAnswers(answers)
       setDetailsByQuestion(cleanDetails)
+      setInitialDetailsByQuestion(cleanDetails)
+    } catch (err: any) {
+      setConsultationSaveErr(err?.message || 'Failed to save consultation')
+    } finally {
+      setSavingConsultation(false)
+    }
+  }
+
+  async function completeConsultation() {
+    if (!data?.id || savingConsultation) return
+    setConsultationSaveErr(null)
+    setSavingConsultation(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/complete`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          history: history.trim(),
+          diagnosis: diagnosis.trim(),
+          recommendations: recommendations.trim(),
+          prescriptionRequired,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setData((prev: any) => ({ ...prev, status: 'COMPLETED' }))
     } catch (err: any) {
       setConsultationSaveErr(err?.message || 'Failed to complete consultation')
     } finally {
@@ -351,8 +404,8 @@ export default function DoctorConsultationDetails() {
           </div>
         ) : <div className="muted">No answers</div>}
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" className="btn" onClick={completeConsultation} disabled={savingConsultation}>
-            {savingConsultation ? 'Completing…' : 'Complete Consultation'}
+          <button type="button" className="btn" onClick={saveQuestionnaire} disabled={savingConsultation}>
+            {savingConsultation ? 'Saving…' : 'Save Consultation'}
           </button>
           {consultationSaveErr && <span className="muted small" style={{ color: '#b91c1c' }}>{consultationSaveErr}</span>}
           {data?.status === 'COMPLETED' && !consultationSaveErr && (
@@ -377,6 +430,15 @@ export default function DoctorConsultationDetails() {
 
       {/* History of Presenting Complaint */}
       <div className="card" style={{ marginTop: 12 }}>
+        <div style={{ marginBottom: 10 }}>
+          <div className="strong" style={{ marginBottom: 6 }}>Prescription Requirement</div>
+          <label style={{ marginRight: 12 }}>
+            <input type="radio" checked={!prescriptionRequired} onChange={() => setPrescriptionRequired(false)} /> No Prescription
+          </label>
+          <label>
+            <input type="radio" checked={prescriptionRequired} onChange={() => setPrescriptionRequired(true)} /> Prescription Required
+          </label>
+        </div>
         <div className="strong" style={{ marginBottom: 8 }}>History of Presenting Complaint</div>
         <textarea
           value={history}
@@ -388,7 +450,7 @@ export default function DoctorConsultationDetails() {
       </div>
 
       {/* Diagnosis */}
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card" style={{ marginTop: 12, opacity: prescriptionRequired ? 1 : 0.5 }}>
         <div className="strong" style={{ marginBottom: 8 }}>Diagnosis</div>
         <textarea
           value={diagnosis}
@@ -409,17 +471,18 @@ export default function DoctorConsultationDetails() {
               <textarea
                 value={m}
                 onChange={(e) => setMed(i, e.target.value)}
+                disabled={!prescriptionRequired}
                 placeholder="e.g., Amoxicillin 500mg – 1 capsule three times daily for 7 days"
                 rows={2}
                 style={{ flex: 1 }}
               />
               {medicines.length > 1 && (
-                <button type="button" className="btn secondary" onClick={() => removeMed(i)}>Remove</button>
+                <button type="button" className="btn secondary" onClick={() => removeMed(i)} disabled={!prescriptionRequired}>Remove</button>
               )}
             </div>
           ))}
           <div>
-            <button type="button" className="btn secondary" onClick={addMed}>Add another medicine</button>
+            <button type="button" className="btn secondary" onClick={addMed} disabled={!prescriptionRequired}>Add another medicine</button>
           </div>
         </div>
 
@@ -437,9 +500,11 @@ export default function DoctorConsultationDetails() {
 
         {/* Create Prescription */}
         <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" className="btn" onClick={createPrescription} disabled={creatingRx}>
-            {creatingRx ? 'Creating…' : 'Create Prescription'}
-          </button>
+          {prescriptionRequired && (
+            <button type="button" className="btn" onClick={createPrescription} disabled={creatingRx}>
+              {creatingRx ? 'Creating…' : 'Create Prescription'}
+            </button>
+          )}
           {rxErr && <span className="muted small" style={{ color: '#b91c1c' }}>{rxErr}</span>}
           {rxId && (
             <>
@@ -452,6 +517,13 @@ export default function DoctorConsultationDetails() {
             </>
           )}
         </div>
+        {(!prescriptionRequired || rxId) && data?.status !== 'COMPLETED' && (
+          <div style={{ marginTop: 12 }}>
+            <button type="button" className="btn" onClick={completeConsultation} disabled={savingConsultation}>
+              {savingConsultation ? 'Completing…' : 'Complete Consultation'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Patient Records quick actions */}
@@ -463,10 +535,10 @@ export default function DoctorConsultationDetails() {
           ) : (
             <button className="btn secondary" type="button" disabled>View Prescription</button>
           )}
-          <button className="btn secondary" type="button" disabled>View Case History</button>
+          <button className="btn secondary" type="button" disabled={!(data?.status === 'COMPLETED' && !prescriptionRequired)}>View Case History</button>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
           {/* Referral Letter (builder) */}
-          {(id || data?.id) ? (
+          {prescriptionRequired && ((id || data?.id) ? (
             <Link
               to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}
               className="btn secondary"
@@ -478,9 +550,9 @@ export default function DoctorConsultationDetails() {
             <button className="btn secondary" type="button" disabled>
               Referral Letter
             </button>
-          )}
+          ))}
           {/* View generated Referral (only if one exists) */}
-          {(() => {
+          {prescriptionRequired && (() => {
             const href =
               (typeof referralPdfUrl === 'string' && referralPdfUrl) ||
               ((typeof referralId === 'number' || typeof referralId === 'string') &&
