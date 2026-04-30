@@ -48,6 +48,10 @@ export default function DoctorConsultationDetails() {
         setDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
         setInitialAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
         setInitialDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
+        setHistory(d?.historyOfPresentingComplaint || '')
+        setDiagnosis(d?.diagnosis || '')
+        setRecommendations(d?.recommendations || '')
+        setPrescriptionRequired(d?.prescriptionRequired !== false)
 
         // fetch latest RX for this consultation (if any)
         try {
@@ -496,9 +500,11 @@ export default function DoctorConsultationDetails() {
 
         {/* Create Prescription */}
         <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" className="btn" onClick={createPrescription} disabled={creatingRx || !prescriptionRequired}>
-            {creatingRx ? 'Creating…' : 'Create Prescription'}
-          </button>
+          {prescriptionRequired && (
+            <button type="button" className="btn" onClick={createPrescription} disabled={creatingRx}>
+              {creatingRx ? 'Creating…' : 'Create Prescription'}
+            </button>
+          )}
           {rxErr && <span className="muted small" style={{ color: '#b91c1c' }}>{rxErr}</span>}
           {rxId && (
             <>
@@ -532,7 +538,7 @@ export default function DoctorConsultationDetails() {
           <button className="btn secondary" type="button" disabled={!(data?.status === 'COMPLETED' && !prescriptionRequired)}>View Case History</button>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
           {/* Referral Letter (builder) */}
-          {(id || data?.id) ? (
+          {prescriptionRequired && ((id || data?.id) ? (
             <Link
               to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}
               className="btn secondary"
@@ -546,9 +552,9 @@ export default function DoctorConsultationDetails() {
             <button className="btn secondary" type="button" disabled>
               Referral Letter
             </button>
-          )}
+          ))}
           {/* View generated Referral (only if one exists) */}
-          {(() => {
+          {prescriptionRequired && (() => {
             const href =
               (typeof referralPdfUrl === 'string' && referralPdfUrl) ||
               ((typeof referralId === 'number' || typeof referralId === 'string') &&

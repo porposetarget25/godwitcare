@@ -186,6 +186,10 @@ public class ConsultationController {
                     d.put("contactName", nz(c.getContactName()));
                     d.put("contactPhone", nz(c.getContactPhone()));
                     d.put("contactAddress", nz(c.getContactAddress()));
+                    d.put("historyOfPresentingComplaint", nz(c.getHistoryOfPresentingComplaint()));
+                    d.put("diagnosis", nz(c.getDiagnosis()));
+                    d.put("recommendations", nz(c.getRecommendations()));
+                    d.put("prescriptionRequired", c.getPrescriptionRequired() == null || c.getPrescriptionRequired());
 
                     ObjectMapper mapper = new ObjectMapper();
                     try {
@@ -283,6 +287,11 @@ public class ConsultationController {
         if (c == null) return ResponseEntity.notFound().build();
 
         c.setStatus(Consultation.Status.COMPLETED);
+        c.setHistoryOfPresentingComplaint((String) body.getOrDefault("history", c.getHistoryOfPresentingComplaint()));
+        c.setDiagnosis((String) body.getOrDefault("diagnosis", c.getDiagnosis()));
+        c.setRecommendations((String) body.getOrDefault("recommendations", c.getRecommendations()));
+        Object prescriptionRequired = body.get("prescriptionRequired");
+        if (prescriptionRequired instanceof Boolean b) c.setPrescriptionRequired(b);
 
         consultations.save(c);
         return ResponseEntity.ok(Map.of("id", c.getId(), "status", c.getStatus().name(), "updated", true));
