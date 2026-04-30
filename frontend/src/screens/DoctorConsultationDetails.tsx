@@ -543,6 +543,8 @@ export default function DoctorConsultationDetails() {
               to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}
               className="btn secondary"
               type="button"
+              onClick={(e) => { if (!prescriptionRequired) e.preventDefault() }}
+              aria-disabled={!prescriptionRequired}
             >
               Referral Letter
             </Link>
