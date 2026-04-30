@@ -204,6 +204,7 @@ export default function Home() {
 
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
+  const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
 
   React.useEffect(() => {
     let ignore = false;
@@ -236,6 +237,20 @@ export default function Home() {
         setReferralUrl(raw ? resolveApiUrl(API_BASE_URL, raw) : null);
       } catch {
         if (!ignore) setReferralUrl(null);
+      }
+    })();
+    return () => { ignore = true; };
+  }, []);
+
+  React.useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/care-history/mine`, { credentials: 'include' });
+        if (ignore) return;
+        setCareHistoryEnabled(res.ok && res.status !== 204);
+      } catch {
+        if (!ignore) setCareHistoryEnabled(false);
       }
     })();
     return () => { ignore = true; };
@@ -443,8 +458,8 @@ export default function Home() {
       <div className="ql-head">Quick Links</div>
 
       <div className="quick-grid">
-        {/* Care History — enabled only if prescription exists */}
-        {rxUrl ? (
+        {/* Care History — enabled if care history has at least one item */}
+        {careHistoryEnabled ? (
           <Link
             to="/care-history"
             className="quick"
@@ -489,7 +504,7 @@ export default function Home() {
               opacity: 0.45,
               textAlign: 'center',
             }}
-            title="Care history becomes available when a prescription is issued"
+            title="Care history becomes available once consultation history is completed"
           >
             <div
               style={{

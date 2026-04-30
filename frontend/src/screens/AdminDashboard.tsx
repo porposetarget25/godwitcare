@@ -20,6 +20,7 @@ import { COUNTRY_NAMES } from '../lib/countries';
 
 type Mode = 'addUser' | 'addDoctor' | 'editUser' | 'editDoctor' | null;
 type TravelerForm = { fullName: string; dateOfBirth: string };
+type UserSearchCriterion = 'all' | 'firstName' | 'lastName' | 'email' | 'whatsApp';
 
 const EMPTY_FORM: AdminUserInput = {
   firstName: '',
@@ -63,6 +64,20 @@ export default function AdminDashboard() {
   const [pendingDocuments, setPendingDocuments] = React.useState<File[]>([]);
   const [docError, setDocError] = React.useState<string | null>(null);
   const [docBusy, setDocBusy] = React.useState(false);
+  const [userSearchCriterion, setUserSearchCriterion] = React.useState<UserSearchCriterion>('all');
+  const [userSearchQuery, setUserSearchQuery] = React.useState('');
+
+  const filteredUsers = React.useMemo(() => {
+    const query = userSearchQuery.trim().toLowerCase();
+    if (!query || userSearchCriterion === 'all') return users;
+
+    return users.filter((u) => {
+      if (userSearchCriterion === 'firstName') return (u.firstName || '').toLowerCase().includes(query);
+      if (userSearchCriterion === 'lastName') return (u.lastName || '').toLowerCase().includes(query);
+      if (userSearchCriterion === 'email') return (u.email || '').toLowerCase().includes(query);
+      return (u.username || '').toLowerCase().includes(query);
+    });
+  }, [users, userSearchCriterion, userSearchQuery]);
 
   async function load() {
     setLoading(true);
@@ -279,12 +294,31 @@ export default function AdminDashboard() {
       <div className="admin-grid">
         <div className="admin-card">
           <h2>Users List</h2>
+          <div className="admin-search-wrap">
+            <select
+              value={userSearchCriterion}
+              onChange={(e) => setUserSearchCriterion(e.target.value as UserSearchCriterion)}
+              aria-label="Search criteria"
+            >
+              <option value="all">All Users</option>
+              <option value="firstName">First Name</option>
+              <option value="lastName">Last Name</option>
+              <option value="email">Email</option>
+              <option value="whatsApp">WhatsApp Number</option>
+            </select>
+            <input
+              value={userSearchQuery}
+              onChange={(e) => setUserSearchQuery(e.target.value)}
+              placeholder={userSearchCriterion === 'all' ? 'Type to narrow users (optional)' : 'Enter search text'}
+              aria-label="Search users"
+            />
+          </div>
           <table className="admin-table">
             <thead>
               <tr><th>Name</th><th>Email</th><th>Username</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={`u-${u.id}`}>
                   <td data-label="Name">{u.firstName} {u.lastName}</td>
                   <td data-label="Email">{u.email || '—'}</td>
@@ -296,6 +330,11 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ))}
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="muted">No users found for the selected search.</td>
+                </tr>
+              )}
             </tbody>
           </table>
           <div className="admin-footer-btn"><button className="btn" onClick={() => openForm('addUser')}>Add User</button></div>

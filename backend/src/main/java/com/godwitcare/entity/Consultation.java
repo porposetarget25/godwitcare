@@ -64,6 +64,13 @@ public class Consultation {
     private String patientId;
 
     private LocalDate dob;
+    @Column(length = 4000)
+    private String historyOfPresentingComplaint;
+    @Column(length = 4000)
+    private String diagnosis;
+    @Column(length = 4000)
+    private String recommendations;
+    private Boolean prescriptionRequired = true;
 
     // ----- getters/setters (existing) -----
     public Long getId() { return id; }
@@ -123,5 +130,37 @@ public class Consultation {
 
     public void setDob(LocalDate dob) {
         this.dob = dob;
+    }
+
+    public String getHistoryOfPresentingComplaint() {
+        return historyOfPresentingComplaint;
+    }
+
+    public void setHistoryOfPresentingComplaint(String historyOfPresentingComplaint) {
+        this.historyOfPresentingComplaint = historyOfPresentingComplaint;
+    }
+
+    public String getDiagnosis() {
+        return diagnosis;
+    }
+
+    public void setDiagnosis(String diagnosis) {
+        this.diagnosis = diagnosis;
+    }
+
+    public String getRecommendations() {
+        return recommendations;
+    }
+
+    public void setRecommendations(String recommendations) {
+        this.recommendations = recommendations;
+    }
+
+    public Boolean getPrescriptionRequired() {
+        return prescriptionRequired;
+    }
+
+    public void setPrescriptionRequired(Boolean prescriptionRequired) {
+        this.prescriptionRequired = prescriptionRequired;
     }
 }
