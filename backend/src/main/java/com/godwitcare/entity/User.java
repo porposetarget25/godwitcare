@@ -38,6 +38,15 @@ public class User {
 
     private java.time.Instant resetPasswordExpiresAt;
 
+    private String otpCodeHash;
+
+    private java.time.Instant otpExpiresAt;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean otpVerified = false;
+
+    private java.time.Instant otpVerifiedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.USER; // default
@@ -83,6 +92,19 @@ public class User {
 
     public java.time.Instant getResetPasswordExpiresAt() { return resetPasswordExpiresAt; }
     public void setResetPasswordExpiresAt(java.time.Instant resetPasswordExpiresAt) { this.resetPasswordExpiresAt = resetPasswordExpiresAt; }
+
+
+    public String getOtpCodeHash() { return otpCodeHash; }
+    public void setOtpCodeHash(String otpCodeHash) { this.otpCodeHash = otpCodeHash; }
+
+    public java.time.Instant getOtpExpiresAt() { return otpExpiresAt; }
+    public void setOtpExpiresAt(java.time.Instant otpExpiresAt) { this.otpExpiresAt = otpExpiresAt; }
+
+    public boolean isOtpVerified() { return otpVerified; }
+    public void setOtpVerified(boolean otpVerified) { this.otpVerified = otpVerified; }
+
+    public java.time.Instant getOtpVerifiedAt() { return otpVerifiedAt; }
+    public void setOtpVerifiedAt(java.time.Instant otpVerifiedAt) { this.otpVerifiedAt = otpVerifiedAt; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }

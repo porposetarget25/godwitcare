@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../api';
 
 export default function ResetPassword() {
+  const [searchParams] = useSearchParams();
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
   const [msg, setMsg] = useState('');
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    const tokenFromQuery = searchParams.get('token');
+    if (tokenFromQuery) setToken(tokenFromQuery);
+  }, [searchParams]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const r = await resetPassword(token, password);
     setMsg(r.message || 'Password reset successful');
+    // Password reset does not establish an authenticated session.
+    // Send the user to login so auth context/session gets initialized correctly.
     setTimeout(() => navigate('/login'), 1000);
   }
 

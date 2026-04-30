@@ -25,6 +25,7 @@ import Profile from './screens/Profile';
 import ForgotPassword from './screens/ForgotPassword';
 import ResetPassword from './screens/ResetPassword';
 import AdminDashboard from './screens/AdminDashboard';
+import OtpVerification from './screens/OtpVerification';
 
 // NEW: shared auth context
 import { AuthProvider, useAuth } from './state/auth';
@@ -123,6 +124,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/verify-otp"
+        element={
+          <Shell>
+            {user ? <OtpVerification /> : <Navigate to="/login" replace />}
+          </Shell>
+        }
+      />
+      <Route
         path="/consultation"
         element={
           <Shell>
@@ -190,8 +199,7 @@ function AppRoutes() {
         path="/home"
         element={
           <Shell>
-            {/* Home can read loading/user itself if needed */}
-            <Home />
+            {user && !user.otpVerified ? <Navigate to="/verify-otp" replace /> : <Home />}
           </Shell>
         }
       />
