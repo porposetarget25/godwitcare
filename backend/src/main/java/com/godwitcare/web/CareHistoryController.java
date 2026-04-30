@@ -73,7 +73,7 @@ public class CareHistoryController {
 
             boolean noPrescriptionCompleted =
                     c.getStatus() == Consultation.Status.COMPLETED
-                            && Boolean.FALSE.equals(c.getPrescriptionRequired());
+                            && !Boolean.TRUE.equals(c.getPrescriptionRequired());
             if (!noPrescriptionCompleted) continue;
 
             m.put("presentingComplaint", Optional.ofNullable(c.getHistoryOfPresentingComplaint()).orElse(""));

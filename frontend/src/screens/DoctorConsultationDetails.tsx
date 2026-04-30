@@ -517,11 +517,22 @@ export default function DoctorConsultationDetails() {
             </>
           )}
         </div>
-        {(!prescriptionRequired || rxId) && data?.status !== 'COMPLETED' && (
+        {data?.status !== 'COMPLETED' && (
           <div style={{ marginTop: 12 }}>
-            <button type="button" className="btn" onClick={completeConsultation} disabled={savingConsultation}>
+            <button
+              type="button"
+              className="btn"
+              onClick={completeConsultation}
+              disabled={savingConsultation || (prescriptionRequired && !rxId)}
+              title={prescriptionRequired && !rxId ? 'Create prescription first, or select No Prescription.' : undefined}
+            >
               {savingConsultation ? 'Completing…' : 'Complete Consultation'}
             </button>
+            {prescriptionRequired && !rxId && (
+              <div className="muted small" style={{ marginTop: 6 }}>
+                Create a prescription first, or switch to No Prescription to complete.
+              </div>
+            )}
           </div>
         )}
       </div>
