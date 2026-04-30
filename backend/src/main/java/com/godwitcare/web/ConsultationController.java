@@ -269,9 +269,6 @@ public class ConsultationController {
         }
 
         p = prescriptions.save(p);
-        // ✅ mark consultation completed
-        c.setStatus(Consultation.Status.COMPLETED);
-        consultations.save(c);
 
         return ResponseEntity.ok(Map.of("id", p.getId()));
     }
@@ -285,17 +282,44 @@ public class ConsultationController {
         Consultation c = consultations.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
 
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        c.setAnswersJson(mapper.writeValueAsString(
-                body.getOrDefault("answers", Map.of())
-        ));
-        c.setDetailsByQuestionJson(mapper.writeValueAsString(
-                body.getOrDefault("detailsByQuestion", Map.of())
-        ));
         c.setStatus(Consultation.Status.COMPLETED);
 
         consultations.save(c);
         return ResponseEntity.ok(Map.of("id", c.getId(), "status", c.getStatus().name(), "updated", true));
+    }
+
+    @PutMapping("/doctor/consultations/{id}/save-questionnaire")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<?> saveQuestionnaire(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) throws Exception {
+        Consultation c = consultations.findById(id).orElse(null);
+        if (c == null) return ResponseEntity.notFound().build();
+
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        @SuppressWarnings("unchecked")
+        Map<String, String> currentAnswers = mapper.readValue(
+                c.getAnswersJson() == null ? "{}" : c.getAnswersJson(), Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, String> currentDetails = mapper.readValue(
+                c.getDetailsByQuestionJson() == null ? "{}" : c.getDetailsByQuestionJson(), Map.class);
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> changedAnswers = (Map<String, String>) body.getOrDefault("answers", Map.of());
+        @SuppressWarnings("unchecked")
+        Map<String, String> changedDetails = (Map<String, String>) body.getOrDefault("detailsByQuestion", Map.of());
+
+        currentAnswers.putAll(changedAnswers);
+        changedDetails.forEach((k, v) -> {
+            if (v == null || v.isBlank()) currentDetails.remove(k);
+            else currentDetails.put(k, v);
+        });
+
+        c.setAnswersJson(mapper.writeValueAsString(currentAnswers));
+        c.setDetailsByQuestionJson(mapper.writeValueAsString(currentDetails));
+        consultations.save(c);
+        return ResponseEntity.ok(Map.of("id", c.getId(), "updated", true));
     }
 
     // ---------- Doctor download any prescription by id ----------
