@@ -1152,6 +1152,18 @@ html { scroll-behavior: smooth; }
   padding: 14px;
 }
 
+.admin-search-wrap {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(220px, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.admin-search-wrap select,
+.admin-search-wrap input {
+  min-height: 40px;
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
@@ -1325,6 +1337,9 @@ html { scroll-behavior: smooth; }
 
   .admin-card {
     padding: 12px;
+  }
+  .admin-search-wrap {
+    grid-template-columns: 1fr;
   }
   .admin-table {
     border-collapse: separate;
