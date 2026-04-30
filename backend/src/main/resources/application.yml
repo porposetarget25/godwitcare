@@ -34,12 +34,12 @@ spring:
 
 twilio:
   account:
-    sid: ${TWILIO_ACCOUNT_SID:}
+    sid: ${TWILIO_ACCOUNT_SID}
   auth:
-    token: ${TWILIO_AUTH_TOKEN:}
+    token: ${TWILIO_AUTH_TOKEN}
   whatsapp:
-    from: ${TWILIO_WHATSAPP_FROM:}
+    from: +14155238886
 
 otp:
-  expiry-seconds: ${OTP_EXPIRY_SECONDS:300}
+  expiry-seconds: 300
 

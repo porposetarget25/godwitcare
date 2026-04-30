@@ -44,3 +44,15 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
     org.hibernate.type.descriptor.sql: TRACE
+
+twilio:
+  account:
+    sid: ${TWILIO_ACCOUNT_SID}
+  auth:
+    token: ${TWILIO_AUTH_TOKEN}
+  whatsapp:
+    from: +14155238886
+
+otp:
+  expiry-seconds: 300
+
