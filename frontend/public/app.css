@@ -116,14 +116,17 @@ header img.logo {
   border-radius:999px;
   transition:background .2s ease, transform .2s ease;
 }
-.navlinks .menu-item-btn {
+.navlinks .top-nav-btn {
   color: #eaf2ff;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 999px;
   line-height: 1.2;
   white-space: nowrap;
+  border: 0;
+  background: transparent;
+  transition: background .2s ease, color .2s ease;
 }
 
 .nav-logout-btn {
@@ -157,20 +160,21 @@ header img.logo {
   z-index: 30;
 }
 .menu-dropdown a,
-.menu-item-btn {
+.dropdown-action-btn {
   color: #0f172a;
   padding: 10px 12px;
   border-radius: 8px;
   font-weight: 600;
 }
-.menu-item-btn {
+.dropdown-action-btn {
   border: 0;
   background: transparent;
   text-align: left;
   font-size: 16px;
+  width: 100%;
 }
 .menu-dropdown a:hover,
-.menu-item-btn:hover {
+.dropdown-action-btn:hover {
   background: #f1f5f9;
 }
 
@@ -190,6 +194,11 @@ header img.logo {
 
 .navlinks a:hover {
   color: #0bd92a;
+}
+
+.navlinks .top-nav-btn:hover {
+  color: #0bd92a;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .navlinks a:hover::after {
@@ -442,7 +451,7 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     white-space: nowrap;
   }
 
-  .navlinks .menu-item-btn {
+  .navlinks .top-nav-btn {
     font-size: 14px;
     padding: 6px 6px;
   }

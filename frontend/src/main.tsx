@@ -84,10 +84,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="navlinks">
-            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
-            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#how')}>How it Works</button>
-            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
-            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#how')}>How it Works</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
             {user ? (
               <div className="menu-wrap" ref={menuRef}>
                 <button
@@ -102,9 +102,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                 {menuOpen ? (
                   <div className="menu-dropdown">
                     <Link to="/profile" onClick={() => setMenuOpen(false)}>Update Profile</Link>
-                    <button type="button" className="menu-item-btn" onClick={() => { setMenuOpen(false); navigate(`/home?openPayments=${Date.now()}#payments`); }}>Payments</button>
+                    <button type="button" className="dropdown-action-btn" onClick={() => { setMenuOpen(false); navigate(`/home?openPayments=${Date.now()}#payments`); }}>Payments</button>
                     <Link to="/change-password" onClick={() => setMenuOpen(false)}>Change Password</Link>
-                    <button type="button" className="menu-item-btn" onClick={handleLogout}>Logout</button>
+                    <button type="button" className="dropdown-action-btn" onClick={handleLogout}>Logout</button>
                   </div>
                 ) : null}
               </div>
