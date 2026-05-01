@@ -116,6 +116,16 @@ header img.logo {
   border-radius:999px;
   transition:background .2s ease, transform .2s ease;
 }
+.navlinks .menu-item-btn {
+  color: #eaf2ff;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 999px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .nav-logout-btn {
   padding: 8px 12px;
   border-radius: 999px;
@@ -407,14 +417,12 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   /* Right-side nav links */
   .navlinks {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
     gap: 6px;
     margin-top: 4px;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
     padding-top: 2px;
     padding-bottom: 4px;
     padding-right: 6px;
@@ -432,6 +440,11 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     letter-spacing: 0.1px;
     padding: 6px 6px;
     white-space: nowrap;
+  }
+
+  .navlinks .menu-item-btn {
+    font-size: 14px;
+    padding: 6px 6px;
   }
 
   .menu-dropdown {
