@@ -268,18 +268,18 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordReq req) {
         if (req == null || req.identifier() == null || req.identifier().isBlank()) {
-            return ResponseEntity.badRequest().body("Username or email is required");
+            return ResponseEntity.badRequest().body("WhatsApp number is required");
         }
 
-        Optional<User> ou = findByIdentifier(req.identifier().trim());
-        if (ou.isPresent()) {
-            User u = ou.get();
-            otpService.generateAndSendOtp(u);
-            users.save(u);
-            return ResponseEntity.ok(Map.of("message", "OTP sent for password reset"));
+        Optional<User> ou = users.findByUsername(req.identifier().trim());
+        if (ou.isEmpty()) {
+            return ResponseEntity.badRequest().body("the number is not registered");
         }
 
-        return ResponseEntity.ok(Map.of("message", "If the account exists, an OTP was sent."));
+        User u = ou.get();
+        otpService.generateAndSendOtp(u);
+        users.save(u);
+        return ResponseEntity.ok(Map.of("message", "the otp has been sent to the registered whatsapp number"));
     }
 
     @PostMapping("/forgot-password/verify-otp")
