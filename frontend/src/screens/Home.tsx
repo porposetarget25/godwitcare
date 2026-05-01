@@ -130,6 +130,12 @@ export default function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    if (window.location.hash === '#payments' && isTravelerUser) {
+      setShowPaymentsModal(true)
+    }
+  }, [isTravelerUser])
+
   const fullName = useMemo(() => {
     if (!user) return ''
     return [user.firstName, user.lastName].filter(Boolean).join(' ')
@@ -273,7 +279,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <Link to="/profile" className="btn">Update Profile</Link>
           </div>
         </div>
 
@@ -315,12 +320,6 @@ export default function Home() {
                 </Link>
               )}
             </div>
-          )}
-          <Link to="/profile" className="btn">Update Profile</Link>
-          {isTravelerUser && (
-            <button className="btn" onClick={() => setShowPaymentsModal(true)}>
-              Payments
-            </button>
           )}
         </div>
       </div>
