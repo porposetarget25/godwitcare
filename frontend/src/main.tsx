@@ -61,6 +61,17 @@ function Shell({ children }: { children: React.ReactNode }) {
     navigate('/dashboard');
   }
 
+  async function handleTopNavClick(hash: '#top' | '#how' | '#features' | '#testimonials') {
+    if (user) {
+      await logout();
+      await refresh();
+      setMenuOpen(false);
+      navigate('/login');
+      return;
+    }
+    navigate(`/dashboard${hash}`);
+  }
+
   return (
     <div className="container">
       <header>
@@ -73,10 +84,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="navlinks">
-            <Link to="/dashboard#top">Home</Link>
-            <Link to="/dashboard#how">How it Works</Link>
-            <Link to="/dashboard#features">Features</Link>
-            <Link to="/dashboard#testimonials">Testimonials</Link>
+            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
+            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#how')}>How it Works</button>
+            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
+            <button type="button" className="menu-item-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
             {user ? (
               <div className="menu-wrap" ref={menuRef}>
                 <button
@@ -91,7 +102,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 {menuOpen ? (
                   <div className="menu-dropdown">
                     <Link to="/profile" onClick={() => setMenuOpen(false)}>Update Profile</Link>
-                    <Link to="/home#payments" onClick={() => setMenuOpen(false)}>Payments</Link>
+                    <button type="button" className="menu-item-btn" onClick={() => { setMenuOpen(false); navigate(`/home?openPayments=${Date.now()}#payments`); }}>Payments</button>
                     <Link to="/change-password" onClick={() => setMenuOpen(false)}>Change Password</Link>
                     <button type="button" className="menu-item-btn" onClick={handleLogout}>Logout</button>
                   </div>
