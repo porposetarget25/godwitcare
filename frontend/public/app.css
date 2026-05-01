@@ -431,7 +431,7 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     justify-content: flex-start;
     gap: 6px;
     margin-top: 4px;
-    overflow: hidden;
+    overflow: visible;
     padding-top: 2px;
     padding-bottom: 4px;
     padding-right: 6px;
