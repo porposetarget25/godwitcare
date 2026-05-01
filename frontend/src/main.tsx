@@ -38,6 +38,21 @@ function Shell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
+
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+
+    function handleDocumentClick(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, [menuOpen]);
 
   async function handleLogout() {
     await logout();
@@ -63,7 +78,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link to="/dashboard#features">Features</Link>
             <Link to="/dashboard#testimonials">Testimonials</Link>
             {user ? (
-              <div className="menu-wrap">
+              <div className="menu-wrap" ref={menuRef}>
                 <button
                   type="button"
                   className="menu-btn"

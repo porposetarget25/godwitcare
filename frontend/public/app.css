@@ -410,13 +410,19 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 6px;
     margin-top: 4px;
     overflow-x: auto;
     overflow-y: visible;
     -webkit-overflow-scrolling: touch;
     padding-top: 2px;
     padding-bottom: 4px;
+    padding-right: 6px;
+  }
+
+  .menu-wrap {
+    margin-left: auto;
+    flex-shrink: 0;
   }
   .navlinks::-webkit-scrollbar { display: none; }
 
@@ -424,8 +430,14 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.1px;
-    padding: 6px 7px;
+    padding: 6px 6px;
     white-space: nowrap;
+  }
+
+  .menu-dropdown {
+    right: 0;
+    min-width: min(220px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
   }
 
   .nav-logout-btn {
