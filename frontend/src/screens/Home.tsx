@@ -1,6 +1,6 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { createPayment, me, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
@@ -45,6 +45,7 @@ function normalizeReg(r: RegApi | null | undefined) {
 }
 
 export default function Home() {
+  const location = useLocation()
   const [user, setUser] = useState<UserDto | null>(null)
   const [checking, setChecking] = useState(true)
 
@@ -131,10 +132,10 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (window.location.hash === '#payments' && isTravelerUser) {
+    if (location.hash === '#payments' && isTravelerUser) {
       setShowPaymentsModal(true)
     }
-  }, [isTravelerUser])
+  }, [location.hash, isTravelerUser])
 
   const fullName = useMemo(() => {
     if (!user) return ''
