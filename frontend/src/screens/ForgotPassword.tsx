@@ -17,7 +17,8 @@ export default function ForgotPassword() {
   async function verifyOtp(e: React.FormEvent) {
     e.preventDefault();
     const res = await verifyForgotPasswordOtp(identifier, otp);
-    navigate(`/reset-password?token=${encodeURIComponent(res.resetToken)}`);
+    sessionStorage.setItem('passwordResetToken', res.resetToken);
+    navigate('/reset-password');
   }
 
   return (
