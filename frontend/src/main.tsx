@@ -24,6 +24,7 @@ import ReferralLetter from './screens/ReferralLetter';
 import Profile from './screens/Profile';
 import ForgotPassword from './screens/ForgotPassword';
 import ResetPassword from './screens/ResetPassword';
+import ChangePassword from './screens/ChangePassword';
 import AdminDashboard from './screens/AdminDashboard';
 import OtpVerification from './screens/OtpVerification';
 
@@ -36,11 +37,39 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
   const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
+
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+
+    function handleDocumentClick(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, [menuOpen]);
 
   async function handleLogout() {
     await logout();
     await refresh();
+    setMenuOpen(false);
     navigate('/dashboard');
+  }
+
+  async function handleTopNavClick(hash: '#top' | '#how' | '#features' | '#testimonials') {
+    if (user) {
+      await logout();
+      await refresh();
+      setMenuOpen(false);
+      navigate('/login');
+      return;
+    }
+    navigate(`/dashboard${hash}`);
   }
 
   return (
@@ -55,14 +84,30 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="navlinks">
-            <Link to="/dashboard#top">Home</Link>
-            <Link to="/dashboard#how">How it Works</Link>
-            <Link to="/dashboard#features">Features</Link>
-            <Link to="/dashboard#testimonials">Testimonials</Link>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#how')}>How it Works</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
+            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
             {user ? (
-              <button type="button" className="btn nav-logout-btn" onClick={handleLogout}>
-                Logout
-              </button>
+              <div className="menu-wrap" ref={menuRef}>
+                <button
+                  type="button"
+                  className="menu-btn"
+                  aria-label="Open account menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen(prev => !prev)}
+                >
+                  ☰
+                </button>
+                {menuOpen ? (
+                  <div className="menu-dropdown">
+                    <Link to="/profile" onClick={() => setMenuOpen(false)}>Update Profile</Link>
+                    <button type="button" className="dropdown-action-btn" onClick={() => { setMenuOpen(false); navigate(`/home?openPayments=${Date.now()}#payments`); }}>Payments</button>
+                    <Link to="/change-password" onClick={() => setMenuOpen(false)}>Change Password</Link>
+                    <button type="button" className="dropdown-action-btn" onClick={handleLogout}>Logout</button>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
@@ -174,6 +219,7 @@ function AppRoutes() {
       <Route path="/profile" element={<Shell><Profile /></Shell>} />
       <Route path="/forgot-password" element={<Shell><ForgotPassword /></Shell>} />
       <Route path="/reset-password" element={<Shell><ResetPassword /></Shell>} />
+      <Route path="/change-password" element={<Shell>{user ? <ChangePassword /> : <Navigate to="/login" replace />}</Shell>} />
       <Route
         path="/doctor/referral/:id"
         element={

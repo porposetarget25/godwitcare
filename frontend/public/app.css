@@ -116,9 +116,66 @@ header img.logo {
   border-radius:999px;
   transition:background .2s ease, transform .2s ease;
 }
+.navlinks .top-nav-btn {
+  color: #eaf2ff;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 999px;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  transition: background .2s ease, color .2s ease;
+}
+
 .nav-logout-btn {
   padding: 8px 12px;
   border-radius: 999px;
+}
+.menu-wrap {
+  position: relative;
+}
+.menu-btn {
+  border: 1px solid #ffffff66;
+  background: #ffffff22;
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 24px;
+  line-height: 1;
+  padding: 6px 12px;
+}
+.menu-dropdown {
+  position: absolute;
+  top: 46px;
+  right: 0;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+}
+.menu-dropdown a,
+.dropdown-action-btn {
+  color: #0f172a;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.dropdown-action-btn {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 16px;
+  width: 100%;
+}
+.menu-dropdown a:hover,
+.dropdown-action-btn:hover {
+  background: #f1f5f9;
 }
 
 
@@ -137,6 +194,11 @@ header img.logo {
 
 .navlinks a:hover {
   color: #0bd92a;
+}
+
+.navlinks .top-nav-btn:hover {
+  color: #0bd92a;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .navlinks a:hover::after {
@@ -364,16 +426,20 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   /* Right-side nav links */
   .navlinks {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 6px;
     margin-top: 4px;
-    overflow-x: auto;
-    overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
     padding-top: 2px;
     padding-bottom: 4px;
+    padding-right: 6px;
+  }
+
+  .menu-wrap {
+    margin-left: auto;
+    flex-shrink: 0;
   }
   .navlinks::-webkit-scrollbar { display: none; }
 
@@ -381,8 +447,19 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
     font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.1px;
-    padding: 6px 7px;
+    padding: 6px 6px;
     white-space: nowrap;
+  }
+
+  .navlinks .top-nav-btn {
+    font-size: 14px;
+    padding: 6px 6px;
+  }
+
+  .menu-dropdown {
+    right: 0;
+    min-width: min(220px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
   }
 
   .nav-logout-btn {

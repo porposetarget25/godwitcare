@@ -1,6 +1,6 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { createPayment, me, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
@@ -45,6 +45,8 @@ function normalizeReg(r: RegApi | null | undefined) {
 }
 
 export default function Home() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [user, setUser] = useState<UserDto | null>(null)
   const [checking, setChecking] = useState(true)
 
@@ -129,6 +131,20 @@ export default function Home() {
       alive = false
     }
   }, [])
+
+  useEffect(() => {
+    if (location.hash.startsWith('#payments') && isTravelerUser) {
+      setShowPaymentsModal(true)
+    }
+  }, [location.hash, isTravelerUser])
+
+
+  const closePaymentsModal = () => {
+    setShowPaymentsModal(false)
+    if (location.hash.startsWith('#payments')) {
+      navigate('/home', { replace: true })
+    }
+  }
 
   const fullName = useMemo(() => {
     if (!user) return ''
@@ -273,7 +289,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <Link to="/profile" className="btn">Update Profile</Link>
           </div>
         </div>
 
@@ -315,12 +330,6 @@ export default function Home() {
                 </Link>
               )}
             </div>
-          )}
-          <Link to="/profile" className="btn">Update Profile</Link>
-          {isTravelerUser && (
-            <button className="btn" onClick={() => setShowPaymentsModal(true)}>
-              Payments
-            </button>
           )}
         </div>
       </div>
@@ -723,11 +732,11 @@ export default function Home() {
       </div>
 
       {showPaymentsModal && (
-        <div className="payment-modal-backdrop" onClick={() => setShowPaymentsModal(false)}>
+        <div className="payment-modal-backdrop" onClick={closePaymentsModal}>
           <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
               <h3>Complete Payment</h3>
-              <button className="payment-close-btn" onClick={() => setShowPaymentsModal(false)} aria-label="Close payments">
+              <button className="payment-close-btn" onClick={closePaymentsModal} aria-label="Close payments">
                 ✕
               </button>
             </div>
