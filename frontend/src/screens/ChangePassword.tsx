@@ -18,8 +18,12 @@ export default function ChangePassword() {
     setError('');
     setMsg('');
     if (!identifier) return setError('Unable to identify your account. Please login again.');
-    const res = await forgotPassword(identifier);
-    setMsg(res.message || 'OTP sent to your registered WhatsApp number.');
+    try {
+      const res = await forgotPassword(identifier);
+      setMsg(res.message || 'the otp has been sent to the registered whatsapp number');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to send OTP. Please try again.');
+    }
   }
 
   async function verifyOtp(e: React.FormEvent) {
