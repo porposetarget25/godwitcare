@@ -24,6 +24,7 @@ import ReferralLetter from './screens/ReferralLetter';
 import Profile from './screens/Profile';
 import ForgotPassword from './screens/ForgotPassword';
 import ResetPassword from './screens/ResetPassword';
+import ChangePassword from './screens/ChangePassword';
 import AdminDashboard from './screens/AdminDashboard';
 import OtpVerification from './screens/OtpVerification';
 
@@ -36,10 +37,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
   const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   async function handleLogout() {
     await logout();
     await refresh();
+    setMenuOpen(false);
     navigate('/dashboard');
   }
 
@@ -60,9 +63,25 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link to="/dashboard#features">Features</Link>
             <Link to="/dashboard#testimonials">Testimonials</Link>
             {user ? (
-              <button type="button" className="btn nav-logout-btn" onClick={handleLogout}>
-                Logout
-              </button>
+              <div className="menu-wrap">
+                <button
+                  type="button"
+                  className="menu-btn"
+                  aria-label="Open account menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen(prev => !prev)}
+                >
+                  ☰
+                </button>
+                {menuOpen ? (
+                  <div className="menu-dropdown">
+                    <Link to="/profile" onClick={() => setMenuOpen(false)}>Update Profile</Link>
+                    <Link to="/home#payments" onClick={() => setMenuOpen(false)}>Payments</Link>
+                    <Link to="/change-password" onClick={() => setMenuOpen(false)}>Change Password</Link>
+                    <button type="button" className="menu-item-btn" onClick={handleLogout}>Logout</button>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
@@ -174,6 +193,7 @@ function AppRoutes() {
       <Route path="/profile" element={<Shell><Profile /></Shell>} />
       <Route path="/forgot-password" element={<Shell><ForgotPassword /></Shell>} />
       <Route path="/reset-password" element={<Shell><ResetPassword /></Shell>} />
+      <Route path="/change-password" element={<Shell>{user ? <ChangePassword /> : <Navigate to="/login" replace />}</Shell>} />
       <Route
         path="/doctor/referral/:id"
         element={
