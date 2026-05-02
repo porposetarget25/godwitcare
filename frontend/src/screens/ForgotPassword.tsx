@@ -5,13 +5,20 @@ import { forgotPassword, verifyForgotPasswordOtp } from '../api';
 export default function ForgotPassword() {
   const [identifier, setIdentifier] = useState('');
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const [otp, setOtp] = useState('');
   const navigate = useNavigate();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await forgotPassword(identifier);
-    setMessage(res.message || 'Request submitted.');
+    setMessage('');
+    setError('');
+    try {
+      const res = await forgotPassword(identifier);
+      setMessage(res.message || 'Request submitted.');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to send OTP. Please try again.');
+    }
   }
 
   async function verifyOtp(e: React.FormEvent) {
@@ -27,12 +34,13 @@ export default function ForgotPassword() {
         <h1 className="auth-title">Forgot Password</h1>
         <form className="auth-form" onSubmit={submit}>
           <div className="field">
-            <label>WhatsApp Number or Email</label>
+            <label>WhatsApp Number</label>
             <input value={identifier} onChange={e => setIdentifier(e.target.value)} required />
           </div>
           <button className="btn block" type="submit">Generate OTP</button>
         </form>
         {!!message && <p className="help">{message}</p>}
+        {!!error && <p className="help" style={{ color: '#b91c1c' }}>{error}</p>}
         <form className="auth-form" onSubmit={verifyOtp}>
           <div className="field">
             <label>Enter OTP</label>

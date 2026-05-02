@@ -1,8 +1,13 @@
 package com.godwitcare.web;
 
 import com.godwitcare.entity.User;
+import com.godwitcare.repo.ConsultationRepository;
+import com.godwitcare.repo.PaymentRepository;
+import com.godwitcare.repo.PrescriptionRepository;
+import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.repo.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,10 +25,22 @@ import java.util.Optional;
 public class UserProfileController {
 
     private final UserRepository users;
+    private final ReferralLetterRepo referrals;
+    private final PrescriptionRepository prescriptions;
+    private final ConsultationRepository consultations;
+    private final PaymentRepository payments;
     private final Path uploadDir = Path.of("uploads", "profile-photos").toAbsolutePath().normalize();
 
-    public UserProfileController(UserRepository users) {
+    public UserProfileController(UserRepository users,
+                                 ReferralLetterRepo referrals,
+                                 PrescriptionRepository prescriptions,
+                                 ConsultationRepository consultations,
+                                 PaymentRepository payments) {
         this.users = users;
+        this.referrals = referrals;
+        this.prescriptions = prescriptions;
+        this.consultations = consultations;
+        this.payments = payments;
     }
 
     public record ProfileReq(String firstName, String lastName, String email, String username) {}
@@ -147,10 +164,19 @@ public class UserProfileController {
     }
 
     @DeleteMapping("/me")
+    @Transactional
     public ResponseEntity<?> deleteAccount(Authentication auth) {
         Optional<User> ou = currentUser(auth);
         if (ou.isEmpty()) return ResponseEntity.status(401).build();
         User u = ou.get();
+
+        // Delete dependent rows first to satisfy FK constraints.
+        Long userId = u.getId();
+        referrals.deleteByConsultationUserId(userId);
+        prescriptions.deleteByConsultationUserId(userId);
+        consultations.deleteByUserId(userId);
+        payments.deleteByUserId(userId);
+
         users.delete(u);
         return ResponseEntity.ok(Map.of("message", "Account deleted"));
     }
