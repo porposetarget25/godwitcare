@@ -5,6 +5,7 @@ import com.godwitcare.repo.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -189,9 +190,16 @@ public class AdminController {
         return ResponseEntity.ok(body);
     }
 
+    @Transactional
     private ResponseEntity<?> deleteByRole(Long id, Role role) {
         User existing = users.findById(id).orElse(null);
         if (existing == null || existing.getRole() != role) return ResponseEntity.notFound().build();
+
+        // Delete dependent rows first to satisfy FK constraints.
+        referrals.deleteByConsultationUserId(id);
+        prescriptions.deleteByConsultationUserId(id);
+        consultations.deleteByUserId(id);
+        payments.deleteByUserId(id);
         users.delete(existing);
         return ResponseEntity.ok(Map.of("deleted", true));
     }
