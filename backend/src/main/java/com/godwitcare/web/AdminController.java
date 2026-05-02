@@ -108,6 +108,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
+    @Transactional
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         return deleteByRole(id, Role.USER);
     }
@@ -123,6 +124,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/doctors/{id}")
+    @Transactional
     public ResponseEntity<?> deleteDoctor(@PathVariable Long id) {
         return deleteByRole(id, Role.DOCTOR);
     }
@@ -190,7 +192,6 @@ public class AdminController {
         return ResponseEntity.ok(body);
     }
 
-    @Transactional
     private ResponseEntity<?> deleteByRole(Long id, Role role) {
         User existing = users.findById(id).orElse(null);
         if (existing == null || existing.getRole() != role) return ResponseEntity.notFound().build();
