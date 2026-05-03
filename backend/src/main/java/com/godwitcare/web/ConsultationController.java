@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.godwitcare.entity.Consultation;
 import com.godwitcare.entity.Prescription;
 import com.godwitcare.entity.User;
+import com.godwitcare.entity.Registration;
+import com.godwitcare.entity.Traveler;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.RegistrationRepository;
@@ -59,6 +61,23 @@ public class ConsultationController {
 
         Consultation c = new Consultation();
         c.setUser(u);
+
+        Object travelerIdVal = body.get("travelerId");
+        if (travelerIdVal != null) {
+            Long travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+            Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
+            if (latest != null) {
+                Traveler selected = latest.getTravelers().stream()
+                        .filter(t -> Objects.equals(t.getId(), travelerId))
+                        .findFirst()
+                        .orElse(null);
+                c.setTraveler(selected);
+                if (selected != null) {
+                    c.setContactName(selected.getFullName());
+                    c.setDob(selected.getDateOfBirth());
+                }
+            }
+        }
         c.setCurrentLocation((String) body.getOrDefault("currentLocation", ""));
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
@@ -94,8 +113,8 @@ public class ConsultationController {
     }
 
 
-    @GetMapping("/consultations/mine/latest")
-    public ResponseEntity<Map<String, Object>> myLatest(Authentication auth) throws Exception {
+    @GetMapping("/consultations/travelers")
+    public ResponseEntity<List<Map<String, Object>>> travelerOptions(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -104,7 +123,39 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        var list = consultations.findByUserEmailOrderByIdDesc(u.getEmail());
+        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
+        List<Map<String, Object>> out = new ArrayList<>();
+
+        Map<String, Object> primary = new LinkedHashMap<>();
+        primary.put("id", "PRIMARY");
+        primary.put("name", (u.getFirstName() == null ? "" : u.getFirstName()) + " " + (u.getLastName() == null ? "" : u.getLastName()));
+        out.add(primary);
+
+        if (latest != null) {
+            for (Traveler t : latest.getTravelers()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", t.getId());
+                row.put("name", t.getFullName());
+                out.add(row);
+            }
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/consultations/mine/latest")
+    public ResponseEntity<Map<String, Object>> myLatest(Authentication auth,
+                                                        @RequestParam(name = "travelerId", required = false) Long travelerId) throws Exception {
+        if (auth == null) return ResponseEntity.status(401).build();
+
+        String principal = auth.getName();
+        User u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        var list = travelerId == null
+                ? consultations.findByUserEmailOrderByIdDesc(u.getEmail())
+                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
         var c = list.get(0);

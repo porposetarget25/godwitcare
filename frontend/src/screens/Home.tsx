@@ -216,11 +216,14 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [selectedTravelerId]);
 
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
+  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string}>>([]);
+  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>('PRIMARY');
+
 
   React.useEffect(() => {
     let ignore = false;
@@ -256,13 +259,19 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [selectedTravelerId]);
 
   React.useEffect(() => {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/care-history/mine`, { credentials: 'include' });
+        const tRes = await fetch(`${API_BASE_URL}/consultations/travelers`, { credentials: 'include' });
+        if (!ignore && tRes.ok) {
+          const arr = await tRes.json().catch(() => []);
+          setTravelerOptions(Array.isArray(arr) ? arr : []);
+        }
+        const qp = selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : '';
+        const res = await fetch(`${API_BASE_URL}/care-history/mine${qp}`, { credentials: 'include' });
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
       } catch {
@@ -270,7 +279,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [selectedTravelerId]);
 
 
 
@@ -465,12 +474,18 @@ export default function Home() {
 
       {/* Quick Links */}
       <div className="ql-head">Quick Links</div>
+      <div style={{marginBottom:12}}>
+        <label className="muted small">Traveller</label>
+        <select value={selectedTravelerId} onChange={(e)=>setSelectedTravelerId(e.target.value)} style={{marginLeft:8,padding:6,borderRadius:8}}>
+          {(travelerOptions.length ? travelerOptions : [{id:'PRIMARY',name:'Primary'}]).map((t:any)=><option key={String(t.id)} value={String(t.id)}>{t.name}</option>)}
+        </select>
+      </div>
 
       <div className="quick-grid">
         {/* Care History — enabled if care history has at least one item */}
         {careHistoryEnabled ? (
           <Link
-            to="/care-history"
+            to={`/care-history${selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : ''}`}
             className="quick"
             style={{
               borderRadius: 16,
