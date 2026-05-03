@@ -199,6 +199,8 @@ export default function Home() {
   }
 
 
+  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>('PRIMARY');
+
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
 
@@ -222,8 +224,6 @@ export default function Home() {
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
   const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string}>>([]);
-  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>('PRIMARY');
-
 
   React.useEffect(() => {
     let ignore = false;
