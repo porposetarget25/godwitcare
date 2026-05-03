@@ -36,6 +36,10 @@ public class Consultation {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "traveler_id")
+    private Traveler traveler;
+
     private String currentLocation;
 
     // Patient Contact & Address
@@ -76,6 +80,8 @@ public class Consultation {
     public Long getId() { return id; }
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+    public Traveler getTraveler() { return traveler; }
+    public void setTraveler(Traveler traveler) { this.traveler = traveler; }
     public String getCurrentLocation() { return currentLocation; }
     public void setCurrentLocation(String currentLocation) { this.currentLocation = currentLocation; }
     public String getContactName() { return contactName; }

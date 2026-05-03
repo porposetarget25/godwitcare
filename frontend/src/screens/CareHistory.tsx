@@ -1,6 +1,6 @@
 // src/screens/CareHistory.tsx
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL, resolveApiUrl } from '../api';
 
 type Item = {
@@ -23,6 +23,8 @@ type Payload = {
 };
 
 export default function CareHistory() {
+  const [params] = useSearchParams();
+  const travelerId = params.get('travelerId');
   const [data, setData] = React.useState<Payload | null>(null);
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -33,7 +35,8 @@ export default function CareHistory() {
     (async () => {
       try {
         // Care history: Patient header + items (only when a Rx exists)
-        const r = await fetch(`${API_BASE_URL}/care-history/mine`, { credentials: 'include' });
+        const qp = travelerId ? `?travelerId=${travelerId}` : '';
+        const r = await fetch(`${API_BASE_URL}/care-history/mine${qp}`, { credentials: 'include' });
         if (ignore) return;
         if (r.status === 204) {
           setData(null);
@@ -49,7 +52,8 @@ export default function CareHistory() {
 
       // Latest prescription (optional quick link)
       try {
-        const r2 = await fetch(`${API_BASE_URL}/prescriptions/latest`, { credentials: 'include' });
+        const qp2 = travelerId ? `?travelerId=${travelerId}` : '';
+        const r2 = await fetch(`${API_BASE_URL}/prescriptions/latest${qp2}`, { credentials: 'include' });
         if (!ignore) {
           if (!r2.ok || r2.status === 204) {
             setRxUrl(null);
@@ -65,7 +69,7 @@ export default function CareHistory() {
       if (!ignore) setLoading(false);
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [travelerId]);
 
   const printPdf = () => window.print();
 
