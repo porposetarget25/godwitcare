@@ -169,7 +169,7 @@ public class ConsultationController {
         if (u == null) return ResponseEntity.status(401).build();
 
         var list = travelerId == null
-                ? consultations.findByUserEmailOrderByIdDesc(u.getEmail())
+                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
                 : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
@@ -439,7 +439,7 @@ public class ConsultationController {
         if (u == null) return ResponseEntity.status(401).build();
 
         Optional<Consultation> latestConsultation = travelerId == null
-                ? consultations.findByUserEmailOrderByIdDesc(u.getEmail()).stream().findFirst()
+                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail()).stream().findFirst()
                 : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId).stream().findFirst();
         if (latestConsultation.isEmpty()) return ResponseEntity.noContent().build();
 
