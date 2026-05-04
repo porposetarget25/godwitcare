@@ -216,9 +216,9 @@ export default function Home() {
     const selectedId = String(selectedTravelerId);
     const selectedPatientId = selectedTraveler?.patientId?.trim();
 
+    // Co-traveller quick links must resolve by the selected traveller ID (same id used on consultation records).
     if (selectedId !== 'PRIMARY') {
       qp.set('travelerId', selectedId);
-      if (selectedPatientId) qp.set('patientId', selectedPatientId);
       return qp;
     }
 
