@@ -445,10 +445,10 @@ public class ConsultationController {
         if (u == null) return ResponseEntity.status(401).build();
 
         Optional<Prescription> latestPrescription;
-        if (travelerId != null) {
-            latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
-        } else if (patientId != null && !patientId.isBlank()) {
+        if (patientId != null && !patientId.isBlank()) {
             latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(u.getId(), patientId);
+        } else if (travelerId != null) {
+            latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
         } else {
             latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId());
         }
