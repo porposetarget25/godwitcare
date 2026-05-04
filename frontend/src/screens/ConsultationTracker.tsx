@@ -225,6 +225,14 @@ export default function ConsultationTracker() {
   const isLogged = params.get('logged') === '1'
   const travelerId = params.get('travelerId')
   const patientId = params.get('patientId')
+
+  const backToHomeHref = React.useMemo(() => {
+    const qp = new URLSearchParams()
+    if (travelerId) qp.set('travelerId', travelerId)
+    if (patientId) qp.set('patientId', patientId)
+    const q = qp.toString()
+    return q ? `/home?${q}` : '/home'
+  }, [travelerId, patientId])
   const [showToast, setShowToast] = useState(isLogged)
 
   // Latest consultation id (to know if Step 1 is done) + status
@@ -497,7 +505,7 @@ export default function ConsultationTracker() {
           Your Consultation Journey
         </h1>
         <div className="page-head-actions">
-          <Link to="/home" className="btn secondary">
+          <Link to={backToHomeHref} className="btn secondary consultation-action-btn">
             Back to Home
           </Link>
         </div>
@@ -554,11 +562,11 @@ export default function ConsultationTracker() {
 
           <div className="consultation-step-actions consultation-step-actions--tight">
             {hasLatestConsultation && latestCid && (
-              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn secondary" style={{ padding: '8px 12px', fontSize: 13 }}>
+              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn secondary consultation-action-btn">
                 {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
               </Link>
             )}
-            <Link to="/consultation/questionnaire" className="btn consultation-action-main">
+            <Link to="/consultation/questionnaire" className="btn consultation-action-btn consultation-action-main">
               Create New Consultation
             </Link>
           </div>
@@ -578,7 +586,7 @@ export default function ConsultationTracker() {
 
           <button
             type="button"
-            className="btn consultation-action-main"
+            className="btn consultation-action-btn consultation-action-main"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
             onClick={onNotifyClick}
           >
@@ -714,7 +722,7 @@ export default function ConsultationTracker() {
               medical advice.
             </div>
           </div>
-          <Link to="/consultation/details" className="btn secondary consultation-action-main">
+          <Link to="/consultation/details" className="btn secondary consultation-action-btn consultation-action-main">
             Upcoming
           </Link>
         </div>
@@ -730,11 +738,11 @@ export default function ConsultationTracker() {
             </div>
           </div>
           {rxUrl ? (
-            <a className="btn consultation-action-main" href={rxUrl} target="_blank" rel="noreferrer">
+            <a className="btn consultation-action-btn consultation-action-main" href={rxUrl} target="_blank" rel="noreferrer">
               View Prescription
             </a>
           ) : (
-            <button className="btn secondary consultation-action-main" type="button" disabled>
+            <button className="btn secondary consultation-action-btn consultation-action-main" type="button" disabled>
               Upcoming
             </button>
           )}
@@ -752,11 +760,11 @@ export default function ConsultationTracker() {
           </div>
 
           {hasRxOrCompleted ? (
-            <button className="btn consultation-action-main" type="button" onClick={openNearbyPharmacies} disabled={findingPharmacy}>
+            <button className="btn consultation-action-btn consultation-action-main" type="button" onClick={openNearbyPharmacies} disabled={findingPharmacy}>
               {findingPharmacy ? 'Finding…' : 'Find Nearby Pharmacies'}
             </button>
           ) : (
-            <button className="btn secondary consultation-action-main" type="button" disabled>
+            <button className="btn secondary consultation-action-btn consultation-action-main" type="button" disabled>
               Upcoming
             </button>
           )}

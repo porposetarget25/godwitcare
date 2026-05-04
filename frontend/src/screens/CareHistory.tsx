@@ -26,6 +26,13 @@ export default function CareHistory() {
   const [params] = useSearchParams();
   const travelerId = params.get('travelerId');
   const patientId = params.get('patientId');
+  const backToHomeHref = React.useMemo(() => {
+    const qp = new URLSearchParams();
+    if (travelerId) qp.set('travelerId', travelerId);
+    if (patientId) qp.set('patientId', patientId);
+    const q = qp.toString();
+    return q ? `/home?${q}` : '/home';
+  }, [travelerId, patientId]);
   const [data, setData] = React.useState<Payload | null>(null);
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -83,7 +90,7 @@ export default function CareHistory() {
       <section className="section">
         <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
-          <Link to="/home" className="btn secondary">Back</Link>
+          <Link to={backToHomeHref} className="btn secondary">Back</Link>
         </div>
         <div className="card">Loading…</div>
       </section>
@@ -95,7 +102,7 @@ export default function CareHistory() {
       <section className="section">
         <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
-          <Link to="/home" className="btn secondary">Back</Link>
+          <Link to={backToHomeHref} className="btn secondary">Back</Link>
         </div>
         <div className="card" style={{ color: '#b91c1c' }}>{err}</div>
       </section>
@@ -107,7 +114,7 @@ export default function CareHistory() {
       <section className="section">
         <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
-          <Link to="/home" className="btn secondary">Back</Link>
+          <Link to={backToHomeHref} className="btn secondary">Back</Link>
         </div>
         <div className="card">No history available yet.</div>
       </section>
@@ -128,7 +135,7 @@ export default function CareHistory() {
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Care History</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to="/home" className="btn secondary">Back</Link>
+          <Link to={backToHomeHref} className="btn secondary">Back</Link>
           <button className="btn" onClick={printPdf}>Print / Save as PDF</button>
         </div>
       </div>

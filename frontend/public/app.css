@@ -836,6 +836,19 @@ html { scroll-behavior: smooth; }
   flex-wrap: wrap;
   gap: 12px;
 }
+
+.consultation-action-btn {
+  min-height: 48px;
+  padding: 12px 20px !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  line-height: 1.2;
+  justify-content: center;
+}
+
+.consultation-step-actions--tight .consultation-action-btn {
+  min-width: 230px;
+}
 .consultation-step-row {
   display: flex;
   justify-content: space-between;
