@@ -66,10 +66,11 @@ public class ConsultationController {
         Object travelerIdVal = body.get("travelerId");
         if (travelerIdVal != null) {
             travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+            final Long selectedTravelerId = travelerId;
             Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
             if (latest != null) {
                 Traveler selected = latest.getTravelers().stream()
-                        .filter(t -> Objects.equals(t.getId(), travelerId))
+                        .filter(t -> Objects.equals(t.getId(), selectedTravelerId))
                         .findFirst()
                         .orElse(null);
                 c.setTraveler(selected);
