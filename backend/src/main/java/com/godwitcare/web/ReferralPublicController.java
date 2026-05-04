@@ -49,11 +49,17 @@ public class ReferralPublicController {
     /** Return latest referral meta for the logged-in patient. */
     @GetMapping("/latest")
     public ResponseEntity<?> latest(Authentication auth,
-                                    @RequestParam(name = "travelerId", required = false) Long travelerId) {
+                                    @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                    @RequestParam(name = "patientId", required = false) String patientId) {
         User u = requireCurrentUser(auth);
-        Optional<ReferralLetter> opt = travelerId == null
-                ? referrals.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId())
-                : referrals.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        Optional<ReferralLetter> opt;
+        if (patientId != null && !patientId.isBlank()) {
+            opt = referrals.findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(u.getId(), patientId);
+        } else {
+            opt = travelerId == null
+                    ? referrals.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId())
+                    : referrals.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        }
 
         if (opt.isEmpty()) return ResponseEntity.noContent().build();
 

@@ -144,6 +144,7 @@ public class ConsultationController {
         Map<String, Object> primary = new LinkedHashMap<>();
         primary.put("id", "PRIMARY");
         primary.put("name", (u.getFirstName() == null ? "" : u.getFirstName()) + " " + (u.getLastName() == null ? "" : u.getLastName()));
+        primary.put("patientId", buildTravelerPatientId(u, null));
         out.add(primary);
 
         if (latest != null) {
@@ -151,6 +152,7 @@ public class ConsultationController {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id", t.getId());
                 row.put("name", t.getFullName());
+                row.put("patientId", buildTravelerPatientId(u, t.getId()));
                 out.add(row);
             }
         }
@@ -159,7 +161,8 @@ public class ConsultationController {
 
     @GetMapping("/consultations/mine/latest")
     public ResponseEntity<Map<String, Object>> myLatest(Authentication auth,
-                                                        @RequestParam(name = "travelerId", required = false) Long travelerId) throws Exception {
+                                                        @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                                       @RequestParam(name = "patientId", required = false) String patientId) throws Exception {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -168,9 +171,11 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        var list = travelerId == null
+        var list = (patientId != null && !patientId.isBlank())
+                ? consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId)
+                : (travelerId == null
                 ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
-                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
+                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId));
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
         var c = list.get(0);
@@ -429,7 +434,8 @@ public class ConsultationController {
 
     @GetMapping("/prescriptions/latest")
     public ResponseEntity<?> patientLatestPrescription(Authentication auth,
-                                                       @RequestParam(name = "travelerId", required = false) Long travelerId) {
+                                                       @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                                       @RequestParam(name = "patientId", required = false) String patientId) {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -438,9 +444,14 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        Optional<Prescription> latestPrescription = travelerId == null
-                ? prescriptions.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId())
-                : prescriptions.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        Optional<Prescription> latestPrescription;
+        if (patientId != null && !patientId.isBlank()) {
+            latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(u.getId(), patientId);
+        } else {
+            latestPrescription = travelerId == null
+                    ? prescriptions.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId())
+                    : prescriptions.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        }
         if (latestPrescription.isEmpty()) return ResponseEntity.noContent().build();
 
         return latestPrescription
