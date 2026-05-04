@@ -214,23 +214,24 @@ export default function Home() {
 
 
   React.useEffect(() => {
-    const travelerFromUrl = searchParams.get('travelerId') || 'PRIMARY';
+    const travelerFromUrl = new URLSearchParams(location.search).get('travelerId') || 'PRIMARY';
     if (travelerFromUrl !== selectedTravelerId) {
       setSelectedTravelerId(travelerFromUrl);
     }
-  }, [searchParams, selectedTravelerId]);
+  }, [location.search, selectedTravelerId]);
 
   React.useEffect(() => {
-    const next = new URLSearchParams(searchParams);
+    const current = new URLSearchParams(location.search);
+    const next = new URLSearchParams(location.search);
     if (selectedTravelerId === 'PRIMARY') {
       next.delete('travelerId');
     } else {
       next.set('travelerId', selectedTravelerId);
     }
-    if (next.toString() !== searchParams.toString()) {
+    if (next.toString() !== current.toString()) {
       setSearchParams(next, { replace: true });
     }
-  }, [selectedTravelerId, searchParams, setSearchParams]);
+  }, [selectedTravelerId, location.search, setSearchParams]);
 
   const selectedTravelerQuery = React.useMemo(() => {
     const qp = new URLSearchParams();
