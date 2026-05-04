@@ -64,7 +64,7 @@ public class Consultation {
         public enum Status { PENDING, IN_PROGRESS, COMPLETED }
 
     // Patient ID (e.g., PV-123456789)
-    @Column(unique = true, length = 20)
+    @Column(length = 20)
     private String patientId;
 
     private LocalDate dob;
