@@ -200,6 +200,16 @@ export default function Home() {
 
 
   const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>('PRIMARY');
+  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
+  const travelerSelectOptions = React.useMemo(() => {
+    const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
+    const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
+    return [primary, ...rest];
+  }, [travelerOptions]);
+  const selectedTraveler = React.useMemo(
+    () => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0],
+    [travelerSelectOptions, selectedTravelerId]
+  );
 
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
@@ -226,13 +236,6 @@ export default function Home() {
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
-  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
-  const travelerSelectOptions = React.useMemo(() => {
-    const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
-    const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
-    return [primary, ...rest];
-  }, [travelerOptions]);
-  const selectedTraveler = React.useMemo(() => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0], [travelerSelectOptions, selectedTravelerId]);
 
   React.useEffect(() => {
     let ignore = false;
