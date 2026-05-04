@@ -59,13 +59,18 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        Consultation c = new Consultation();
-        c.setUser(u);
-
         Long travelerId = null;
         Object travelerIdVal = body.get("travelerId");
         if (travelerIdVal != null) {
             travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+        }
+        String patientId = buildTravelerPatientId(u, travelerId);
+        List<Consultation> existingForPatient = consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId);
+        Consultation c = existingForPatient.isEmpty() ? new Consultation() : existingForPatient.get(0);
+        c.setUser(u);
+        c.setPatientId(patientId);
+
+        if (travelerId != null) {
             final Long selectedTravelerId = travelerId;
             Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
             if (latest != null) {
@@ -79,12 +84,13 @@ public class ConsultationController {
                     c.setDob(selected.getDateOfBirth());
                 }
             }
+        } else {
+            c.setTraveler(null);
         }
         c.setCurrentLocation((String) body.getOrDefault("currentLocation", ""));
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
-        c.setPatientId(buildTravelerPatientId(u, travelerId));
 
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
