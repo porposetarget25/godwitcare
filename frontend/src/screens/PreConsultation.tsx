@@ -429,6 +429,10 @@ export default function PreConsultation() {
         if (trimmed) details[k] = trimmed
       }
 
+      const travelerId = selectedPatientKey.startsWith('trav-')
+        ? Number(selectedPatientKey.slice(5).replace(/^idx-/, ''))
+        : null
+
       const payload = {
         currentLocation: sanitizeAscii(location),
         contactName,
@@ -437,6 +441,7 @@ export default function PreConsultation() {
         answers: castAnswers,
         detailsByQuestion: details,
         dob: dob || null,
+        travelerId: Number.isFinite(travelerId) ? travelerId : null,
       }
 
       const url = isEdit

@@ -386,8 +386,9 @@ export default function ConsultationTracker() {
     }
   }, [])
 
-  const isStep1Done = !!latestCid
-  const hasRxOrCompleted = !!rxUrl || latestStatus === 'COMPLETED'
+  const hasLatestConsultation = !!latestCid
+  const isLatestCompleted = latestStatus === 'COMPLETED'
+  const hasRxOrCompleted = !!rxUrl || isLatestCompleted
 
   // Shared styles
   const cardStyle: React.CSSProperties = {
@@ -400,8 +401,8 @@ export default function ConsultationTracker() {
   }
   const step1CardStyle: React.CSSProperties = {
     ...cardStyle,
-    opacity: isStep1Done ? 0.7 : 1,
-    filter: isStep1Done ? 'grayscale(15%)' : 'none',
+    opacity: 1,
+    filter: 'none',
   }
   const titleStyle: React.CSSProperties = {
     fontSize: 18,
@@ -543,20 +544,16 @@ export default function ConsultationTracker() {
             </div>
           </div>
 
-          {isStep1Done ? (
-            <div className="consultation-step-actions consultation-step-actions--tight">
-              <button className="btn secondary" type="button" disabled>
-                Submitted
-              </button>
-              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn" style={{ padding: '8px 12px', fontSize: 13 }}>
-                Edit Details
+          <div className="consultation-step-actions consultation-step-actions--tight">
+            {hasLatestConsultation && latestCid && (
+              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn secondary" style={{ padding: '8px 12px', fontSize: 13 }}>
+                {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
               </Link>
-            </div>
-          ) : (
+            )}
             <Link to="/consultation/questionnaire" className="btn consultation-action-main">
-              Submit Details
+              Create New Consultation
             </Link>
-          )}
+          </div>
         </div>
       </div>
 
