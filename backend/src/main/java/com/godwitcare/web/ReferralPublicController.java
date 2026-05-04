@@ -51,18 +51,9 @@ public class ReferralPublicController {
     public ResponseEntity<?> latest(Authentication auth,
                                     @RequestParam(name = "travelerId", required = false) Long travelerId) {
         User u = requireCurrentUser(auth);
-        Optional<ReferralLetter> opt;
-        if (travelerId == null) {
-            var latest = consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
-                    .stream().findFirst();
-            if (latest.isEmpty()) return ResponseEntity.noContent().build();
-            opt = referrals.findTopByConsultationIdOrderByIdDesc(latest.get().getId());
-        } else {
-            var latest = consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId)
-                    .stream().findFirst();
-            if (latest.isEmpty()) return ResponseEntity.noContent().build();
-            opt = referrals.findTopByConsultationIdOrderByIdDesc(latest.get().getId());
-        }
+        Optional<ReferralLetter> opt = travelerId == null
+                ? referrals.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId())
+                : referrals.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
 
         if (opt.isEmpty()) return ResponseEntity.noContent().build();
 

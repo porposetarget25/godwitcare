@@ -438,12 +438,12 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        Optional<Consultation> latestConsultation = travelerId == null
-                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail()).stream().findFirst()
-                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId).stream().findFirst();
-        if (latestConsultation.isEmpty()) return ResponseEntity.noContent().build();
+        Optional<Prescription> latestPrescription = travelerId == null
+                ? prescriptions.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId())
+                : prescriptions.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        if (latestPrescription.isEmpty()) return ResponseEntity.noContent().build();
 
-        return prescriptions.findTopByConsultationIdOrderByIdDesc(latestConsultation.get().getId())
+        return latestPrescription
                 .<ResponseEntity<?>>map(p -> {
                     var body = new java.util.HashMap<String, Object>();
                     body.put("id", p.getId());
