@@ -225,6 +225,11 @@ export default function Home() {
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
   const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string}>>([]);
+  const travelerSelectOptions = React.useMemo(() => {
+    const primary = { id: 'PRIMARY', name: 'Primary' };
+    const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
+    return [primary, ...rest];
+  }, [travelerOptions]);
 
   React.useEffect(() => {
     let ignore = false;
@@ -479,7 +484,7 @@ export default function Home() {
       <div style={{marginBottom:12}}>
         <label className="muted small">Traveller</label>
         <select value={selectedTravelerId} onChange={(e)=>setSelectedTravelerId(e.target.value)} style={{marginLeft:8,padding:6,borderRadius:8}}>
-          {(travelerOptions.length ? travelerOptions : [{id:'PRIMARY',name:'Primary'}]).map((t:any)=><option key={String(t.id)} value={String(t.id)}>{t.name}</option>)}
+          {travelerSelectOptions.map((t:any)=><option key={String(t.id)} value={String(t.id)}>{t.name}</option>)}
         </select>
       </div>
 
