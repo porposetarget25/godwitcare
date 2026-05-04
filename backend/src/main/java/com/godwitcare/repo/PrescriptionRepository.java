@@ -14,6 +14,8 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, Long
     List<Prescription> findByPatientIdOrderByIdDesc(String patientId);
     Optional<Prescription> findFirstByPatientIdOrderByIdDesc(String patientId);
     Optional<Prescription> findTopByConsultationIdOrderByIdDesc(Long consultationId);
+    Optional<Prescription> findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(Long userId);
+    Optional<Prescription> findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(Long userId, Long travelerId);
     void deleteByConsultationUserId(Long userId);
     // latest by patient (traveler view)
     Optional<Prescription> findTopByConsultation_User_IdOrderByIdDesc(Long userId);
