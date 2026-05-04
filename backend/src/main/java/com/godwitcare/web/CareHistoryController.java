@@ -42,7 +42,7 @@ public class CareHistoryController {
 
         // All consultations for user (newest first)
         List<Consultation> list = travelerId == null
-                ? consultations.findByUserEmailOrderByIdDesc(u.getEmail())
+                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
                 : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 

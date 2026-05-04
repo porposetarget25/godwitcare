@@ -53,9 +53,10 @@ public class ReferralPublicController {
         User u = requireCurrentUser(auth);
         Optional<ReferralLetter> opt;
         if (travelerId == null) {
-            opt = referrals.findTopByConsultationUserUsernameOrConsultationUserEmailOrderByIdDesc(
-                    u.getUsername(), u.getEmail()
-            );
+            var latest = consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
+                    .stream().findFirst();
+            if (latest.isEmpty()) return ResponseEntity.noContent().build();
+            opt = referrals.findTopByConsultationIdOrderByIdDesc(latest.get().getId());
         } else {
             var latest = consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId)
                     .stream().findFirst();
