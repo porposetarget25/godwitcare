@@ -43,12 +43,12 @@ public class CareHistoryController {
 
         // All consultations for user (newest first)
         List<Consultation> list;
-        if (patientId != null && !patientId.isBlank()) {
+        if (travelerId != null) {
+            list = consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
+        } else if (patientId != null && !patientId.isBlank()) {
             list = consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId);
         } else {
-            list = travelerId == null
-                    ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
-                    : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
+            list = consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail());
         }
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
