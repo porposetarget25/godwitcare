@@ -53,10 +53,10 @@ public class ReferralPublicController {
                                     @RequestParam(name = "patientId", required = false) String patientId) {
         User u = requireCurrentUser(auth);
         Optional<ReferralLetter> opt;
-        if (travelerId != null) {
-            opt = referrals.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
-        } else if (patientId != null && !patientId.isBlank()) {
+        if (patientId != null && !patientId.isBlank()) {
             opt = referrals.findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(u.getId(), patientId);
+        } else if (travelerId != null) {
+            opt = referrals.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
         } else {
             opt = referrals.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId());
         }
