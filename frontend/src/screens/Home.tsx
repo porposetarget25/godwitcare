@@ -208,8 +208,10 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const qp = selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : '';
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest${qp}`, { credentials: 'include' });
+        const qp = new URLSearchParams();
+        if (selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
+        if (selectedTravelerId !== 'PRIMARY') qp.set('travelerId', String(selectedTravelerId));
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest?${qp.toString()}`, { credentials: 'include' });
         if (ignore) return;
         if (!res.ok || res.status === 204) { setRxUrl(null); return; }
         const j = await res.json().catch(() => null);
@@ -219,24 +221,27 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerId]);
+  }, [selectedTravelerId, selectedTraveler?.patientId]);
 
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
-  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string}>>([]);
+  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
   const travelerSelectOptions = React.useMemo(() => {
-    const primary = { id: 'PRIMARY', name: 'Primary' };
+    const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
     const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
     return [primary, ...rest];
   }, [travelerOptions]);
+  const selectedTraveler = React.useMemo(() => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0], [travelerSelectOptions, selectedTravelerId]);
 
   React.useEffect(() => {
     let ignore = false;
     (async () => {
       try {
-        const qp = selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : '';
-        const res = await fetch(`${API_BASE_URL}/referrals/latest${qp}`, {
+        const qp = new URLSearchParams();
+        if (selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
+        if (selectedTravelerId !== 'PRIMARY') qp.set('travelerId', String(selectedTravelerId));
+        const res = await fetch(`${API_BASE_URL}/referrals/latest?${qp.toString()}`, {
           credentials: 'include',
         });
         if (ignore) return;
@@ -266,7 +271,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerId]);
+  }, [selectedTravelerId, selectedTraveler?.patientId]);
 
   React.useEffect(() => {
     let ignore = false;
@@ -277,8 +282,10 @@ export default function Home() {
           const arr = await tRes.json().catch(() => []);
           setTravelerOptions(Array.isArray(arr) ? arr : []);
         }
-        const qp = selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : '';
-        const res = await fetch(`${API_BASE_URL}/care-history/mine${qp}`, { credentials: 'include' });
+        const qp = new URLSearchParams();
+        if (selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
+        if (selectedTravelerId !== 'PRIMARY') qp.set('travelerId', String(selectedTravelerId));
+        const res = await fetch(`${API_BASE_URL}/care-history/mine?${qp.toString()}`, { credentials: 'include' });
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
       } catch {
@@ -286,7 +293,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerId]);
+  }, [selectedTravelerId, selectedTraveler?.patientId]);
 
 
 
@@ -492,7 +499,7 @@ export default function Home() {
         {/* Care History — enabled if care history has at least one item */}
         {careHistoryEnabled ? (
           <Link
-            to={`/care-history${selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : ''}`}
+            to={`/care-history?${new URLSearchParams({ ...(selectedTravelerId !== 'PRIMARY' ? { travelerId: String(selectedTravelerId) } : {}), ...(selectedTraveler?.patientId ? { patientId: selectedTraveler.patientId } : {}) }).toString()}`}
             className="quick"
             style={{
               borderRadius: 16,
@@ -556,7 +563,7 @@ export default function Home() {
 
         {/* Tracker */}
         <Link
-          to={`/consultation/tracker${selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : ''}`}
+          to={`/consultation/tracker?${new URLSearchParams({ ...(selectedTravelerId !== 'PRIMARY' ? { travelerId: String(selectedTravelerId) } : {}), ...(selectedTraveler?.patientId ? { patientId: selectedTraveler.patientId } : {}) }).toString()}`}
           className="quick"
           style={{
             borderRadius: 16,

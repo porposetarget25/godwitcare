@@ -9,6 +9,7 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
     List<Consultation> findByUserEmailOrderByIdDesc(String email);
     List<Consultation> findByUserEmailAndTravelerIdOrderByIdDesc(String email, Long travelerId);
     List<Consultation> findByUserEmailAndTravelerIsNullOrderByIdDesc(String email);
+    List<Consultation> findByUserEmailAndPatientIdOrderByIdDesc(String email, String patientId);
     List<Consultation> findByUserIdOrderByIdDesc(Long userId);
     void deleteByUserId(Long userId);
 }

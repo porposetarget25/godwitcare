@@ -31,7 +31,8 @@ public class CareHistoryController {
 
     @GetMapping("/care-history/mine")
     public ResponseEntity<?> mine(Authentication auth,
-                                  @RequestParam(name = "travelerId", required = false) Long travelerId) {
+                                  @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                  @RequestParam(name = "patientId", required = false) String patientId) {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -41,9 +42,14 @@ public class CareHistoryController {
         if (u == null) return ResponseEntity.status(401).build();
 
         // All consultations for user (newest first)
-        List<Consultation> list = travelerId == null
-                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
-                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
+        List<Consultation> list;
+        if (patientId != null && !patientId.isBlank()) {
+            list = consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId);
+        } else {
+            list = travelerId == null
+                    ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
+                    : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId);
+        }
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
         // Patient header from the MOST RECENT consultation
