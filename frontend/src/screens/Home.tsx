@@ -436,7 +436,7 @@ export default function Home() {
               WhatsApp
             </a> */}
             <Link
-              to="/consultation/tracker"
+              to={selectedTravelerQuery.toString() ? `/consultation/tracker?${selectedTravelerQuery.toString()}` : '/consultation/tracker'}
               className="btn"
               style={{
                 backgroundColor: '#75b948ff',
