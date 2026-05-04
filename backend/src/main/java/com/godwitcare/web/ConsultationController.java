@@ -62,9 +62,10 @@ public class ConsultationController {
         Consultation c = new Consultation();
         c.setUser(u);
 
+        Long travelerId = null;
         Object travelerIdVal = body.get("travelerId");
         if (travelerIdVal != null) {
-            Long travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+            travelerId = Long.valueOf(String.valueOf(travelerIdVal));
             Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
             if (latest != null) {
                 Traveler selected = latest.getTravelers().stream()
@@ -82,9 +83,7 @@ public class ConsultationController {
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
-        // Generate unique 9-digit patientId
-        String patientId = "PV-" + String.format("%09d", (int) (Math.random() * 1_000_000_000));
-        c.setPatientId(patientId);
+        c.setPatientId(buildTravelerPatientId(u, travelerId));
 
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
@@ -110,6 +109,21 @@ public class ConsultationController {
                 "id", c.getId(),
                 "status", c.getStatus().name()
         ));
+    }
+
+    private String buildTravelerPatientId(User user, Long travelerId) {
+        String base = "PV-" + String.format("%09d", user.getId() == null ? 0L : user.getId());
+        if (travelerId == null) return base;
+
+        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
+        if (latest == null || latest.getTravelers() == null) return base + "-" + travelerId;
+
+        int seq = 1;
+        for (Traveler t : latest.getTravelers()) {
+            if (Objects.equals(t.getId(), travelerId)) return base + "-" + seq;
+            seq++;
+        }
+        return base + "-" + travelerId;
     }
 
 
@@ -413,7 +427,8 @@ public class ConsultationController {
     }
 
     @GetMapping("/prescriptions/latest")
-    public ResponseEntity<?> patientLatestPrescription(Authentication auth) {
+    public ResponseEntity<?> patientLatestPrescription(Authentication auth,
+                                                       @RequestParam(name = "travelerId", required = false) Long travelerId) {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -422,7 +437,12 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        return prescriptions.findTopByConsultation_User_IdOrderByIdDesc(u.getId())
+        Optional<Consultation> latestConsultation = travelerId == null
+                ? consultations.findByUserEmailOrderByIdDesc(u.getEmail()).stream().findFirst()
+                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId).stream().findFirst();
+        if (latestConsultation.isEmpty()) return ResponseEntity.noContent().build();
+
+        return prescriptions.findTopByConsultationIdOrderByIdDesc(latestConsultation.get().getId())
                 .<ResponseEntity<?>>map(p -> {
                     var body = new java.util.HashMap<String, Object>();
                     body.put("id", p.getId());

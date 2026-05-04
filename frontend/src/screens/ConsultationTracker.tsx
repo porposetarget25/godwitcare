@@ -223,6 +223,7 @@ function onlyDigits(s: string) {
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
   const isLogged = params.get('logged') === '1'
+  const travelerId = params.get('travelerId')
   const [showToast, setShowToast] = useState(isLogged)
 
   // Latest consultation id (to know if Step 1 is done) + status
@@ -276,7 +277,8 @@ export default function ConsultationTracker() {
         }
 
         // 2) Latest consultation (cid/status + address/mobile if available)
-        const res = await fetch(`${API_BASE_URL}/consultations/mine/latest`, {
+        const qp = travelerId ? `?travelerId=${travelerId}` : ''
+        const res = await fetch(`${API_BASE_URL}/consultations/mine/latest${qp}`, {
           credentials: 'include',
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
@@ -318,7 +320,7 @@ export default function ConsultationTracker() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [travelerId])
 
   // WhatsApp target (doctor business number)
   const WA_NUMBER = '447783579014' // digits only, country code + number
@@ -361,7 +363,8 @@ export default function ConsultationTracker() {
     let ignore = false
     ;(async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
+        const qp = travelerId ? `?travelerId=${travelerId}` : ''
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest${qp}`, {
           credentials: 'include',
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
@@ -384,7 +387,7 @@ export default function ConsultationTracker() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [travelerId])
 
   const hasLatestConsultation = !!latestCid
   const isLatestCompleted = latestStatus === 'COMPLETED'
