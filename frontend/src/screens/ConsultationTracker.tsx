@@ -226,13 +226,16 @@ export default function ConsultationTracker() {
   const travelerId = params.get('travelerId')
   const patientId = params.get('patientId')
 
-  const backToHomeHref = React.useMemo(() => {
+  const travelerQueryString = React.useMemo(() => {
     const qp = new URLSearchParams()
     if (travelerId) qp.set('travelerId', travelerId)
     if (patientId) qp.set('patientId', patientId)
-    const q = qp.toString()
-    return q ? `/home?${q}` : '/home'
+    return qp.toString()
   }, [travelerId, patientId])
+
+  const backToHomeHref = React.useMemo(() => {
+    return travelerQueryString ? `/home?${travelerQueryString}` : '/home'
+  }, [travelerQueryString])
   const [showToast, setShowToast] = useState(isLogged)
 
   // Latest consultation id (to know if Step 1 is done) + status
@@ -562,11 +565,11 @@ export default function ConsultationTracker() {
 
           <div className="consultation-step-actions consultation-step-actions--tight">
             {hasLatestConsultation && latestCid && (
-              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn secondary consultation-action-btn">
+              <Link to={`/consultation/questionnaire?cid=${latestCid}${travelerQueryString ? `&${travelerQueryString}` : ''}`} className="btn secondary consultation-action-btn">
                 {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
               </Link>
             )}
-            <Link to="/consultation/questionnaire" className="btn consultation-action-btn consultation-action-main">
+            <Link to={travelerQueryString ? `/consultation/questionnaire?${travelerQueryString}` : '/consultation/questionnaire'} className="btn consultation-action-btn consultation-action-main">
               Create New Consultation
             </Link>
           </div>
@@ -722,7 +725,7 @@ export default function ConsultationTracker() {
               medical advice.
             </div>
           </div>
-          <Link to="/consultation/details" className="btn secondary consultation-action-btn consultation-action-main">
+          <Link to={travelerQueryString ? `/consultation/details?${travelerQueryString}` : '/consultation/details'} className="btn secondary consultation-action-btn consultation-action-main">
             Upcoming
           </Link>
         </div>
