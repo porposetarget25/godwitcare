@@ -219,7 +219,7 @@ export default function Home() {
     (async () => {
       try {
         const qp = new URLSearchParams();
-        if (selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
+        if (selectedTravelerId === 'PRIMARY' && selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
         if (selectedTravelerId !== 'PRIMARY') qp.set('travelerId', String(selectedTravelerId));
         const res = await fetch(`${API_BASE_URL}/prescriptions/latest?${qp.toString()}`, { credentials: 'include' });
         if (ignore) return;
@@ -242,7 +242,7 @@ export default function Home() {
     (async () => {
       try {
         const qp = new URLSearchParams();
-        if (selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
+        if (selectedTravelerId === 'PRIMARY' && selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
         if (selectedTravelerId !== 'PRIMARY') qp.set('travelerId', String(selectedTravelerId));
         const res = await fetch(`${API_BASE_URL}/referrals/latest?${qp.toString()}`, {
           credentials: 'include',
@@ -286,7 +286,7 @@ export default function Home() {
           setTravelerOptions(Array.isArray(arr) ? arr : []);
         }
         const qp = new URLSearchParams();
-        if (selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
+        if (selectedTravelerId === 'PRIMARY' && selectedTraveler?.patientId) qp.set('patientId', selectedTraveler.patientId);
         if (selectedTravelerId !== 'PRIMARY') qp.set('travelerId', String(selectedTravelerId));
         const res = await fetch(`${API_BASE_URL}/care-history/mine?${qp.toString()}`, { credentials: 'include' });
         if (ignore) return;
@@ -502,7 +502,7 @@ export default function Home() {
         {/* Care History — enabled if care history has at least one item */}
         {careHistoryEnabled ? (
           <Link
-            to={`/care-history?${new URLSearchParams({ ...(selectedTravelerId !== 'PRIMARY' ? { travelerId: String(selectedTravelerId) } : {}), ...(selectedTraveler?.patientId ? { patientId: selectedTraveler.patientId } : {}) }).toString()}`}
+            to={`/care-history?${new URLSearchParams({ ...(selectedTravelerId !== 'PRIMARY' ? { travelerId: String(selectedTravelerId) } : {}), ...(selectedTravelerId === 'PRIMARY' && selectedTraveler?.patientId ? { patientId: selectedTraveler.patientId } : {}) }).toString()}`}
             className="quick"
             style={{
               borderRadius: 16,
@@ -566,7 +566,7 @@ export default function Home() {
 
         {/* Tracker */}
         <Link
-          to={`/consultation/tracker?${new URLSearchParams({ ...(selectedTravelerId !== 'PRIMARY' ? { travelerId: String(selectedTravelerId) } : {}), ...(selectedTraveler?.patientId ? { patientId: selectedTraveler.patientId } : {}) }).toString()}`}
+          to={`/consultation/tracker?${new URLSearchParams({ ...(selectedTravelerId !== 'PRIMARY' ? { travelerId: String(selectedTravelerId) } : {}), ...(selectedTravelerId === 'PRIMARY' && selectedTraveler?.patientId ? { patientId: selectedTraveler.patientId } : {}) }).toString()}`}
           className="quick"
           style={{
             borderRadius: 16,
