@@ -3,6 +3,7 @@ package com.godwitcare.web;
 
 import com.godwitcare.entity.ReferralLetter;
 import com.godwitcare.entity.User;
+import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.repo.UserRepository;
 import org.springframework.http.*;
@@ -24,10 +25,12 @@ public class ReferralPublicController {
 
     private final UserRepository users;
     private final ReferralLetterRepo referrals;
+    private final ConsultationRepository consultations;
 
-    public ReferralPublicController(UserRepository users, ReferralLetterRepo referrals) {
+    public ReferralPublicController(UserRepository users, ReferralLetterRepo referrals, ConsultationRepository consultations) {
         this.users = users;
         this.referrals = referrals;
+        this.consultations = consultations;
     }
 
     private User requireCurrentUser(Authentication auth) {
@@ -45,13 +48,18 @@ public class ReferralPublicController {
 
     /** Return latest referral meta for the logged-in patient. */
     @GetMapping("/latest")
-    public ResponseEntity<?> latest(Authentication auth) {
+    public ResponseEntity<?> latest(Authentication auth,
+                                    @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                    @RequestParam(name = "patientId", required = false) String patientId) {
         User u = requireCurrentUser(auth);
-
-        Optional<ReferralLetter> opt = referrals
-                .findTopByConsultationUserUsernameOrConsultationUserEmailOrderByIdDesc(
-                        u.getUsername(), u.getEmail()
-                );
+        Optional<ReferralLetter> opt;
+        if (patientId != null && !patientId.isBlank()) {
+            opt = referrals.findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(u.getId(), patientId);
+        } else if (travelerId != null) {
+            opt = referrals.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        } else {
+            opt = referrals.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId());
+        }
 
         if (opt.isEmpty()) return ResponseEntity.noContent().build();
 

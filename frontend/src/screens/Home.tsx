@@ -199,6 +199,29 @@ export default function Home() {
   }
 
 
+  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>('PRIMARY');
+  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
+  const travelerSelectOptions = React.useMemo(() => {
+    const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
+    const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
+    return [primary, ...rest];
+  }, [travelerOptions]);
+  const selectedTraveler = React.useMemo(
+    () => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0],
+    [travelerSelectOptions, selectedTravelerId]
+  );
+
+  const selectedTravelerQuery = React.useMemo(() => {
+    const qp = new URLSearchParams();
+    const selectedId = String(selectedTravelerId);
+    const selectedPatientId = selectedTraveler?.patientId?.trim();
+
+    // Include both identifiers when available so backend filters can match either path.
+    if (selectedId !== 'PRIMARY') qp.set('travelerId', selectedId);
+    if (selectedPatientId) qp.set('patientId', selectedPatientId);
+    return qp;
+  }, [selectedTravelerId, selectedTraveler?.patientId]);
+
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
 
@@ -206,7 +229,7 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery.toString()}`, { credentials: 'include' });
         if (ignore) return;
         if (!res.ok || res.status === 204) { setRxUrl(null); return; }
         const j = await res.json().catch(() => null);
@@ -216,7 +239,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [selectedTravelerQuery]);
 
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
@@ -226,7 +249,7 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/referrals/latest`, {
+        const res = await fetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery.toString()}`, {
           credentials: 'include',
         });
         if (ignore) return;
@@ -256,13 +279,18 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [selectedTravelerQuery]);
 
   React.useEffect(() => {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/care-history/mine`, { credentials: 'include' });
+        const tRes = await fetch(`${API_BASE_URL}/consultations/travelers`, { credentials: 'include' });
+        if (!ignore && tRes.ok) {
+          const arr = await tRes.json().catch(() => []);
+          setTravelerOptions(Array.isArray(arr) ? arr : []);
+        }
+        const res = await fetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, { credentials: 'include' });
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
       } catch {
@@ -270,7 +298,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, []);
+  }, [selectedTravelerQuery]);
 
 
 
@@ -465,12 +493,18 @@ export default function Home() {
 
       {/* Quick Links */}
       <div className="ql-head">Quick Links</div>
+      <div style={{marginBottom:12}}>
+        <label className="muted small">Traveller</label>
+        <select value={selectedTravelerId} onChange={(e)=>setSelectedTravelerId(e.target.value)} style={{marginLeft:8,padding:6,borderRadius:8}}>
+          {travelerSelectOptions.map((t:any)=><option key={String(t.id)} value={String(t.id)}>{t.name}</option>)}
+        </select>
+      </div>
 
       <div className="quick-grid">
         {/* Care History — enabled if care history has at least one item */}
         {careHistoryEnabled ? (
           <Link
-            to="/care-history"
+            to={`/care-history?${selectedTravelerQuery.toString()}`}
             className="quick"
             style={{
               borderRadius: 16,
@@ -534,7 +568,7 @@ export default function Home() {
 
         {/* Tracker */}
         <Link
-          to="/consultation/tracker"
+          to={`/consultation/tracker?${selectedTravelerQuery.toString()}`}
           className="quick"
           style={{
             borderRadius: 16,

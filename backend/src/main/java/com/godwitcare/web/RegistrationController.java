@@ -216,6 +216,7 @@ public class RegistrationController {
                     if (reg.getTravelers() != null) {
                         for (var t : reg.getTravelers()) {
                             var m = new java.util.HashMap<String, Object>();
+                            m.put("id", t.getId());
                             m.put("fullName", t.getFullName());
                             m.put("dateOfBirth", t.getDateOfBirth() != null ? t.getDateOfBirth().toString() : "");
                             travellers.add(m);

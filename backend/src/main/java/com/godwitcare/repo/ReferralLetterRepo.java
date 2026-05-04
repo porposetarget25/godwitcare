@@ -12,6 +12,9 @@ public interface ReferralLetterRepo extends JpaRepository<ReferralLetter, Long> 
     );
 
     Optional<ReferralLetter> findTopByConsultationIdOrderByIdDesc(Long consultationId);
+    Optional<ReferralLetter> findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(Long userId);
+    Optional<ReferralLetter> findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(Long userId, Long travelerId);
+    Optional<ReferralLetter> findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(Long userId, String patientId);
     java.util.List<ReferralLetter> findByConsultationUserIdOrderByIdDesc(Long userId);
     void deleteByConsultationUserId(Long userId);
 

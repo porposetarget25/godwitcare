@@ -223,6 +223,8 @@ function onlyDigits(s: string) {
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
   const isLogged = params.get('logged') === '1'
+  const travelerId = params.get('travelerId')
+  const patientId = params.get('patientId')
   const [showToast, setShowToast] = useState(isLogged)
 
   // Latest consultation id (to know if Step 1 is done) + status
@@ -276,7 +278,10 @@ export default function ConsultationTracker() {
         }
 
         // 2) Latest consultation (cid/status + address/mobile if available)
-        const res = await fetch(`${API_BASE_URL}/consultations/mine/latest`, {
+        const qp = new URLSearchParams()
+        if (travelerId) qp.set('travelerId', travelerId)
+        if (patientId) qp.set('patientId', patientId)
+        const res = await fetch(`${API_BASE_URL}/consultations/mine/latest?${qp.toString()}`, {
           credentials: 'include',
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
@@ -318,7 +323,7 @@ export default function ConsultationTracker() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [travelerId, patientId])
 
   // WhatsApp target (doctor business number)
   const WA_NUMBER = '447783579014' // digits only, country code + number
@@ -361,7 +366,10 @@ export default function ConsultationTracker() {
     let ignore = false
     ;(async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, {
+        const qp = new URLSearchParams()
+        if (travelerId) qp.set('travelerId', travelerId)
+        if (patientId) qp.set('patientId', patientId)
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest?${qp.toString()}`, {
           credentials: 'include',
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
@@ -384,10 +392,11 @@ export default function ConsultationTracker() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [travelerId, patientId])
 
-  const isStep1Done = !!latestCid
-  const hasRxOrCompleted = !!rxUrl || latestStatus === 'COMPLETED'
+  const hasLatestConsultation = !!latestCid
+  const isLatestCompleted = latestStatus === 'COMPLETED'
+  const hasRxOrCompleted = !!rxUrl || isLatestCompleted
 
   // Shared styles
   const cardStyle: React.CSSProperties = {
@@ -400,8 +409,8 @@ export default function ConsultationTracker() {
   }
   const step1CardStyle: React.CSSProperties = {
     ...cardStyle,
-    opacity: isStep1Done ? 0.7 : 1,
-    filter: isStep1Done ? 'grayscale(15%)' : 'none',
+    opacity: 1,
+    filter: 'none',
   }
   const titleStyle: React.CSSProperties = {
     fontSize: 18,
@@ -543,20 +552,16 @@ export default function ConsultationTracker() {
             </div>
           </div>
 
-          {isStep1Done ? (
-            <div className="consultation-step-actions consultation-step-actions--tight">
-              <button className="btn secondary" type="button" disabled>
-                Submitted
-              </button>
-              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn" style={{ padding: '8px 12px', fontSize: 13 }}>
-                Edit Details
+          <div className="consultation-step-actions consultation-step-actions--tight">
+            {hasLatestConsultation && latestCid && (
+              <Link to={`/consultation/questionnaire?cid=${latestCid}`} className="btn secondary" style={{ padding: '8px 12px', fontSize: 13 }}>
+                {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
               </Link>
-            </div>
-          ) : (
+            )}
             <Link to="/consultation/questionnaire" className="btn consultation-action-main">
-              Submit Details
+              Create New Consultation
             </Link>
-          )}
+          </div>
         </div>
       </div>
 

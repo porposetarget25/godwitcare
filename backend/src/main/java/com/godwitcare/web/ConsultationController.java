@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.godwitcare.entity.Consultation;
 import com.godwitcare.entity.Prescription;
 import com.godwitcare.entity.User;
+import com.godwitcare.entity.Registration;
+import com.godwitcare.entity.Traveler;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.RegistrationRepository;
@@ -57,15 +59,37 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
+        Long travelerId = null;
+        Object travelerIdVal = body.get("travelerId");
+        if (travelerIdVal != null) {
+            travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+        }
+        String patientId = buildTravelerPatientId(u, travelerId);
         Consultation c = new Consultation();
         c.setUser(u);
+        c.setPatientId(patientId);
+
+        if (travelerId != null) {
+            final Long selectedTravelerId = travelerId;
+            Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
+            if (latest != null) {
+                Traveler selected = latest.getTravelers().stream()
+                        .filter(t -> Objects.equals(t.getId(), selectedTravelerId))
+                        .findFirst()
+                        .orElse(null);
+                c.setTraveler(selected);
+                if (selected != null) {
+                    c.setContactName(selected.getFullName());
+                    c.setDob(selected.getDateOfBirth());
+                }
+            }
+        } else {
+            c.setTraveler(null);
+        }
         c.setCurrentLocation((String) body.getOrDefault("currentLocation", ""));
         c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
-        // Generate unique 9-digit patientId
-        String patientId = "PV-" + String.format("%09d", (int) (Math.random() * 1_000_000_000));
-        c.setPatientId(patientId);
 
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
@@ -93,9 +117,24 @@ public class ConsultationController {
         ));
     }
 
+    private String buildTravelerPatientId(User user, Long travelerId) {
+        String base = "PV-" + String.format("%09d", user.getId() == null ? 0L : user.getId());
+        if (travelerId == null) return base;
 
-    @GetMapping("/consultations/mine/latest")
-    public ResponseEntity<Map<String, Object>> myLatest(Authentication auth) throws Exception {
+        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
+        if (latest == null || latest.getTravelers() == null) return base + "-" + travelerId;
+
+        int seq = 1;
+        for (Traveler t : latest.getTravelers()) {
+            if (Objects.equals(t.getId(), travelerId)) return base + "-" + seq;
+            seq++;
+        }
+        return base + "-" + travelerId;
+    }
+
+
+    @GetMapping("/consultations/travelers")
+    public ResponseEntity<List<Map<String, Object>>> travelerOptions(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -104,7 +143,44 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        var list = consultations.findByUserEmailOrderByIdDesc(u.getEmail());
+        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
+        List<Map<String, Object>> out = new ArrayList<>();
+
+        Map<String, Object> primary = new LinkedHashMap<>();
+        primary.put("id", "PRIMARY");
+        primary.put("name", (u.getFirstName() == null ? "" : u.getFirstName()) + " " + (u.getLastName() == null ? "" : u.getLastName()));
+        primary.put("patientId", buildTravelerPatientId(u, null));
+        out.add(primary);
+
+        if (latest != null) {
+            for (Traveler t : latest.getTravelers()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", t.getId());
+                row.put("name", t.getFullName());
+                row.put("patientId", buildTravelerPatientId(u, t.getId()));
+                out.add(row);
+            }
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/consultations/mine/latest")
+    public ResponseEntity<Map<String, Object>> myLatest(Authentication auth,
+                                                        @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                                       @RequestParam(name = "patientId", required = false) String patientId) throws Exception {
+        if (auth == null) return ResponseEntity.status(401).build();
+
+        String principal = auth.getName();
+        User u = users.findByUsername(principal)
+                .or(() -> users.findByEmail(principal))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+
+        var list = (patientId != null && !patientId.isBlank())
+                ? consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId)
+                : (travelerId == null
+                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
+                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId));
         if (list.isEmpty()) return ResponseEntity.noContent().build();
 
         var c = list.get(0);
@@ -362,7 +438,9 @@ public class ConsultationController {
     }
 
     @GetMapping("/prescriptions/latest")
-    public ResponseEntity<?> patientLatestPrescription(Authentication auth) {
+    public ResponseEntity<?> patientLatestPrescription(Authentication auth,
+                                                       @RequestParam(name = "travelerId", required = false) Long travelerId,
+                                                       @RequestParam(name = "patientId", required = false) String patientId) {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -371,7 +449,17 @@ public class ConsultationController {
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
 
-        return prescriptions.findTopByConsultation_User_IdOrderByIdDesc(u.getId())
+        Optional<Prescription> latestPrescription;
+        if (patientId != null && !patientId.isBlank()) {
+            latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationPatientIdOrderByIdDesc(u.getId(), patientId);
+        } else if (travelerId != null) {
+            latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationTravelerIdOrderByIdDesc(u.getId(), travelerId);
+        } else {
+            latestPrescription = prescriptions.findTopByConsultationUserIdAndConsultationTravelerIsNullOrderByIdDesc(u.getId());
+        }
+        if (latestPrescription.isEmpty()) return ResponseEntity.noContent().build();
+
+        return latestPrescription
                 .<ResponseEntity<?>>map(p -> {
                     var body = new java.util.HashMap<String, Object>();
                     body.put("id", p.getId());
