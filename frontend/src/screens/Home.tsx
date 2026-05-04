@@ -208,7 +208,8 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest`, { credentials: 'include' });
+        const qp = selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : '';
+        const res = await fetch(`${API_BASE_URL}/prescriptions/latest${qp}`, { credentials: 'include' });
         if (ignore) return;
         if (!res.ok || res.status === 204) { setRxUrl(null); return; }
         const j = await res.json().catch(() => null);
@@ -229,7 +230,8 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/referrals/latest`, {
+        const qp = selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : '';
+        const res = await fetch(`${API_BASE_URL}/referrals/latest${qp}`, {
           credentials: 'include',
         });
         if (ignore) return;
@@ -549,7 +551,7 @@ export default function Home() {
 
         {/* Tracker */}
         <Link
-          to="/consultation/tracker"
+          to={`/consultation/tracker${selectedTravelerId !== 'PRIMARY' ? `?travelerId=${selectedTravelerId}` : ''}`}
           className="quick"
           style={{
             borderRadius: 16,
