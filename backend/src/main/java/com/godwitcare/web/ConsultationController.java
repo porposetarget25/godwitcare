@@ -65,8 +65,7 @@ public class ConsultationController {
             travelerId = Long.valueOf(String.valueOf(travelerIdVal));
         }
         String patientId = buildTravelerPatientId(u, travelerId);
-        List<Consultation> existingForPatient = consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId);
-        Consultation c = existingForPatient.isEmpty() ? new Consultation() : existingForPatient.get(0);
+        Consultation c = new Consultation();
         c.setUser(u);
         c.setPatientId(patientId);
 
