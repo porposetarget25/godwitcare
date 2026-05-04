@@ -210,7 +210,16 @@ export default function PreConsultation() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const cid = params.get('cid') // if present => edit mode
+  const travelerId = params.get('travelerId')
+  const patientId = params.get('patientId')
   const isEdit = !!cid
+
+  const travelerQueryString = useMemo(() => {
+    const qp = new URLSearchParams()
+    if (travelerId) qp.set('travelerId', travelerId)
+    if (patientId) qp.set('patientId', patientId)
+    return qp.toString()
+  }, [travelerId, patientId])
 
   // Contact fields
   const [location, setLocation] = useState('')
@@ -461,7 +470,7 @@ export default function PreConsultation() {
         throw new Error(`Failed to save consultation: ${res.status} ${t}`)
       }
 
-      nav('/consultation/tracker?logged=1')
+      nav(travelerQueryString ? `/consultation/tracker?logged=1&${travelerQueryString}` : '/consultation/tracker?logged=1')
     } catch (err) {
       console.error(err)
       alert('Sorry, we could not save your details. Please try again.')
@@ -534,7 +543,7 @@ export default function PreConsultation() {
     <section className="section">
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Pre-Consultation Checklist</h1>
-        <Link to="/consultation/tracker" className="btn secondary">Back</Link>
+        <Link to={travelerQueryString ? `/consultation/tracker?${travelerQueryString}` : '/consultation/tracker'} className="btn secondary">Back</Link>
       </div>
 
       <form className="form" onSubmit={submit}>
