@@ -507,6 +507,11 @@ export default function ConsultationTracker() {
         <h1 className="page-title consultation-journey-title" style={{ marginBottom: 0 }}>
           Your Consultation Journey
         </h1>
+        <div className="page-head-actions">
+          <Link to={backToHomeHref} className="btn secondary consultation-action-btn">
+            Back to Home
+          </Link>
+        </div>
       </div>
 
       {/* Toast */}
@@ -559,9 +564,6 @@ export default function ConsultationTracker() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
-            <Link to={backToHomeHref} className="btn secondary consultation-action-btn">
-              Back to Home
-            </Link>
             <div className="consultation-step-actions consultation-step-actions--tight">
               {hasLatestConsultation && latestCid && (
                 <Link to={`/consultation/questionnaire?cid=${latestCid}${travelerQueryString ? `&${travelerQueryString}` : ''}`} className="btn secondary consultation-action-btn">
