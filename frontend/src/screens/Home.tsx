@@ -1,6 +1,6 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { createPayment, me, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
@@ -47,6 +47,7 @@ function normalizeReg(r: RegApi | null | undefined) {
 export default function Home() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [user, setUser] = useState<UserDto | null>(null)
   const [checking, setChecking] = useState(true)
 
@@ -199,7 +200,7 @@ export default function Home() {
   }
 
 
-  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>('PRIMARY');
+  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>(searchParams.get('travelerId') || 'PRIMARY');
   const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
   const travelerSelectOptions = React.useMemo(() => {
     const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
@@ -210,6 +211,25 @@ export default function Home() {
     () => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0],
     [travelerSelectOptions, selectedTravelerId]
   );
+
+
+  React.useEffect(() => {
+    const travelerFromUrl = new URLSearchParams(location.search).get('travelerId') || 'PRIMARY';
+    setSelectedTravelerId((prev) => (travelerFromUrl !== prev ? travelerFromUrl : prev));
+  }, [location.search]);
+
+  React.useEffect(() => {
+    const currentTraveler = searchParams.get('travelerId') || 'PRIMARY';
+    if (currentTraveler === selectedTravelerId) return;
+
+    const next = new URLSearchParams(searchParams);
+    if (selectedTravelerId === 'PRIMARY') {
+      next.delete('travelerId');
+    } else {
+      next.set('travelerId', selectedTravelerId);
+    }
+    setSearchParams(next, { replace: true });
+  }, [selectedTravelerId, searchParams, setSearchParams]);
 
   const selectedTravelerQuery = React.useMemo(() => {
     const qp = new URLSearchParams();
@@ -416,7 +436,7 @@ export default function Home() {
               WhatsApp
             </a> */}
             <Link
-              to="/consultation/tracker"
+              to={selectedTravelerQuery.toString() ? `/consultation/tracker?${selectedTravelerQuery.toString()}` : '/consultation/tracker'}
               className="btn"
               style={{
                 backgroundColor: '#75b948ff',
