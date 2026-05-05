@@ -558,18 +558,20 @@ export default function ConsultationTracker() {
             </div>
           </div>
 
-          <div className="consultation-step-actions consultation-step-actions--tight">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
             <Link to={backToHomeHref} className="btn secondary consultation-action-btn">
               Back to Home
             </Link>
-            {hasLatestConsultation && latestCid && (
-              <Link to={`/consultation/questionnaire?cid=${latestCid}${travelerQueryString ? `&${travelerQueryString}` : ''}`} className="btn secondary consultation-action-btn">
-                {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
+            <div className="consultation-step-actions consultation-step-actions--tight">
+              {hasLatestConsultation && latestCid && (
+                <Link to={`/consultation/questionnaire?cid=${latestCid}${travelerQueryString ? `&${travelerQueryString}` : ''}`} className="btn secondary consultation-action-btn">
+                  {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
+                </Link>
+              )}
+              <Link to={travelerQueryString ? `/consultation/questionnaire?${travelerQueryString}` : '/consultation/questionnaire'} className="btn consultation-action-btn consultation-action-main">
+                Create New Consultation
               </Link>
-            )}
-            <Link to={travelerQueryString ? `/consultation/questionnaire?${travelerQueryString}` : '/consultation/questionnaire'} className="btn consultation-action-btn consultation-action-main">
-              Create New Consultation
-            </Link>
+            </div>
           </div>
         </div>
       </div>
