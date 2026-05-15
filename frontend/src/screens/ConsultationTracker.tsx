@@ -255,6 +255,7 @@ export default function ConsultationTracker() {
   const [countryCode, setCountryCode] = useState<string>('64') // default NZ
   const [altNumber, setAltNumber] = useState<string>('') // number without +, free input
   const [contactErr, setContactErr] = useState<string | null>(null)
+  const [hasNotificationSent, setHasNotificationSent] = useState(false)
 
   // Toast on landing after logging consultation
   useEffect(() => {
@@ -407,7 +408,10 @@ export default function ConsultationTracker() {
 
   const hasLatestConsultation = !!latestCid
   const isLatestCompleted = latestStatus === 'COMPLETED'
-  const hasRxOrCompleted = !!rxUrl || isLatestCompleted
+  const canNotifyClinician = hasLatestConsultation
+  const canOpenUpcoming = hasNotificationSent
+  const canViewPrescription = isLatestCompleted && !!rxUrl
+  const canFindNearbyPharmacies = isLatestCompleted
 
   // Shared styles
   const cardStyle: React.CSSProperties = {
@@ -436,6 +440,12 @@ export default function ConsultationTracker() {
     lineHeight: 1.4,
   }
 
+
+  const disabledButtonStyle: React.CSSProperties = {
+    opacity: 0.55,
+    cursor: 'not-allowed',
+    pointerEvents: 'none',
+  }
   // Locate Pharmacy
   const [findingPharmacy, setFindingPharmacy] = useState(false)
 
@@ -496,7 +506,10 @@ export default function ConsultationTracker() {
     }
 
     // Open WhatsApp with draft message
-    window.open(waHref, '_blank', 'noopener,noreferrer')
+    const whatsappWindow = window.open(waHref, '_blank', 'noopener,noreferrer')
+    if (whatsappWindow) {
+      setHasNotificationSent(true)
+    }
     setShowContactPrompt(false)
   }
 
@@ -592,8 +605,15 @@ export default function ConsultationTracker() {
           <button
             type="button"
             className="btn consultation-action-btn consultation-action-main"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              ...(canNotifyClinician ? {} : disabledButtonStyle),
+            }}
             onClick={onNotifyClick}
+            disabled={!canNotifyClinician}
+            aria-disabled={!canNotifyClinician}
           >
             Notify Clinician
           </button>
@@ -727,9 +747,24 @@ export default function ConsultationTracker() {
               medical advice.
             </div>
           </div>
-          <Link to={travelerQueryString ? `/consultation/details?${travelerQueryString}` : '/consultation/details'} className="btn secondary consultation-action-btn consultation-action-main">
-            Upcoming
-          </Link>
+          {canOpenUpcoming ? (
+            <Link
+              to={travelerQueryString ? `/consultation/details?${travelerQueryString}` : '/consultation/details'}
+              className="btn secondary consultation-action-btn consultation-action-main"
+            >
+              Upcoming
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="btn secondary consultation-action-btn consultation-action-main"
+              style={disabledButtonStyle}
+              disabled
+              aria-disabled="true"
+            >
+              Upcoming
+            </button>
+          )}
         </div>
       </div>
 
@@ -742,12 +777,12 @@ export default function ConsultationTracker() {
               Receive your digital prescription in the app with dosage instructions and medication details.
             </div>
           </div>
-          {rxUrl ? (
-            <a className="btn consultation-action-btn consultation-action-main" href={rxUrl} target="_blank" rel="noreferrer">
+          {canViewPrescription ? (
+            <a className="btn consultation-action-btn consultation-action-main" href={rxUrl!} target="_blank" rel="noreferrer">
               View Prescription
             </a>
           ) : (
-            <button className="btn secondary consultation-action-btn consultation-action-main" type="button" disabled>
+            <button className="btn secondary consultation-action-btn consultation-action-main" type="button" style={disabledButtonStyle} disabled aria-disabled="true">
               Upcoming
             </button>
           )}
@@ -764,12 +799,12 @@ export default function ConsultationTracker() {
             </div>
           </div>
 
-          {hasRxOrCompleted ? (
+          {canFindNearbyPharmacies ? (
             <button className="btn consultation-action-btn consultation-action-main" type="button" onClick={openNearbyPharmacies} disabled={findingPharmacy}>
               {findingPharmacy ? 'Finding…' : 'Find Nearby Pharmacies'}
             </button>
           ) : (
-            <button className="btn secondary consultation-action-btn consultation-action-main" type="button" disabled>
+            <button className="btn secondary consultation-action-btn consultation-action-main" type="button" style={disabledButtonStyle} disabled aria-disabled="true">
               Upcoming
             </button>
           )}
