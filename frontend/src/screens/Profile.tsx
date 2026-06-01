@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 
-type Person = { fullName: string; dateOfBirth: string };
+type Person = { id?: number; fullName: string; dateOfBirth: string };
 
 const ALL_COUNTRIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
@@ -107,6 +107,7 @@ export default function Profile() {
             setAllergies(!!reg.allergies);
             setFitToFlyCertificate(!!reg.fitToFlyCertificate);
             setTravelers((reg.travelers || []).map(t => ({
+              id: t.id,
               fullName: t.fullName || '',
               dateOfBirth: t.dateOfBirth || '',
             })));
