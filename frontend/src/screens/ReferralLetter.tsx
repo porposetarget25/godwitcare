@@ -1,7 +1,7 @@
 // src/screens/DoctorReferral.tsx
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { API_BASE_URL } from '../api';
+import { authFetch, API_BASE_URL } from '../api';
 
 // Prevent double `/api` (e.g., API_BASE_URL already has /api and server returns /api/..)
 function normalizeApiUrl(base: string, path: string | null | undefined): string | null {
@@ -63,7 +63,7 @@ export default function DoctorReferral() {
         const cId = Number(id);
         if (!cId || Number.isNaN(cId)) throw new Error('Invalid consultation id.');
 
-        const res = await fetch(`${API_BASE_URL}/doctor/consultations/${cId}`, { credentials: 'include' });
+        const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${cId}`, {});
         if (!res.ok) throw new Error(`Failed to load consultation (${res.status}).`);
         const data: ConsultationDTO = await res.json();
         if (ignore) return;
@@ -132,13 +132,12 @@ Referring Practitioner`
     if (!c?.id) return;
     try {
       // Create referral for this consultation
-      const createRes = await fetch(
+      const createRes = await authFetch(
         `${API_BASE_URL}/doctor/consultations/${c.id}/referrals`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paragraph: body }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paragraph: body }),
         }
       );
 
@@ -168,9 +167,9 @@ Referring Practitioner`
       }
 
       if (meta?.id) {
-        const pdfRes = await fetch(
+        const pdfRes = await authFetch(
           `${API_BASE_URL}/doctor/referrals/${meta.id}/pdf`,
-          { credentials: 'include' }
+          {}
         );
         if (!pdfRes.ok) throw new Error('Failed to download referral PDF.');
         const blob = await pdfRes.blob();

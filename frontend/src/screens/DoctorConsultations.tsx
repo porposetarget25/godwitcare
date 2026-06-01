@@ -1,7 +1,7 @@
 // src/screens/DoctorConsultations.tsx
 import React from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { API_BASE_URL } from '../api'
+import { authFetch, API_BASE_URL } from '../api'
 
 type Item = {
   id: number
@@ -26,7 +26,7 @@ export default function DoctorConsultations() {
     setLoading(true)
     try {
       const q = which === 'ALL' ? '' : `?status=${encodeURIComponent(which)}`
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations${q}`, { credentials: 'include' })
+      const res = await authFetch(`${API_BASE_URL}/doctor/consultations${q}`, {})
       const j = (await res.json()) as Item[]
       setItems(Array.isArray(j) ? j : [])
     } catch {

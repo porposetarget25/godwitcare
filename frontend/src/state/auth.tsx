@@ -1,11 +1,12 @@
 // src/state/auth.tsx
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
 } from 'react';
-import { getMe, type UserDto } from '../api';
+import { clearAuthToken, getMe, getTokenExpiresAt, type UserDto } from '../api';
 
 type AuthState = {
   user: UserDto | null;
@@ -34,31 +35,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const clearUser = useCallback(() => {
+    clearAuthToken();
+    setUser(null);
+  }, []);
+
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const u = await getMe();
       setUser(u);
       try {
-        localStorage.setItem('gc_user', JSON.stringify(u ?? null));
+        if (u) localStorage.setItem('gc_user', JSON.stringify(u));
+        else localStorage.removeItem('gc_user');
       } catch {
         // ignore
       }
     } catch {
-      setUser(null);
-      try {
-        localStorage.removeItem('gc_user');
-      } catch {
-        // ignore
-      }
+      clearUser();
     } finally {
       setLoading(false);
     }
-  };
+  }, [clearUser]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const expiresAt = getTokenExpiresAt();
+    if (!expiresAt) {
+      clearUser();
+      return;
+    }
+
+    const timeoutMs = Math.max(0, expiresAt - Date.now());
+    const timeout = window.setTimeout(() => {
+      clearUser();
+      window.location.hash = '#/login';
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [clearUser, user]);
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      clearUser();
+      window.location.hash = '#/login';
+    };
+
+    window.addEventListener('godwitcare:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('godwitcare:auth-expired', handleAuthExpired);
+  }, [clearUser]);
 
   return (
     <AuthCtx.Provider value={{ user, loading, refresh: load }}>
