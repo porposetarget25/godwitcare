@@ -41,7 +41,7 @@ public class AdminController {
         this.encoder = encoder;
     }
 
-    public record TravelerReq(String fullName, LocalDate dateOfBirth) {}
+    public record TravelerReq(Long id, String fullName, LocalDate dateOfBirth) {}
 
     public record AdminUserReq(
             String firstName,
@@ -279,6 +279,65 @@ public class AdminController {
         return ResponseEntity.ok(toUserRow(entity));
     }
 
+    private void syncTravelers(Registration registration, List<TravelerReq> requestedTravelers) {
+        List<TravelerReq> normalizedTravelers = normalizeTravelers(requestedTravelers);
+        List<Traveler> existingTravelers = registration.getTravelers();
+        List<Traveler> remainingReusableTravelers = existingTravelers.stream()
+                .sorted(Comparator.comparing(Traveler::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        Map<Long, Traveler> reusableTravelersById = new HashMap<>();
+        for (Traveler traveler : remainingReusableTravelers) {
+            if (traveler.getId() != null) {
+                reusableTravelersById.put(traveler.getId(), traveler);
+            }
+        }
+
+        Set<Long> usedTravelerIds = new HashSet<>();
+        for (TravelerReq requestedTraveler : normalizedTravelers) {
+            Traveler traveler = null;
+            if (requestedTraveler.id() != null && usedTravelerIds.add(requestedTraveler.id())) {
+                traveler = reusableTravelersById.get(requestedTraveler.id());
+            }
+            if (traveler == null && !remainingReusableTravelers.isEmpty()) {
+                traveler = remainingReusableTravelers.get(0);
+            }
+            if (traveler == null) {
+                traveler = new Traveler();
+                existingTravelers.add(traveler);
+            } else {
+                remainingReusableTravelers.remove(traveler);
+            }
+            applyTraveler(traveler, requestedTraveler, registration);
+        }
+
+        for (Traveler traveler : remainingReusableTravelers) {
+            Long travelerId = traveler.getId();
+            boolean hasConsultations = travelerId != null && consultations.existsByTravelerId(travelerId);
+            if (!hasConsultations) {
+                existingTravelers.remove(traveler);
+                traveler.setRegistration(null);
+            }
+        }
+    }
+
+    private List<TravelerReq> normalizeTravelers(List<TravelerReq> requestedTravelers) {
+        if (requestedTravelers == null) return List.of();
+        List<TravelerReq> normalizedTravelers = new ArrayList<>();
+        for (TravelerReq traveler : requestedTravelers) {
+            if (traveler == null || traveler.fullName() == null || traveler.fullName().isBlank() || traveler.dateOfBirth() == null) {
+                continue;
+            }
+            normalizedTravelers.add(new TravelerReq(traveler.id(), traveler.fullName().trim(), traveler.dateOfBirth()));
+        }
+        return normalizedTravelers;
+    }
+
+    private void applyTraveler(Traveler traveler, TravelerReq requestedTraveler, Registration registration) {
+        traveler.setRegistration(registration);
+        traveler.setFullName(requestedTraveler.fullName());
+        traveler.setDateOfBirth(requestedTraveler.dateOfBirth());
+    }
+
     private void syncLatestRegistrationAndPayment(User entity, AdminUserReq req) {
         if (entity.getEmail() != null && !entity.getEmail().isBlank()) {
             Registration registration = registrations.findTopByEmailAddressOrderByIdDesc(entity.getEmail())
@@ -302,21 +361,7 @@ public class AdminController {
             registration.setTravelEndDate(req.travelEndDate());
             registration.setPackageDays(req.packageDays());
 
-            List<Traveler> travelerEntities = new ArrayList<>();
-            if (req.travelers() != null) {
-                for (TravelerReq t : req.travelers()) {
-                    if (t == null || t.fullName() == null || t.fullName().isBlank() || t.dateOfBirth() == null) {
-                        continue;
-                    }
-                    Traveler traveler = new Traveler();
-                    traveler.setRegistration(registration);
-                    traveler.setFullName(t.fullName().trim());
-                    traveler.setDateOfBirth(t.dateOfBirth());
-                    travelerEntities.add(traveler);
-                }
-            }
-            registration.getTravelers().clear();
-            registration.getTravelers().addAll(travelerEntities);
+            syncTravelers(registration, req.travelers());
             registrations.save(registration);
         }
 

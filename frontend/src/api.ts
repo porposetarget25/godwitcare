@@ -59,6 +59,7 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
 }
 // ---------- Types ----------
 export type Traveler = {
+  id?: number
   fullName: string
   dateOfBirth: string
 }
@@ -248,6 +249,7 @@ function toBackend(r: Registration | any) {
 
   // Accept either draft['Travelers'] or draft.travelers
   const raw = (r['Travelers'] ?? r.travelers ?? []) as Array<{
+    id?: number
     fullName?: string
     dateOfBirth?: string
   }>
@@ -256,6 +258,7 @@ function toBackend(r: Registration | any) {
     ? raw
         .filter(t => t && t.fullName && t.dateOfBirth)
         .map(t => ({
+          id: t.id,
           fullName: String(t.fullName).trim(),
           dateOfBirth: String(t.dateOfBirth), // yyyy-MM-dd
         }))
