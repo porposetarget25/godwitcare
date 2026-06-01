@@ -80,6 +80,39 @@ public class AdminController {
         return m;
     }
 
+    private Map<String, Object> toTravelerDto(Traveler traveler) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", traveler.getId());
+        m.put("fullName", traveler.getFullName());
+        m.put("dateOfBirth", traveler.getDateOfBirth());
+        return m;
+    }
+
+    private Map<String, Object> toRegistrationDto(Registration registration) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", registration.getId());
+        m.put("firstName", registration.getFirstName());
+        m.put("middleName", registration.getMiddleName());
+        m.put("lastName", registration.getLastName());
+        m.put("dateOfBirth", registration.getDateOfBirth());
+        m.put("gender", registration.getGender());
+        m.put("primaryWhatsAppNumber", registration.getPrimaryWhatsAppNumber());
+        m.put("carerSecondaryWhatsAppNumber", registration.getCarerSecondaryWhatsAppNumber());
+        m.put("emailAddress", registration.getEmailAddress());
+        m.put("longTermMedication", registration.getLongTermMedication());
+        m.put("healthCondition", registration.getHealthCondition());
+        m.put("allergies", registration.getAllergies());
+        m.put("fitToFlyCertificate", registration.getFitToFlyCertificate());
+        m.put("travellingFrom", registration.getTravellingFrom());
+        m.put("travellingTo", registration.getTravellingTo());
+        m.put("travelStartDate", registration.getTravelStartDate());
+        m.put("travelEndDate", registration.getTravelEndDate());
+        m.put("packageDays", registration.getPackageDays());
+        m.put("documentFileName", registration.getDocumentFileName());
+        m.put("travelers", registration.getTravelers().stream().map(this::toTravelerDto).toList());
+        return m;
+    }
+
     @GetMapping("/dashboard")
     public ResponseEntity<?> dashboard() {
         List<Map<String, Object>> userList = users.findByRoleOrderByIdDesc(Role.USER).stream().map(this::toUserRow).toList();
@@ -130,6 +163,7 @@ public class AdminController {
     }
 
     @GetMapping("/users/{id}/details")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> userDetails(@PathVariable Long id) {
         User u = users.findById(id).orElse(null);
         if (u == null || u.getRole() != Role.USER) return ResponseEntity.notFound().build();
@@ -184,7 +218,7 @@ public class AdminController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("user", toUserRow(u));
-        body.put("registrationDetails", regList);
+        body.put("registrationDetails", regList.stream().map(this::toRegistrationDto).toList());
         body.put("consultationHistory", cDto);
         body.put("prescriptions", pDto);
         body.put("referralLetters", rDto);
