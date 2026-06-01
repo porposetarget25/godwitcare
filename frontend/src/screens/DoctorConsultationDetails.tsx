@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { doctorGetConsultation } from '../api'
+import { authFetch, doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
 import { doctorLatestPrescriptionMeta } from '../api'
 import { resolveApiUrl } from '../api'
@@ -84,9 +84,9 @@ export default function DoctorConsultationDetails() {
     let ignore = false
     ;(async () => {
       try {
-        const r = await fetch(
+        const r = await authFetch(
           `${API_BASE_URL}/doctor/consultations/${cid}/referrals/latest`,
-          { credentials: 'include' }
+          {}
         )
 
         if (ignore) return
@@ -179,11 +179,10 @@ export default function DoctorConsultationDetails() {
         }
       })
 
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/save-questionnaire`, {
+      const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${data.id}/save-questionnaire`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
           answers: changedAnswers,
           detailsByQuestion: changedDetails,
         }),
@@ -210,11 +209,10 @@ export default function DoctorConsultationDetails() {
     setConsultationSaveErr(null)
     setSavingConsultation(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/complete`, {
+      const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${data.id}/complete`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
           history: history.trim(),
           diagnosis: diagnosis.trim(),
           recommendations: recommendations.trim(),
@@ -247,13 +245,12 @@ export default function DoctorConsultationDetails() {
     setCreatingRx(true);
     try {
       // 1. Create prescription on backend
-      const res = await fetch(
+      const res = await authFetch(
         `${API_BASE_URL}/doctor/consultations/${data.id}/prescriptions`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
             history: history.trim(),
             diagnosis: diagnosis.trim(),
             medicines: meds,
@@ -271,8 +268,7 @@ export default function DoctorConsultationDetails() {
       setRxId(typeof j.id === 'number' ? j.id : null);
 
       // 2. Download PDF
-      const pdfRes = await fetch(`${API_BASE_URL}/doctor/prescriptions/${j.id}/pdf`, {
-        credentials: 'include',
+      const pdfRes = await authFetch(`${API_BASE_URL}/doctor/prescriptions/${j.id}/pdf`, {
       });
       if (!pdfRes.ok) throw new Error('Failed to download prescription PDF');
 

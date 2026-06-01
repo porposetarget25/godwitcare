@@ -41,7 +41,7 @@ public class AdminController {
         this.encoder = encoder;
     }
 
-    public record TravelerReq(String fullName, LocalDate dateOfBirth) {}
+    public record TravelerReq(Long id, String fullName, LocalDate dateOfBirth) {}
 
     public record AdminUserReq(
             String firstName,
@@ -77,6 +77,39 @@ public class AdminController {
         m.put("email", u.getEmail());
         m.put("username", u.getUsername());
         m.put("role", u.getRole().name());
+        return m;
+    }
+
+    private Map<String, Object> toTravelerDto(Traveler traveler) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", traveler.getId());
+        m.put("fullName", traveler.getFullName());
+        m.put("dateOfBirth", traveler.getDateOfBirth());
+        return m;
+    }
+
+    private Map<String, Object> toRegistrationDto(Registration registration) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", registration.getId());
+        m.put("firstName", registration.getFirstName());
+        m.put("middleName", registration.getMiddleName());
+        m.put("lastName", registration.getLastName());
+        m.put("dateOfBirth", registration.getDateOfBirth());
+        m.put("gender", registration.getGender());
+        m.put("primaryWhatsAppNumber", registration.getPrimaryWhatsAppNumber());
+        m.put("carerSecondaryWhatsAppNumber", registration.getCarerSecondaryWhatsAppNumber());
+        m.put("emailAddress", registration.getEmailAddress());
+        m.put("longTermMedication", registration.getLongTermMedication());
+        m.put("healthCondition", registration.getHealthCondition());
+        m.put("allergies", registration.getAllergies());
+        m.put("fitToFlyCertificate", registration.getFitToFlyCertificate());
+        m.put("travellingFrom", registration.getTravellingFrom());
+        m.put("travellingTo", registration.getTravellingTo());
+        m.put("travelStartDate", registration.getTravelStartDate());
+        m.put("travelEndDate", registration.getTravelEndDate());
+        m.put("packageDays", registration.getPackageDays());
+        m.put("documentFileName", registration.getDocumentFileName());
+        m.put("travelers", registration.getTravelers().stream().map(this::toTravelerDto).toList());
         return m;
     }
 
@@ -130,6 +163,7 @@ public class AdminController {
     }
 
     @GetMapping("/users/{id}/details")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> userDetails(@PathVariable Long id) {
         User u = users.findById(id).orElse(null);
         if (u == null || u.getRole() != Role.USER) return ResponseEntity.notFound().build();
@@ -184,7 +218,7 @@ public class AdminController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("user", toUserRow(u));
-        body.put("registrationDetails", regList);
+        body.put("registrationDetails", regList.stream().map(this::toRegistrationDto).toList());
         body.put("consultationHistory", cDto);
         body.put("prescriptions", pDto);
         body.put("referralLetters", rDto);
@@ -245,6 +279,65 @@ public class AdminController {
         return ResponseEntity.ok(toUserRow(entity));
     }
 
+    private void syncTravelers(Registration registration, List<TravelerReq> requestedTravelers) {
+        List<TravelerReq> normalizedTravelers = normalizeTravelers(requestedTravelers);
+        List<Traveler> existingTravelers = registration.getTravelers();
+        List<Traveler> remainingReusableTravelers = existingTravelers.stream()
+                .sorted(Comparator.comparing(Traveler::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        Map<Long, Traveler> reusableTravelersById = new HashMap<>();
+        for (Traveler traveler : remainingReusableTravelers) {
+            if (traveler.getId() != null) {
+                reusableTravelersById.put(traveler.getId(), traveler);
+            }
+        }
+
+        Set<Long> usedTravelerIds = new HashSet<>();
+        for (TravelerReq requestedTraveler : normalizedTravelers) {
+            Traveler traveler = null;
+            if (requestedTraveler.id() != null && usedTravelerIds.add(requestedTraveler.id())) {
+                traveler = reusableTravelersById.get(requestedTraveler.id());
+            }
+            if (traveler == null && !remainingReusableTravelers.isEmpty()) {
+                traveler = remainingReusableTravelers.get(0);
+            }
+            if (traveler == null) {
+                traveler = new Traveler();
+                existingTravelers.add(traveler);
+            } else {
+                remainingReusableTravelers.remove(traveler);
+            }
+            applyTraveler(traveler, requestedTraveler, registration);
+        }
+
+        for (Traveler traveler : remainingReusableTravelers) {
+            Long travelerId = traveler.getId();
+            boolean hasConsultations = travelerId != null && consultations.existsByTravelerId(travelerId);
+            if (!hasConsultations) {
+                existingTravelers.remove(traveler);
+                traveler.setRegistration(null);
+            }
+        }
+    }
+
+    private List<TravelerReq> normalizeTravelers(List<TravelerReq> requestedTravelers) {
+        if (requestedTravelers == null) return List.of();
+        List<TravelerReq> normalizedTravelers = new ArrayList<>();
+        for (TravelerReq traveler : requestedTravelers) {
+            if (traveler == null || traveler.fullName() == null || traveler.fullName().isBlank() || traveler.dateOfBirth() == null) {
+                continue;
+            }
+            normalizedTravelers.add(new TravelerReq(traveler.id(), traveler.fullName().trim(), traveler.dateOfBirth()));
+        }
+        return normalizedTravelers;
+    }
+
+    private void applyTraveler(Traveler traveler, TravelerReq requestedTraveler, Registration registration) {
+        traveler.setRegistration(registration);
+        traveler.setFullName(requestedTraveler.fullName());
+        traveler.setDateOfBirth(requestedTraveler.dateOfBirth());
+    }
+
     private void syncLatestRegistrationAndPayment(User entity, AdminUserReq req) {
         if (entity.getEmail() != null && !entity.getEmail().isBlank()) {
             Registration registration = registrations.findTopByEmailAddressOrderByIdDesc(entity.getEmail())
@@ -268,21 +361,7 @@ public class AdminController {
             registration.setTravelEndDate(req.travelEndDate());
             registration.setPackageDays(req.packageDays());
 
-            List<Traveler> travelerEntities = new ArrayList<>();
-            if (req.travelers() != null) {
-                for (TravelerReq t : req.travelers()) {
-                    if (t == null || t.fullName() == null || t.fullName().isBlank() || t.dateOfBirth() == null) {
-                        continue;
-                    }
-                    Traveler traveler = new Traveler();
-                    traveler.setRegistration(registration);
-                    traveler.setFullName(t.fullName().trim());
-                    traveler.setDateOfBirth(t.dateOfBirth());
-                    travelerEntities.add(traveler);
-                }
-            }
-            registration.getTravelers().clear();
-            registration.getTravelers().addAll(travelerEntities);
+            syncTravelers(registration, req.travelers());
             registrations.save(registration);
         }
 

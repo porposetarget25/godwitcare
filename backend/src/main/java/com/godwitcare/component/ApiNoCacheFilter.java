@@ -15,8 +15,7 @@ public class ApiNoCacheFilter extends OncePerRequestFilter {
             res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
             res.setHeader("Pragma", "no-cache");
             res.setDateHeader("Expires", 0);
-            // If you use cookies for auth, this helps intermediaries:
-            res.setHeader("Vary", "Cookie, Authorization");
+            res.setHeader("Vary", "Authorization");
         }
         chain.doFilter(req, res);
     }

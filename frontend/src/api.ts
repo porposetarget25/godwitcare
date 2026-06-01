@@ -1,17 +1,65 @@
 // ========================= api.ts =========================
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\]\\^])/g, '\\$1') + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
+const AUTH_TOKEN_KEY = 'gc_auth_token'
+const AUTH_EXPIRES_AT_KEY = 'gc_auth_expires_at'
+
+export type AuthLoginResponse = {
+  user: UserDto
+  token: string
+  expiresInSeconds: number
 }
 
-function csrfHeaders(): Record<string, string> {
-  // Spring (CookieCsrfTokenRepository) uses XSRF-TOKEN cookie + X-XSRF-TOKEN header
-  const token = getCookie('XSRF-TOKEN') || getCookie('X-CSRF-TOKEN');
-  return token ? { 'X-XSRF-TOKEN': token } : {};
+export function getStoredToken(): string | null {
+  if (typeof localStorage === 'undefined') return null
+  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  const expiresAt = Number(localStorage.getItem(AUTH_EXPIRES_AT_KEY) || '0')
+  if (!token || !expiresAt || Date.now() >= expiresAt) {
+    clearAuthToken()
+    return null
+  }
+  return token
+}
+
+export function getTokenExpiresAt(): number | null {
+  if (typeof localStorage === 'undefined') return null
+  const expiresAt = Number(localStorage.getItem(AUTH_EXPIRES_AT_KEY) || '0')
+  return expiresAt > 0 ? expiresAt : null
+}
+
+export function storeAuthToken(token: string, expiresInSeconds: number) {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(AUTH_TOKEN_KEY, token)
+  localStorage.setItem(AUTH_EXPIRES_AT_KEY, String(Date.now() + expiresInSeconds * 1000))
+}
+
+export function clearAuthToken() {
+  if (typeof localStorage === 'undefined') return
+  localStorage.removeItem(AUTH_TOKEN_KEY)
+  localStorage.removeItem(AUTH_EXPIRES_AT_KEY)
+  localStorage.removeItem('gc_user')
+}
+
+function authHeaders(headers?: HeadersInit): Headers {
+  const merged = new Headers(headers)
+  const token = getStoredToken()
+  if (token) merged.set('Authorization', `Bearer ${token}`)
+  return merged
+}
+
+export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(input, {
+    ...init,
+    cache: init.cache ?? 'no-store',
+    headers: authHeaders(init.headers),
+  })
+  if (res.status === 401) {
+    clearAuthToken()
+    window.dispatchEvent(new Event('godwitcare:auth-expired'))
+  }
+  return res
 }
 // ---------- Types ----------
 export type Traveler = {
+  id?: number
   fullName: string
   dateOfBirth: string
 }
@@ -201,6 +249,7 @@ function toBackend(r: Registration | any) {
 
   // Accept either draft['Travelers'] or draft.travelers
   const raw = (r['Travelers'] ?? r.travelers ?? []) as Array<{
+    id?: number
     fullName?: string
     dateOfBirth?: string
   }>
@@ -209,6 +258,7 @@ function toBackend(r: Registration | any) {
     ? raw
         .filter(t => t && t.fullName && t.dateOfBirth)
         .map(t => ({
+          id: t.id,
           fullName: String(t.fullName).trim(),
           dateOfBirth: String(t.dateOfBirth), // yyyy-MM-dd
         }))
@@ -237,11 +287,10 @@ export const API_BASE_URL = API_BASE
 // ---------- Generic request helper (resilient to HTML error pages) ----------
 async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
-  const res = await fetch(url, {
-    credentials: 'include',
+  const res = await authFetch(url, {
+    ...init,
     cache: 'no-store',
     headers: { 'Cache-Control': 'no-cache', ...(init.headers || {}) },
-    ...init,
   })
 
   const contentType = res.headers.get('content-type') || ''
@@ -267,7 +316,7 @@ export async function saveRegistration(r: Registration) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(toBackend(r)),
-    // note: registration creation is public; session not required
+    // note: registration creation is public; JWT not required
   })
 }
 
@@ -291,9 +340,8 @@ export async function deleteDocument(registrationId: number, docId: number): Pro
 }
 
 export async function getLatestRegistrationByEmail(email: string): Promise<RegistrationApi | null> {
-  const res = await fetch(`${API_BASE}/registrations?email=${encodeURIComponent(email)}`, {
+  const res = await authFetch(`${API_BASE}/registrations?email=${encodeURIComponent(email)}`, {
     method: 'GET',
-    credentials: 'include',
     cache: 'no-store',
     headers: { 'Cache-Control': 'no-cache' },
   })
@@ -307,7 +355,6 @@ export async function getLatestRegistrationByEmail(email: string): Promise<Regis
 export async function updateRegistrationById(id: number, payload: RegistrationApi) {
   return request<RegistrationApi>(`/registrations/${id}`, {
     method: 'PUT',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
@@ -318,53 +365,52 @@ export async function downloadDocumentBlob(
   docId: number
 ): Promise<Blob> {
   const url = `${API_BASE}/registrations/${registrationId}/documents/${docId}`
-  const res = await fetch(url, { method: 'GET' })
+  const res = await authFetch(url, { method: 'GET' })
   if (!res.ok) throw new Error('Failed to download document')
   return res.blob()
 }
 
-// ---------- Auth (session-based) ----------
+// ---------- Auth (JWT-based) ----------
 // Backend:
 //   POST /api/auth/register   {firstName,lastName,email,password} -> 200 UserDto
-//   POST /api/auth/login      {email,password}  -> 200 UserDto + sets JSESSIONID
-//   POST /api/auth/logout     -> 200 + invalidates session
-//   GET  /api/auth/me         -> 200 UserDto if logged-in; 401 otherwise
+//   POST /api/auth/login      {email,password}  -> 200 { user, token, expiresInSeconds }
+//   POST /api/auth/logout     -> 200; client discards JWT
+//   GET  /api/auth/me         -> 200 UserDto when Authorization bearer token is valid; 401 otherwise
 
 export async function login(email: string, password: string): Promise<UserDto> {
-  const user = await request<UserDto>('/auth/login', {
+  const response = await request<AuthLoginResponse>('/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   })
-  try { localStorage.setItem('gc_user', JSON.stringify(user)) } catch {}
-  return user
+  storeAuthToken(response.token, response.expiresInSeconds)
+  try { localStorage.setItem('gc_user', JSON.stringify(response.user)) } catch {}
+  return response.user
 }
 
 export async function logout(): Promise<void> {
   try {
-    await fetch(`${API_BASE}/auth/logout`, {
+    await authFetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
-      credentials: 'include',
-      headers: {
-        ...csrfHeaders(),
+    headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
         Pragma: 'no-cache',
       },
-    });
+      });
   } catch {
     // network/other error -> ignore
   } finally {
     // client-side logout regardless of server result
-    try { localStorage.removeItem('gc_user'); } catch {}
+    clearAuthToken()
   }
 }
 
 export async function me(): Promise<UserDto | null> {
   // use fetch to inspect 401 without throwing
-  const res = await fetch(`${API_BASE}/auth/me`, {
+  if (!getStoredToken()) return null
+  const res = await authFetch(`${API_BASE}/auth/me`, {
     method: 'GET',
-    credentials: 'include',
     cache: 'no-store',
     headers: { 'Cache-Control': 'no-cache' }
   })
@@ -381,10 +427,9 @@ export async function registerAuthUser(
   password: string,
   username: string        // REQUIRED: primary WhatsApp number (with +CC)
 ): Promise<UserDto> {
-  const res = await fetch(`${API_BASE}/auth/register`, {
+  const res = await authFetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify({
       firstName,
       lastName,
@@ -401,18 +446,16 @@ export async function registerAuthUser(
 export async function sendOtpToWhatsApp(): Promise<{message: string}> {
   return request('/auth/otp/send', {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-  });
+      });
 }
 
 export async function verifyOtp(code: string): Promise<UserDto> {
   return request<UserDto>('/auth/otp/verify', {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
-  });
+      });
 }
 
 export async function checkAuthAvailability(email?: string, username?: string): Promise<AuthAvailability> {
@@ -420,9 +463,8 @@ export async function checkAuthAvailability(email?: string, username?: string): 
   if (email?.trim()) params.set('email', email.trim())
   if (username?.trim()) params.set('username', username.trim())
   const qs = params.toString()
-  const res = await fetch(`${API_BASE}/auth/availability${qs ? `?${qs}` : ''}`, {
+  const res = await authFetch(`${API_BASE}/auth/availability${qs ? `?${qs}` : ''}`, {
     method: 'GET',
-    credentials: 'include',
     cache: 'no-store',
   })
   if (!res.ok) throw new Error('Failed to validate registration fields')
@@ -435,15 +477,13 @@ export async function createConsultation(payload: ConsultationCreate) {
   return request('/consultations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
 }
 
 export async function myLatestConsultation() {
-  const res = await fetch(`${API_BASE}/consultations/mine/latest`, {
-    credentials: 'include',
-  })
+  const res = await authFetch(`${API_BASE}/consultations/mine/latest`, {
+      })
   if (res.status === 204) return null
   if (!res.ok) throw new Error('Failed to load')
   return res.json()
@@ -453,26 +493,23 @@ export async function myLatestConsultation() {
 export async function doctorListConsultations(): Promise<ConsultationSummary[]> {
   return request<ConsultationSummary[]>('/doctor/consultations', {
     method: 'GET',
-    credentials: 'include',
-  })
+      })
 }
 
 export async function doctorGetConsultation(id: number): Promise<ConsultationDetails> {
   return request<ConsultationDetails>(`/doctor/consultations/${id}`, {
     method: 'GET',
-    credentials: 'include',
-  })
+      })
 }
 
 // Optional: status/notes update for doctors
 export async function doctorUpdateConsultation(
   id: number,
-  body: Partial<{ status: ConsultationSummary['status']; notes: string }>
+    body: Partial<{ status: ConsultationSummary['status']; notes: string }>
 ) {
   return request(`/doctor/consultations/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(body),
   })
 }
@@ -490,16 +527,14 @@ export async function doctorCreatePrescription(
   return request(`/doctor/consultations/${consultationId}/prescriptions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
 }
 
 
 export async function doctorDownloadPrescriptionPdf(prescriptionId: number): Promise<Blob> {
-  const r = await fetch(`${API_BASE_URL}/doctor/prescriptions/${prescriptionId}/pdf`, {
-    credentials: 'include'
-  });
+  const r = await authFetch(`${API_BASE_URL}/doctor/prescriptions/${prescriptionId}/pdf`, {
+      });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.blob();
 }
@@ -508,12 +543,11 @@ export async function doctorDownloadPrescriptionPdf(prescriptionId: number): Pro
 export async function doctorLatestPrescriptionMeta(consultationId: number) {
   return request(`/doctor/consultations/${consultationId}/prescriptions/latest`, {
     method: 'GET',
-    credentials: 'include',
-  })
+      })
 }
 
 export async function patientDownloadLatestPrescription(): Promise<Blob | null> {
-  const r = await fetch(`${API_BASE_URL}/prescriptions/latest/pdf`, { credentials: 'include' });
+  const r = await authFetch(`${API_BASE_URL}/prescriptions/latest/pdf`, {});
   if (r.status === 204) return null;
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.blob();
@@ -523,8 +557,7 @@ export async function patientDownloadLatestPrescription(): Promise<Blob | null> 
 export async function patientLatestPrescriptionMeta() {
   return request('/prescriptions/latest', {
     method: 'GET',
-    credentials: 'include',
-  })
+      })
 }
 
 // utils/url.ts
@@ -551,19 +584,19 @@ export function resolveApiUrl(base: string, path: string) {
 // api.ts
 
 export async function getMe(): Promise<UserDto | null> {
-  const res = await fetch(`${API_BASE}/auth/me`, {
+  if (!getStoredToken()) return null
+  const res = await authFetch(`${API_BASE}/auth/me`, {
     method: 'GET',
-    credentials: 'include',
     cache: 'no-store',
     headers: { 'Cache-Control': 'no-cache' },
-  });
+      });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error('Failed to fetch current user');
   return res.json() as Promise<UserDto>;
 }
 
 export async function getMyProfile(): Promise<UserDto> {
-  return request<UserDto>('/users/me', { method: 'GET', credentials: 'include' });
+  return request<UserDto>('/users/me', { method: 'GET',  });
 }
 
 export async function updateMyProfile(payload: {
@@ -574,10 +607,9 @@ export async function updateMyProfile(payload: {
 }) {
   return request('/users/me', {
     method: 'PUT',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+      });
 }
 
 export async function uploadMyPhoto(file: File) {
@@ -585,17 +617,16 @@ export async function uploadMyPhoto(file: File) {
   fd.append('file', file);
   return request('/users/me/photo', {
     method: 'POST',
-    credentials: 'include',
     body: fd,
-  });
+      });
 }
 
 export async function deleteMyPhoto() {
-  return request('/users/me/photo', { method: 'DELETE', credentials: 'include' });
+  return request('/users/me/photo', { method: 'DELETE',  });
 }
 
 export async function deleteMyAccount() {
-  return request('/users/me', { method: 'DELETE', credentials: 'include' });
+  return request('/users/me', { method: 'DELETE',  });
 }
 
 export async function forgotPassword(identifier: string): Promise<{message: string}> {
@@ -603,7 +634,7 @@ export async function forgotPassword(identifier: string): Promise<{message: stri
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identifier }),
-  });
+      });
 }
 
 export async function verifyForgotPasswordOtp(
@@ -614,7 +645,7 @@ export async function verifyForgotPasswordOtp(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identifier, code }),
-  });
+      });
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<{message: string}> {
@@ -622,66 +653,61 @@ export async function resetPassword(token: string, newPassword: string): Promise
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, newPassword }),
-  });
+      });
 }
 
 export async function adminDashboard(): Promise<{ users: AdminListItem[]; doctors: AdminListItem[] }> {
-  return request('/admin/dashboard', { method: 'GET', credentials: 'include' });
+  return request('/admin/dashboard', { method: 'GET',  });
 }
 
 export async function adminGetUserDetails(id: number): Promise<any> {
-  return request(`/admin/users/${id}/details`, { method: 'GET', credentials: 'include' });
+  return request(`/admin/users/${id}/details`, { method: 'GET',  });
 }
 
 export async function adminCreateUser(payload: AdminUserInput): Promise<AdminListItem> {
   return request('/admin/users', {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+      });
 }
 
 export async function adminUpdateUser(id: number, payload: AdminUserInput): Promise<AdminListItem> {
   return request(`/admin/users/${id}`, {
     method: 'PUT',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+      });
 }
 
 export async function adminDeleteUser(id: number): Promise<void> {
-  await request(`/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
+  await request(`/admin/users/${id}`, { method: 'DELETE',  });
 }
 
 export async function adminCreateDoctor(payload: AdminUserInput): Promise<AdminListItem> {
   return request('/admin/doctors', {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+      });
 }
 
 export async function adminUpdateDoctor(id: number, payload: AdminUserInput): Promise<AdminListItem> {
   return request(`/admin/doctors/${id}`, {
     method: 'PUT',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+      });
 }
 
 export async function adminDeleteDoctor(id: number): Promise<void> {
-  await request(`/admin/doctors/${id}`, { method: 'DELETE', credentials: 'include' });
+  await request(`/admin/doctors/${id}`, { method: 'DELETE',  });
 }
 
 export async function createPayment(payload: CreatePaymentPayload) {
   return request('/payments', {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
+      });
 }

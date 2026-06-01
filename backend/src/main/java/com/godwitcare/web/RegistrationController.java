@@ -1,14 +1,17 @@
 package com.godwitcare.web;
 
 import com.godwitcare.entity.Registration;
+import com.godwitcare.entity.Traveler;
 import com.godwitcare.entity.RegistrationDocument;
 import com.godwitcare.repo.RegistrationDocumentRepository;
 import com.godwitcare.repo.RegistrationRepository;
+import com.godwitcare.repo.ConsultationRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.UserRepository;
 
@@ -22,14 +25,17 @@ public class RegistrationController {
     private final RegistrationRepository repo;
     private final RegistrationDocumentRepository docs;
     private final UserRepository users;
+    private final ConsultationRepository consultations;
 
 
     public RegistrationController(RegistrationRepository repo,
                                   RegistrationDocumentRepository docs,
-                                  UserRepository users) {
+                                  UserRepository users,
+                                  ConsultationRepository consultations) {
         this.repo = repo;
         this.docs = docs;
         this.users = users;
+        this.consultations = consultations;
     }
 
     /* ---------------- Registrations ---------------- */
@@ -53,23 +59,101 @@ public class RegistrationController {
     }
 
     @PutMapping("/registrations/{id}")
+    @Transactional
     public ResponseEntity<?> update(
             @PathVariable("id") Long id, @Valid @RequestBody Registration r) {
 
         return repo.findById(id)
                 .map(existing -> {
-                    r.setId(id);
+                    List<Traveler> normalizedTravelers = normalizeTravelers(r.getTravelers());
+                    if (normalizedTravelers.size() > 6) return ResponseEntity.badRequest().build();
 
-                    if (r.getTravelers() == null) r.setTravelers(new java.util.ArrayList<>());
-                    r.getTravelers().removeIf(t ->
-                            t.getFullName() == null || t.getFullName().isBlank() || t.getDateOfBirth() == null);
-                    if (r.getTravelers().size() > 6) return ResponseEntity.badRequest().build();
+                    copyRegistrationDetails(existing, r);
+                    syncTravelers(existing, normalizedTravelers);
 
-                    r.getTravelers().forEach(t -> t.setRegistration(r));
-
-                    return ResponseEntity.ok(repo.save(r));
+                    return ResponseEntity.ok(repo.save(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private List<Traveler> normalizeTravelers(List<Traveler> requestedTravelers) {
+        if (requestedTravelers == null) return List.of();
+        List<Traveler> normalizedTravelers = new ArrayList<>();
+        for (Traveler traveler : requestedTravelers) {
+            if (traveler == null || traveler.getFullName() == null || traveler.getFullName().isBlank() || traveler.getDateOfBirth() == null) {
+                continue;
+            }
+            traveler.setFullName(traveler.getFullName().trim());
+            normalizedTravelers.add(traveler);
+        }
+        return normalizedTravelers;
+    }
+
+    private void copyRegistrationDetails(Registration target, Registration source) {
+        target.setFirstName(source.getFirstName());
+        target.setMiddleName(source.getMiddleName());
+        target.setLastName(source.getLastName());
+        target.setDateOfBirth(source.getDateOfBirth());
+        target.setGender(source.getGender());
+        target.setPrimaryWhatsAppNumber(source.getPrimaryWhatsAppNumber());
+        target.setCarerSecondaryWhatsAppNumber(source.getCarerSecondaryWhatsAppNumber());
+        target.setEmailAddress(source.getEmailAddress());
+        target.setLongTermMedication(source.getLongTermMedication());
+        target.setHealthCondition(source.getHealthCondition());
+        target.setAllergies(source.getAllergies());
+        target.setFitToFlyCertificate(source.getFitToFlyCertificate());
+        target.setTravellingFrom(source.getTravellingFrom());
+        target.setTravellingTo(source.getTravellingTo());
+        target.setTravelStartDate(source.getTravelStartDate());
+        target.setTravelEndDate(source.getTravelEndDate());
+        target.setPackageDays(source.getPackageDays());
+        target.setDocumentFileName(source.getDocumentFileName());
+    }
+
+    private void syncTravelers(Registration registration, List<Traveler> requestedTravelers) {
+        List<Traveler> existingTravelers = registration.getTravelers();
+        List<Traveler> remainingReusableTravelers = existingTravelers.stream()
+                .sorted(Comparator.comparing(Traveler::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        Map<Long, Traveler> reusableTravelersById = new HashMap<>();
+        for (Traveler traveler : remainingReusableTravelers) {
+            if (traveler.getId() != null) {
+                reusableTravelersById.put(traveler.getId(), traveler);
+            }
+        }
+
+        Set<Long> usedTravelerIds = new HashSet<>();
+        for (Traveler requestedTraveler : requestedTravelers) {
+            Traveler traveler = null;
+            if (requestedTraveler.getId() != null && usedTravelerIds.add(requestedTraveler.getId())) {
+                traveler = reusableTravelersById.get(requestedTraveler.getId());
+            }
+            if (traveler == null && !remainingReusableTravelers.isEmpty()) {
+                traveler = remainingReusableTravelers.get(0);
+            }
+            if (traveler == null) {
+                traveler = new Traveler();
+                existingTravelers.add(traveler);
+            } else {
+                remainingReusableTravelers.remove(traveler);
+            }
+            applyTraveler(traveler, requestedTraveler, registration);
+        }
+
+        for (Traveler traveler : remainingReusableTravelers) {
+            Long travelerId = traveler.getId();
+            boolean hasConsultations = travelerId != null && consultations.existsByTravelerId(travelerId);
+            if (!hasConsultations) {
+                existingTravelers.remove(traveler);
+                traveler.setRegistration(null);
+            }
+        }
+    }
+
+    private void applyTraveler(Traveler traveler, Traveler requestedTraveler, Registration registration) {
+        traveler.setRegistration(registration);
+        traveler.setFullName(requestedTraveler.getFullName());
+        traveler.setDateOfBirth(requestedTraveler.getDateOfBirth());
     }
 
 

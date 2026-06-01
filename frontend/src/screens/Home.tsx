@@ -1,7 +1,7 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { createPayment, me, type UserDto } from '../api'
+import { authFetch, createPayment, me, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -87,9 +87,9 @@ export default function Home() {
           if (!u?.email || u?.roles?.includes?.('DOCTOR')) return
 
           setLoadingReg(true)
-          const res = await fetch(
+          const res = await authFetch(
             `${API_BASE_URL}/registrations?email=${encodeURIComponent(u.email)}`,
-            { credentials: 'include' }
+            {}
           )
 
           let latest: RegApi | null = null
@@ -110,9 +110,9 @@ export default function Home() {
 
           if (normalized?.id) {
             setLoadingDocs(true)
-            const dres = await fetch(
+            const dres = await authFetch(
               `${API_BASE_URL}/registrations/${normalized.id}/documents`,
-              { credentials: 'include' }
+              {}
             )
             if (dres.status === 200) {
               const arr = (await dres.json()) as DocInfo[]
@@ -249,7 +249,7 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery.toString()}`, { credentials: 'include' });
+        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery.toString()}`, {});
         if (ignore) return;
         if (!res.ok || res.status === 204) { setRxUrl(null); return; }
         const j = await res.json().catch(() => null);
@@ -269,9 +269,8 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery.toString()}`, {
-          credentials: 'include',
-        });
+        const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery.toString()}`, {
+      });
         if (ignore) return;
 
         // No referral yet
@@ -305,12 +304,12 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const tRes = await fetch(`${API_BASE_URL}/consultations/travelers`, { credentials: 'include' });
+        const tRes = await authFetch(`${API_BASE_URL}/consultations/travelers`, {});
         if (!ignore && tRes.ok) {
           const arr = await tRes.json().catch(() => []);
           setTravelerOptions(Array.isArray(arr) ? arr : []);
         }
-        const res = await fetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, { credentials: 'include' });
+        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, {});
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
       } catch {

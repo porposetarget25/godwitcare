@@ -19,7 +19,7 @@ import {
 import { COUNTRY_NAMES } from '../lib/countries';
 
 type Mode = 'addUser' | 'addDoctor' | 'editUser' | 'editDoctor' | null;
-type TravelerForm = { fullName: string; dateOfBirth: string };
+type TravelerForm = { id?: number; fullName: string; dateOfBirth: string };
 type UserSearchCriterion = 'all' | 'firstName' | 'lastName' | 'email' | 'whatsApp';
 
 const EMPTY_FORM: AdminUserInput = {
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
       if (userSearchCriterion === 'lastName') return (u.lastName || '').toLowerCase().includes(query);
       if (userSearchCriterion === 'email') return (u.email || '').toLowerCase().includes(query);
       return (u.username || '').toLowerCase().includes(query);
-    });
+      });
   }, [users, userSearchCriterion, userSearchQuery]);
 
   async function load() {
@@ -145,6 +145,7 @@ export default function AdminDashboard() {
     const latestPayment = d?.paymentHistory?.[0] || {};
     const nextTravelers: TravelerForm[] = Array.isArray(latestReg?.travelers)
       ? latestReg.travelers.map((t: any) => ({
+          id: t?.id,
           fullName: t?.fullName || '',
           dateOfBirth: toDateInput(t?.dateOfBirth),
         }))
@@ -179,7 +180,7 @@ export default function AdminDashboard() {
       paymentCurrency: latestPayment?.currency || '',
       cardExpiry: latestPayment?.cardExpiry || '',
       password: '',
-    });
+      });
 
     const regId = Number(latestReg?.id);
     if (Number.isFinite(regId) && regId > 0) {

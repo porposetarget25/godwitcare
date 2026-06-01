@@ -1,7 +1,7 @@
 // src/screens/ConsultationTracker.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { API_BASE_URL, resolveApiUrl, getMe } from '../api'
+import { authFetch, API_BASE_URL, resolveApiUrl, getMe } from '../api'
 
 type ContactChoice = 'SAME' | 'DIFFERENT'
 
@@ -293,10 +293,9 @@ export default function ConsultationTracker() {
         const qp = new URLSearchParams()
         if (travelerId) qp.set('travelerId', travelerId)
         if (patientId) qp.set('patientId', patientId)
-        const res = await fetch(`${API_BASE_URL}/consultations/mine/latest?${qp.toString()}`, {
-          credentials: 'include',
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' },
+        const res = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${qp.toString()}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
         })
         if (!alive) return
 
@@ -381,10 +380,9 @@ export default function ConsultationTracker() {
         const qp = new URLSearchParams()
         if (travelerId) qp.set('travelerId', travelerId)
         if (patientId) qp.set('patientId', patientId)
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest?${qp.toString()}`, {
-          credentials: 'include',
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' },
+        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${qp.toString()}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
         })
         if (ignore) return
         if (res.status === 204 || !res.ok) {
