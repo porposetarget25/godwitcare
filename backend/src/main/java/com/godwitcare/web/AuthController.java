@@ -4,20 +4,13 @@ import com.godwitcare.entity.Role;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.UserRepository;
 import com.godwitcare.service.OtpService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import com.godwitcare.security.JwtService;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,17 +24,17 @@ public class AuthController {
 
     private final UserRepository users;
     private final PasswordEncoder encoder;
-    private final SecurityContextRepository securityContextRepository;
     private final OtpService otpService;
+    private final JwtService jwtService;
 
     public AuthController(UserRepository users,
                           PasswordEncoder encoder,
-                          SecurityContextRepository securityContextRepository,
-                          OtpService otpService) {
+                          OtpService otpService,
+                          JwtService jwtService) {
         this.users = users;
         this.encoder = encoder;
-        this.securityContextRepository = securityContextRepository;
         this.otpService = otpService;
+        this.jwtService = jwtService;
     }
 
     // ---------- DTOs ----------
@@ -75,6 +68,7 @@ public class AuthController {
                           String username,
                           List<String> roles,
                           boolean otpVerified) {}
+    public record AuthResponse(UserDto user, String token, long expiresInSeconds) {}
     public record AvailabilityDto(boolean emailRegistered, boolean whatsAppRegistered) {}
 
     private UserDto toDto(User u) {
@@ -97,17 +91,8 @@ public class AuthController {
         return users.findByUsername(identifier).or(() -> users.findByEmail(identifier));
     }
 
-    private Authentication buildAuth(User u) {
-        GrantedAuthority ga = new SimpleGrantedAuthority("ROLE_" + u.getRole().name());
-        return new UsernamePasswordAuthenticationToken(u.getUsername(), null, List.of(ga));
-    }
-
-    private void persistContext(Authentication auth, HttpServletRequest request, HttpServletResponse response) {
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(auth);
-        SecurityContextHolder.setContext(context);
-        securityContextRepository.saveContext(context, request, response);
-        request.getSession(true);
+    private AuthResponse authResponse(User u) {
+        return new AuthResponse(toDto(u), jwtService.generateToken(u), jwtService.getExpirationMs() / 1000L);
     }
 
     private Optional<User> currentUser(Authentication auth) {
@@ -196,9 +181,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginReq req,
-                                   HttpServletRequest request,
-                                   HttpServletResponse response) {
+    public ResponseEntity<?> login(@RequestBody LoginReq req) {
 
         // Determine identifier precedence: identifier -> username -> email
         String id = (req.identifier() != null && !req.identifier().isBlank())
@@ -221,16 +204,11 @@ public class AuthController {
             return ResponseEntity.status(401).body("Invalid credentials");
         }
 
-        // Build Authentication with authorities and persist to session
-        Authentication auth = buildAuth(u);
-        persistContext(auth, request, response);
-
-        return ResponseEntity.ok(toDto(u));
+        return ResponseEntity.ok(authResponse(u));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request) throws Exception {
-        request.logout();
+    public ResponseEntity<?> logout() {
         return ResponseEntity.ok().build();
     }
 

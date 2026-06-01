@@ -1,7 +1,7 @@
 // src/screens/PreConsultation.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { API_BASE_URL } from '../api'
+import { authFetch, API_BASE_URL } from '../api'
 
 type YesNo = 'Yes' | 'No'
 type Ans = YesNo | undefined
@@ -269,7 +269,7 @@ export default function PreConsultation() {
     ;(async () => {
       // 1) Try latest Registration (DOB lives here)
       try {
-        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
+        const r = await authFetch(`${API_BASE_URL}/registrations/mine/latest`, {})
         if (!ignore && r.ok) {
           const reg = await r.json().catch(() => null)
           if (reg) {
@@ -297,11 +297,11 @@ export default function PreConsultation() {
 
       // 2) Latest consultation details (address/location; fallback dob)
       try {
-        const r0 = await fetch(`${API_BASE_URL}/consultations/mine/latest`, { credentials: 'include' })
+        const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest`, {})
         if (!ignore && r0.ok) {
           const latest = await r0.json().catch(() => null)
           if (latest?.id) {
-            const r1 = await fetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, { credentials: 'include' })
+            const r1 = await authFetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, {})
             if (!ignore && r1.ok) {
               const j = await r1.json()
               if (!location && j?.currentLocation) setLocation(j.currentLocation)
@@ -315,7 +315,7 @@ export default function PreConsultation() {
 
       // 3) Fallback /auth/me
       try {
-        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
+        const r = await authFetch(`${API_BASE_URL}/auth/me`, {})
         if (!ignore && r.ok) {
           const me = await r.json()
           if (people.length === 0) {
@@ -348,7 +348,7 @@ export default function PreConsultation() {
     let ignore = false
     ;(async () => {
       try {
-        const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' })
+        const r = await authFetch(`${API_BASE_URL}/consultations/${cid}/mine`, {})
         if (!ignore && r.ok) {
           const j = await r.json()
           setLocation(j.currentLocation || '')
@@ -357,7 +357,7 @@ export default function PreConsultation() {
           setContactAddress(j.contactAddress || '')
           setDob(toYMD(j.dob || ''))
 
-          const r2 = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' })
+          const r2 = await authFetch(`${API_BASE_URL}/registrations/mine/latest`, {})
           if (!ignore && r2.ok) {
             const reg = await r2.json().catch(() => null)
             if (reg) {
@@ -458,11 +458,10 @@ export default function PreConsultation() {
         : `${API_BASE_URL}/consultations`
       const method = isEdit ? 'PUT' : 'POST'
 
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
@@ -487,7 +486,7 @@ export default function PreConsultation() {
   async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
     try {
       const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`
-      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+      const res = await authFetch(url, { headers: { 'Accept-Language': 'en' } })
       if (!res.ok) return null
       const j = await res.json()
       return j?.display_name || null

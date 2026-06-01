@@ -1,7 +1,7 @@
 // src/screens/Login.tsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { login } from '../api';   // session login
+import { login } from '../api';
 import { useAuth } from '../state/auth';
 
 export default function Login() {

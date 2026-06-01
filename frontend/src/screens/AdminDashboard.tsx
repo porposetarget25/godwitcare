@@ -76,7 +76,7 @@ export default function AdminDashboard() {
       if (userSearchCriterion === 'lastName') return (u.lastName || '').toLowerCase().includes(query);
       if (userSearchCriterion === 'email') return (u.email || '').toLowerCase().includes(query);
       return (u.username || '').toLowerCase().includes(query);
-    });
+      });
   }, [users, userSearchCriterion, userSearchQuery]);
 
   async function load() {
@@ -179,7 +179,7 @@ export default function AdminDashboard() {
       paymentCurrency: latestPayment?.currency || '',
       cardExpiry: latestPayment?.cardExpiry || '',
       password: '',
-    });
+      });
 
     const regId = Number(latestReg?.id);
     if (Number.isFinite(regId) && regId > 0) {

@@ -1,7 +1,7 @@
 // src/screens/CareHistory.tsx
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { API_BASE_URL, resolveApiUrl } from '../api';
+import { authFetch, API_BASE_URL, resolveApiUrl } from '../api';
 
 type Item = {
   consultationId: number;
@@ -46,7 +46,7 @@ export default function CareHistory() {
         const qp = new URLSearchParams();
         if (travelerId) qp.set('travelerId', travelerId);
         if (patientId) qp.set('patientId', patientId);
-        const r = await fetch(`${API_BASE_URL}/care-history/mine?${qp.toString()}`, { credentials: 'include' });
+        const r = await authFetch(`${API_BASE_URL}/care-history/mine?${qp.toString()}`, {});
         if (ignore) return;
         if (r.status === 204) {
           setData(null);
@@ -65,7 +65,7 @@ export default function CareHistory() {
         const qp2 = new URLSearchParams();
         if (travelerId) qp2.set('travelerId', travelerId);
         if (patientId) qp2.set('patientId', patientId);
-        const r2 = await fetch(`${API_BASE_URL}/prescriptions/latest?${qp2.toString()}`, { credentials: 'include' });
+        const r2 = await authFetch(`${API_BASE_URL}/prescriptions/latest?${qp2.toString()}`, {});
         if (!ignore) {
           if (!r2.ok || r2.status === 204) {
             setRxUrl(null);
@@ -191,7 +191,7 @@ export default function CareHistory() {
       {items.map((it) => {
         const dateStr = new Date(it.date).toLocaleDateString(undefined, {
           year: 'numeric', month: 'long', day: 'numeric'
-        });
+      });
         const meds = medsToList(it.medicines);
 
         return (

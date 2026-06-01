@@ -28,7 +28,7 @@ export default function ResetPassword() {
     setMsg(r.message || 'Password reset successful');
     sessionStorage.removeItem('passwordResetToken');
     // Password reset does not establish an authenticated session.
-    // Send the user to login so auth context/session gets initialized correctly.
+    // Send the user to login so auth context gets initialized correctly.
     setTimeout(() => navigate('/login'), 1000);
   }
 
