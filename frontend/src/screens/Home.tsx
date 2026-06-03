@@ -216,7 +216,9 @@ export default function Home() {
         setStripePublishableKey(cfg.publishableKey || '')
         setStripeEnvironment(cfg.environment || 'test')
         if (!cfg.frontendConfigured) {
-          setPaymentError('Stripe checkout is not configured. Please contact support.')
+          setPaymentError('Stripe publishable key is not configured for the active backend profile. Please set STRIPE_PUBLISHABLE_KEY and restart the backend.')
+        } else if (cfg.backendConfigured === false) {
+          setPaymentError('Stripe secret key is not configured for the active backend profile. Please set STRIPE_SECRET_KEY and restart the backend.')
         }
       } catch (err: any) {
         if (alive) setPaymentError(err?.message || 'Unable to load payment configuration.')
@@ -275,7 +277,7 @@ export default function Home() {
       return
     }
     if (!stripePublishableKey) {
-      setPaymentError('Stripe checkout is not configured. Please contact support.')
+      setPaymentError('Stripe publishable key is not configured for the active backend profile. Please set STRIPE_PUBLISHABLE_KEY and restart the backend.')
       return
     }
 

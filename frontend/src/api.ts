@@ -221,6 +221,7 @@ export type StripePaymentConfig = {
   publishableKey: string
   environment: string
   frontendConfigured: boolean
+  backendConfigured?: boolean
 }
 
 export type PaymentIntentResponse = {

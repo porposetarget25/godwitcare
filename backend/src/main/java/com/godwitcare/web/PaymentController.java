@@ -55,7 +55,8 @@ public class PaymentController {
         return ResponseEntity.ok(Map.of(
                 "publishableKey", stripeProperties.getPublishableKey() == null ? "" : stripeProperties.getPublishableKey(),
                 "environment", stripeProperties.getEnvironment(),
-                "frontendConfigured", stripeProperties.isFrontendConfigured()
+                "frontendConfigured", stripeProperties.isFrontendConfigured(),
+                "backendConfigured", stripeProperties.isBackendConfigured()
         ));
     }
 
