@@ -1,7 +1,7 @@
 // src/screens/Home.tsx
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { authFetch, createPayment, me, type UserDto } from '../api'
+import { authFetch, confirmPaymentIntent, createPaymentIntent, getStripePaymentConfig, me, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -33,6 +33,50 @@ type DocInfo = {
   createdAt?: string
 }
 
+
+type StripeElementsInstance = {
+  create: (type: 'payment') => { mount: (target: HTMLElement) => void; unmount: () => void; destroy?: () => void }
+}
+
+type StripeInstance = {
+  elements: (options: { clientSecret: string; appearance?: Record<string, unknown> }) => StripeElementsInstance
+  confirmPayment: (options: {
+    elements: StripeElementsInstance
+    confirmParams?: { return_url?: string }
+    redirect: 'if_required'
+  }) => Promise<{ error?: { message?: string }; paymentIntent?: { id: string; status: string } }>
+}
+
+declare global {
+  interface Window {
+    Stripe?: (publishableKey: string) => StripeInstance
+  }
+}
+
+let stripeSdkPromise: Promise<void> | null = null
+
+function loadStripeSdk() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Stripe is only available in the browser.'))
+  if (window.Stripe) return Promise.resolve()
+  if (!stripeSdkPromise) {
+    stripeSdkPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector<HTMLScriptElement>('script[src="https://js.stripe.com/v3/"]')
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true })
+        existing.addEventListener('error', () => reject(new Error('Unable to load Stripe.js.')), { once: true })
+        return
+      }
+      const script = document.createElement('script')
+      script.src = 'https://js.stripe.com/v3/'
+      script.async = true
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Unable to load Stripe.js.'))
+      document.head.appendChild(script)
+    })
+  }
+  return stripeSdkPromise
+}
+
 function normalizeReg(r: RegApi | null | undefined) {
   if (!r) return null
   const from = r['Travelling From'] ?? r.travellingFrom ?? ''
@@ -59,12 +103,17 @@ export default function Home() {
   const [selectedMethod, setSelectedMethod] = useState<'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET'>('CARD')
   const [amount, setAmount] = useState('49.99')
   const [currency, setCurrency] = useState('GBP')
-  const [cardNumber, setCardNumber] = useState('')
-  const [expiryDate, setExpiryDate] = useState('')
-  const [cvv, setCvv] = useState('')
+  const [stripePublishableKey, setStripePublishableKey] = useState('')
+  const [stripeEnvironment, setStripeEnvironment] = useState('test')
+  const [clientSecret, setClientSecret] = useState('')
+  const [stripePaymentIntentId, setStripePaymentIntentId] = useState('')
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
+  const stripeRef = useRef<StripeInstance | null>(null)
+  const elementsRef = useRef<StripeElementsInstance | null>(null)
+  const paymentElementRef = useRef<{ unmount: () => void; destroy?: () => void } | null>(null)
+  const paymentElementContainerRef = useRef<HTMLDivElement | null>(null)
 
 
   const isDoctor = !!user?.roles?.some?.(
@@ -140,12 +189,72 @@ export default function Home() {
   }, [location.hash, isTravelerUser])
 
 
+  const resetStripePaymentElement = () => {
+    paymentElementRef.current?.unmount()
+    paymentElementRef.current?.destroy?.()
+    paymentElementRef.current = null
+    elementsRef.current = null
+    setClientSecret('')
+    setStripePaymentIntentId('')
+  }
+
   const closePaymentsModal = () => {
+    resetStripePaymentElement()
     setShowPaymentsModal(false)
     if (location.hash.startsWith('#payments')) {
       navigate('/home', { replace: true })
     }
   }
+
+  useEffect(() => {
+    if (!showPaymentsModal) return
+    let alive = true
+    ;(async () => {
+      try {
+        const cfg = await getStripePaymentConfig()
+        if (!alive) return
+        setStripePublishableKey(cfg.publishableKey || '')
+        setStripeEnvironment(cfg.environment || 'test')
+        if (!cfg.frontendConfigured) {
+          setPaymentError('Stripe checkout is not configured. Please contact support.')
+        }
+      } catch (err: any) {
+        if (alive) setPaymentError(err?.message || 'Unable to load payment configuration.')
+      }
+    })()
+    return () => { alive = false }
+  }, [showPaymentsModal])
+
+  useEffect(() => {
+    if (!clientSecret || !stripePublishableKey || !paymentElementContainerRef.current) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await loadStripeSdk()
+        if (cancelled || !window.Stripe || !paymentElementContainerRef.current) return
+        const stripe = window.Stripe(stripePublishableKey)
+        const elements = stripe.elements({
+          clientSecret,
+          appearance: { theme: 'stripe' },
+        })
+        const paymentElement = elements.create('payment')
+        paymentElement.mount(paymentElementContainerRef.current)
+        stripeRef.current = stripe
+        elementsRef.current = elements
+        paymentElementRef.current = paymentElement
+      } catch (err: any) {
+        if (!cancelled) setPaymentError(err?.message || 'Unable to initialise secure Stripe checkout.')
+      }
+    })()
+    return () => {
+      cancelled = true
+      paymentElementRef.current?.unmount()
+      paymentElementRef.current?.destroy?.()
+      paymentElementRef.current = null
+      elementsRef.current = null
+      stripeRef.current = null
+    }
+  }, [clientSecret, stripePublishableKey])
 
   const fullName = useMemo(() => {
     if (!user) return ''
@@ -158,46 +267,66 @@ export default function Home() {
 
     const parsedAmount = Number(amount)
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setPaymentError('Please enter a valid amount.')
+      setPaymentError('Please enter a valid amount greater than zero.')
       return
     }
-
-    if (selectedMethod === 'CARD') {
-      const cleanCard = cardNumber.replace(/\s+/g, '')
-      if (!/^\d{16}$/.test(cleanCard)) {
-        setPaymentError('Card number must be exactly 16 digits.')
-        return
-      }
-      if (!expiryDate.trim()) {
-        setPaymentError('Please provide an expiry date.')
-        return
-      }
-      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate.trim())) {
-        setPaymentError('Expiry date must be in MM/YY format.')
-        return
-      }
+    if (!/^[A-Z]{3}$/.test(currency.trim().toUpperCase())) {
+      setPaymentError('Currency must be a valid 3-letter code, for example GBP.')
+      return
+    }
+    if (!stripePublishableKey) {
+      setPaymentError('Stripe checkout is not configured. Please contact support.')
+      return
     }
 
     setPaymentLoading(true)
     try {
-      await createPayment({
-        method: selectedMethod,
-        amount: parsedAmount,
-        currency,
-        cardNumber: selectedMethod === 'CARD' ? cardNumber : undefined,
-        expiryDate: selectedMethod === 'CARD' ? expiryDate : undefined,
-        cvv: selectedMethod === 'CARD' ? cvv : undefined,
+      if (!clientSecret) {
+        const intent = await createPaymentIntent({
+          method: selectedMethod,
+          amount: parsedAmount,
+          currency,
+        })
+        setClientSecret(intent.clientSecret)
+        setStripePaymentIntentId(intent.stripePaymentIntentId)
+        setPaymentSuccess('Secure payment form loaded. Enter your card details below to complete payment.')
+        return
+      }
+
+      if (!stripeRef.current || !elementsRef.current) {
+        setPaymentError('Secure payment form is still loading. Please try again in a moment.')
+        return
+      }
+
+      const result = await stripeRef.current.confirmPayment({
+        elements: elementsRef.current,
+        confirmParams: { return_url: window.location.href },
+        redirect: 'if_required',
       })
-      setPaymentSuccess(`Payment completed via ${selectedMethod.replace('_', ' ').toLowerCase()}.`)
-      setCardNumber('')
-      setExpiryDate('')
-      setCvv('')
+
+      if (result.error) {
+        setPaymentError(result.error.message || 'Payment could not be completed. Please check your details and try again.')
+        return
+      }
+
+      const paymentIntentId = result.paymentIntent?.id || stripePaymentIntentId
+      const synced = await confirmPaymentIntent(paymentIntentId)
+      const status = (synced.status || result.paymentIntent?.status || '').toLowerCase()
+      if (status === 'succeeded') {
+        setPaymentSuccess('Payment completed successfully.')
+      } else if (status === 'processing') {
+        setPaymentSuccess('Payment is processing. We will update your account when Stripe confirms it.')
+      } else {
+        setPaymentError(synced.failureMessage || `Payment status: ${status || 'requires follow-up'}.`)
+      }
+      resetStripePaymentElement()
     } catch (err: any) {
       setPaymentError(err?.message || 'Payment failed. Please try again.')
     } finally {
       setPaymentLoading(false)
     }
   }
+
 
 
   const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>(searchParams.get('travelerId') || 'PRIMARY');
@@ -809,6 +938,7 @@ export default function Home() {
                   className={`payment-method-chip ${selectedMethod === m.code ? 'active' : ''}`}
                   onClick={() => {
                     setSelectedMethod(m.code as 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET')
+                    resetStripePaymentElement()
                     setPaymentError(null)
                     setPaymentSuccess(null)
                   }}
@@ -826,7 +956,7 @@ export default function Home() {
                   step="0.01"
                   min="0"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => { setAmount(e.target.value); resetStripePaymentElement() }}
                   placeholder="49.99"
                 />
               </div>
@@ -836,44 +966,19 @@ export default function Home() {
                   type="text"
                   value={currency}
                   maxLength={3}
-                  onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                  onChange={(e) => { setCurrency(e.target.value.toUpperCase()); resetStripePaymentElement() }}
                   placeholder="GBP"
                 />
               </div>
             </div>
 
-            {selectedMethod === 'CARD' && (
-              <div className="payment-form-grid">
-                <div className="field">
-                  <label>Card Number</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="1234 5678 9012 3456"
-                  />
-                </div>
-                <div className="field">
-                  <label>Expiry (MM/YY)</label>
-                  <input
-                    type="text"
-                    value={expiryDate}
-                    onChange={(e) => setExpiryDate(e.target.value)}
-                    placeholder="08/29"
-                  />
-                </div>
-                <div className="field">
-                  <label>CVV</label>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    value={cvv}
-                    onChange={(e) => setCvv(e.target.value)}
-                    maxLength={4}
-                    placeholder="***"
-                  />
-                </div>
+            <div className="payment-secure-note">
+              Card details are collected by Stripe in {stripeEnvironment === 'live' ? 'production' : 'sandbox'} mode and are never stored by GodwitCare.
+            </div>
+
+            {clientSecret && (
+              <div className="stripe-payment-element-panel">
+                <div ref={paymentElementContainerRef} />
               </div>
             )}
 
@@ -881,7 +986,7 @@ export default function Home() {
             {paymentSuccess && <div className="payment-success">{paymentSuccess}</div>}
 
             <button className="btn block" onClick={submitPayment} disabled={paymentLoading}>
-              {paymentLoading ? 'Processing…' : 'Proceed to Pay'}
+              {paymentLoading ? 'Processing…' : clientSecret ? 'Pay securely with Stripe' : 'Continue to secure checkout'}
             </button>
           </div>
         </div>

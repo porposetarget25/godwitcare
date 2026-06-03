@@ -44,3 +44,7 @@ app:
     secret: ${APP_JWT_SECRET:godwitcare-development-jwt-secret-change-me-please-32-bytes-minimum}
     expiration-ms: 900000
     issuer: godwitcare
+  stripe:
+    environment: ${STRIPE_ENVIRONMENT:test}
+    secret-key: ${STRIPE_SECRET_KEY:xxxxx}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}

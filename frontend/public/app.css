@@ -1517,3 +1517,21 @@ html { scroll-behavior: smooth; }
     justify-content: center;
   }
 }
+
+.payment-secure-note {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  color: #1e3a8a;
+  font-size: 14px;
+  margin: 10px 0;
+  padding: 10px 12px;
+}
+
+.stripe-payment-element-panel {
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  margin: 12px 0;
+  padding: 14px;
+}

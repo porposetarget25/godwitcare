@@ -45,7 +45,8 @@ const EMPTY_FORM: AdminUserInput = {
   paymentMethod: '',
   paymentAmount: undefined,
   paymentCurrency: '',
-  cardExpiry: '',
+  paymentStatus: '',
+  stripePaymentIntentId: '',
 };
 
 export default function AdminDashboard() {
@@ -178,7 +179,8 @@ export default function AdminDashboard() {
       paymentMethod: latestPayment?.method || '',
       paymentAmount: latestPayment?.amount != null ? Number(latestPayment.amount) : undefined,
       paymentCurrency: latestPayment?.currency || '',
-      cardExpiry: latestPayment?.cardExpiry || '',
+      paymentStatus: latestPayment?.status || '',
+      stripePaymentIntentId: latestPayment?.stripePaymentIntentId || '',
       password: '',
       });
 
@@ -463,7 +465,8 @@ export default function AdminDashboard() {
                   <div className="field"><label>Payment Method</label><input value={form.paymentMethod || ''} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} placeholder="CARD / EFT / BANK_TRANSFER / DIGITAL_WALLET" /></div>
                   <div className="field"><label>Payment Amount</label><input type="number" step="0.01" min={0} value={form.paymentAmount ?? ''} onChange={(e) => setForm({ ...form, paymentAmount: e.target.value ? Number(e.target.value) : undefined })} /></div>
                   <div className="field"><label>Payment Currency</label><input value={form.paymentCurrency || ''} onChange={(e) => setForm({ ...form, paymentCurrency: e.target.value })} placeholder="GBP" /></div>
-                  <div className="field"><label>Card Expiry</label><input value={form.cardExpiry || ''} onChange={(e) => setForm({ ...form, cardExpiry: e.target.value })} placeholder="MM/YY" /></div>
+                  <div className="field"><label>Payment Status</label><input value={form.paymentStatus || 'Not available'} readOnly /></div>
+                  <div className="field"><label>Stripe Payment ID</label><input value={form.stripePaymentIntentId || 'Not available'} readOnly /></div>
 
                   <div className="field admin-documents">
                     <h4 className="admin-section-title">Travel Documents</h4>

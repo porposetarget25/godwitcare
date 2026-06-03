@@ -135,7 +135,8 @@ export type AdminUserInput = {
   paymentMethod?: string
   paymentAmount?: number
   paymentCurrency?: string
-  cardExpiry?: string
+  paymentStatus?: string
+  stripePaymentIntentId?: string
 }
 
 export type AuthAvailability = {
@@ -210,13 +211,35 @@ export type ConsultationDetails = ConsultationSummary & {
 
 export type PaymentMethod = 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET'
 
-export type CreatePaymentPayload = {
+export type CreatePaymentIntentPayload = {
   method: PaymentMethod
   amount: number
   currency?: string
-  cardNumber?: string
-  expiryDate?: string
-  cvv?: string
+}
+
+export type StripePaymentConfig = {
+  publishableKey: string
+  environment: string
+  frontendConfigured: boolean
+}
+
+export type PaymentIntentResponse = {
+  id: number
+  method: PaymentMethod
+  amount: number
+  currency: string
+  stripePaymentIntentId: string
+  clientSecret: string
+  status: string
+  failureMessage?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type PaymentTransactionResponse = Omit<PaymentIntentResponse, 'clientSecret'> & {
+  stripeChargeId?: string
+  cardLast4?: string
+  cardBrand?: string
 }
 
 // ---------- Model -> Backend payload mapper ----------
@@ -297,7 +320,16 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   const text = await res.text()
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+    let message = text.slice(0, 200)
+    if (contentType.includes('application/json')) {
+      try {
+        const parsed = JSON.parse(text)
+        message = parsed?.message || message
+      } catch {
+        // fall back to raw response text
+      }
+    }
+    throw new Error(message || `HTTP ${res.status}`)
   }
 
   if (!text) return {} as T
@@ -704,10 +736,21 @@ export async function adminDeleteDoctor(id: number): Promise<void> {
   await request(`/admin/doctors/${id}`, { method: 'DELETE',  });
 }
 
-export async function createPayment(payload: CreatePaymentPayload) {
-  return request('/payments', {
+export async function getStripePaymentConfig(): Promise<StripePaymentConfig> {
+  return request('/payments/config', { method: 'GET' })
+}
+
+export async function createPaymentIntent(payload: CreatePaymentIntentPayload): Promise<PaymentIntentResponse> {
+  return request('/payments/payment-intents', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-      });
+  })
+}
+
+export async function confirmPaymentIntent(paymentIntentId: string): Promise<PaymentTransactionResponse> {
+  return request(`/payments/payment-intents/${encodeURIComponent(paymentIntentId)}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
