@@ -27,20 +27,44 @@ public class Payment {
     @Column(length = 8)
     private String currency;
 
+    @Column(length = 128, unique = true)
+    private String stripePaymentIntentId;
+
+    @Column(length = 128)
+    private String stripeChargeId;
+
+    @Column(nullable = false, length = 32)
+    private String status = "CREATED";
+
+    @Column(length = 512)
+    private String failureMessage;
+
     @Column(length = 4)
     private String cardLast4;
 
-    @Column(length = 7)
-    private String cardExpiry;
+    @Column(length = 32)
+    private String cardBrand;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(nullable = false)
+    private Instant updatedAt;
+
     @PrePersist
     void onCreate() {
+        Instant now = Instant.now();
         if (createdAt == null) {
-            createdAt = Instant.now();
+            createdAt = now;
         }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
     }
 
     public Long getId() {
@@ -79,6 +103,38 @@ public class Payment {
         this.currency = currency;
     }
 
+    public String getStripePaymentIntentId() {
+        return stripePaymentIntentId;
+    }
+
+    public void setStripePaymentIntentId(String stripePaymentIntentId) {
+        this.stripePaymentIntentId = stripePaymentIntentId;
+    }
+
+    public String getStripeChargeId() {
+        return stripeChargeId;
+    }
+
+    public void setStripeChargeId(String stripeChargeId) {
+        this.stripeChargeId = stripeChargeId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getFailureMessage() {
+        return failureMessage;
+    }
+
+    public void setFailureMessage(String failureMessage) {
+        this.failureMessage = failureMessage;
+    }
+
     public String getCardLast4() {
         return cardLast4;
     }
@@ -87,15 +143,19 @@ public class Payment {
         this.cardLast4 = cardLast4;
     }
 
-    public String getCardExpiry() {
-        return cardExpiry;
+    public String getCardBrand() {
+        return cardBrand;
     }
 
-    public void setCardExpiry(String cardExpiry) {
-        this.cardExpiry = cardExpiry;
+    public void setCardBrand(String cardBrand) {
+        this.cardBrand = cardBrand;
     }
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }
