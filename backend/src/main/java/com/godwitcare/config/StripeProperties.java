@@ -20,7 +20,7 @@ public class StripeProperties {
     private String environment = "test";
 
     public String getSecretKey() {
-        return secretKey;
+        return normalize(secretKey);
     }
 
     public void setSecretKey(String secretKey) {
@@ -28,7 +28,7 @@ public class StripeProperties {
     }
 
     public String getPublishableKey() {
-        return publishableKey;
+        return normalize(publishableKey);
     }
 
     public void setPublishableKey(String publishableKey) {
@@ -36,7 +36,8 @@ public class StripeProperties {
     }
 
     public String getEnvironment() {
-        return environment;
+        String normalizedEnvironment = normalize(environment);
+        return normalizedEnvironment == null ? "test" : normalizedEnvironment;
     }
 
     public void setEnvironment(String environment) {
@@ -44,19 +45,19 @@ public class StripeProperties {
     }
 
     public boolean isBackendConfigured() {
-        return isSecretKey(secretKey);
+        return isSecretKey(getSecretKey());
     }
 
     public boolean isFrontendConfigured() {
-        return isPublishableKey(publishableKey);
+        return isPublishableKey(getPublishableKey());
     }
 
     public boolean hasSecretKeyValue() {
-        return hasText(secretKey);
+        return hasText(getSecretKey());
     }
 
     public boolean hasPublishableKeyValue() {
-        return hasText(publishableKey);
+        return hasText(getPublishableKey());
     }
 
     public static boolean isSecretKey(String key) {
@@ -67,7 +68,13 @@ public class StripeProperties {
         return hasText(key) && key.trim().startsWith("pk_");
     }
 
+    private static String normalize(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
     private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
+        return normalize(value) != null;
     }
 }
