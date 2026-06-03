@@ -110,10 +110,13 @@ public class StripePaymentService {
     }
 
     private void ensureStripeConfigured() {
-        if (!stripeProperties.isBackendConfigured()) {
-            throw new IllegalStateException("Stripe secret key is not configured.");
+        if (!stripeProperties.hasSecretKeyValue()) {
+            throw new IllegalStateException("Stripe secret key is not configured. Set STRIPE_SECRET_KEY to your sk_test or sk_live key.");
         }
-        Stripe.apiKey = stripeProperties.getSecretKey();
+        if (!stripeProperties.isBackendConfigured()) {
+            throw new IllegalStateException("Stripe secret key must start with sk_test or sk_live. Do not use a publishable pk_ key for backend API calls.");
+        }
+        Stripe.apiKey = stripeProperties.getSecretKey().trim();
     }
 
     private String normalizeStatus(String stripeStatus) {
