@@ -60,4 +60,5 @@ app:
   # Stripe settings live in application.yml so profile-specific files do not
   # accidentally override keys that were configured in the base file.
   # Prefer STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY environment variables
-  # for deployed environments.
+  # for deployed environments. For compatibility, top-level stripe.* keys are
+  # also accepted by StripeProperties when app.stripe.* is not present.
