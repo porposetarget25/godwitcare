@@ -1,16 +1,19 @@
 package com.godwitcare.web;
 
+import com.godwitcare.config.StripeProperties;
 import com.godwitcare.entity.Payment;
 import com.godwitcare.entity.PaymentMethod;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.PaymentRepository;
 import com.godwitcare.repo.UserRepository;
+import com.godwitcare.service.StripePaymentService;
+import com.stripe.exception.StripeException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -21,19 +24,23 @@ public class PaymentController {
 
     private final UserRepository users;
     private final PaymentRepository payments;
+    private final StripePaymentService stripePaymentService;
+    private final StripeProperties stripeProperties;
 
-    public PaymentController(UserRepository users, PaymentRepository payments) {
+    public PaymentController(UserRepository users,
+                             PaymentRepository payments,
+                             StripePaymentService stripePaymentService,
+                             StripeProperties stripeProperties) {
         this.users = users;
         this.payments = payments;
+        this.stripePaymentService = stripePaymentService;
+        this.stripeProperties = stripeProperties;
     }
 
-    public record PaymentRequest(
+    public record PaymentIntentRequest(
             String method,
             BigDecimal amount,
-            String currency,
-            String cardNumber,
-            String expiryDate,
-            String cvv
+            String currency
     ) {}
 
     private Optional<User> currentUser(Authentication auth) {
@@ -42,56 +49,91 @@ public class PaymentController {
         return users.findByUsername(principal).or(() -> users.findByEmail(principal));
     }
 
-    @PostMapping
-    public ResponseEntity<?> create(Authentication auth, @RequestBody PaymentRequest req) {
+    @GetMapping("/config")
+    public ResponseEntity<?> config(Authentication auth) {
+        if (currentUser(auth).isEmpty()) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(Map.of(
+                "publishableKey", stripeProperties.getPublishableKey() == null ? "" : stripeProperties.getPublishableKey(),
+                "environment", stripeProperties.getEnvironment(),
+                "frontendConfigured", stripeProperties.isFrontendConfigured(),
+                "backendConfigured", stripeProperties.isBackendConfigured()
+        ));
+    }
+
+    @PostMapping("/payment-intents")
+    public ResponseEntity<?> createPaymentIntent(Authentication auth, @RequestBody PaymentIntentRequest req) {
         Optional<User> ou = currentUser(auth);
         if (ou.isEmpty()) return ResponseEntity.status(401).build();
 
         if (req.amount() == null || req.amount().compareTo(BigDecimal.ZERO) <= 0) {
-            return ResponseEntity.badRequest().body("Amount must be greater than zero");
+            return ResponseEntity.badRequest().body(Map.of("message", "Amount must be greater than zero."));
         }
 
         PaymentMethod method;
         try {
-            method = PaymentMethod.valueOf((req.method() == null ? "" : req.method().trim().toUpperCase(Locale.ROOT)));
+            method = PaymentMethod.valueOf((req.method() == null ? "CARD" : req.method().trim().toUpperCase(Locale.ROOT)));
         } catch (Exception ex) {
-            return ResponseEntity.badRequest().body("Invalid payment method");
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid payment method."));
         }
 
-        Payment p = new Payment();
-        p.setUser(ou.get());
-        p.setMethod(method);
-        p.setAmount(req.amount().setScale(2, RoundingMode.HALF_UP));
-        p.setCurrency((req.currency() == null || req.currency().isBlank()) ? "GBP" : req.currency().trim().toUpperCase(Locale.ROOT));
-
-        if (method == PaymentMethod.CARD) {
-            String digits = req.cardNumber() == null ? "" : req.cardNumber().replaceAll("\\s+", "");
-            if (!digits.matches("\\d{16}")) {
-                return ResponseEntity.badRequest().body("Card number must be exactly 16 digits");
-            }
-            String expiry = req.expiryDate() == null ? "" : req.expiryDate().trim();
-            if (expiry.isBlank()) {
-                return ResponseEntity.badRequest().body("Expiry date is required");
-            }
-            if (!expiry.matches("(0[1-9]|1[0-2])/[0-9]{2}")) {
-                return ResponseEntity.badRequest().body("Expiry date must be in MM/YY format");
-            }
-            p.setCardLast4(digits.substring(12));
-            p.setCardExpiry(expiry);
-            // CVV is intentionally ignored and never stored.
+        String currency;
+        try {
+            currency = stripePaymentService.normalizeCurrency(req.currency());
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
 
-        p = payments.save(p);
+        try {
+            StripePaymentService.PaymentIntentSession session = stripePaymentService.createPaymentIntent(ou.get(), method, req.amount(), currency);
+            Map<String, Object> response = toPaymentDto(session.payment());
+            response.put("clientSecret", session.clientSecret());
+            return ResponseEntity.ok(response);
+        } catch (StripeException ex) {
+            return ResponseEntity.status(502).body(Map.of("message", stripeMessage(ex)));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(503).body(Map.of("message", ex.getMessage()));
+        }
+    }
 
-        return ResponseEntity.ok(Map.of(
-                "id", p.getId(),
-                "method", p.getMethod().name(),
-                "amount", p.getAmount(),
-                "currency", p.getCurrency(),
-                "cardLast4", p.getCardLast4(),
-                "cardExpiry", p.getCardExpiry(),
-                "userId", p.getUser().getId(),
-                "createdAt", p.getCreatedAt()
-        ));
+    @PostMapping("/payment-intents/{paymentIntentId}/confirm")
+    public ResponseEntity<?> confirmPaymentIntent(Authentication auth, @PathVariable String paymentIntentId) {
+        Optional<User> ou = currentUser(auth);
+        if (ou.isEmpty()) return ResponseEntity.status(401).build();
+
+        Optional<Payment> payment = payments.findByStripePaymentIntentIdAndUserId(paymentIntentId, ou.get().getId());
+        if (payment.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        try {
+            return ResponseEntity.ok(toPaymentDto(stripePaymentService.syncPaymentIntent(payment.get())));
+        } catch (StripeException ex) {
+            return ResponseEntity.status(502).body(Map.of("message", stripeMessage(ex)));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(503).body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    private Map<String, Object> toPaymentDto(Payment p) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("id", p.getId());
+        body.put("method", p.getMethod().name());
+        body.put("amount", p.getAmount());
+        body.put("currency", p.getCurrency());
+        body.put("stripePaymentIntentId", p.getStripePaymentIntentId());
+        body.put("stripeChargeId", p.getStripeChargeId());
+        body.put("status", p.getStatus());
+        body.put("failureMessage", p.getFailureMessage());
+        body.put("cardLast4", p.getCardLast4());
+        body.put("cardBrand", p.getCardBrand());
+        body.put("userId", p.getUser().getId());
+        body.put("createdAt", p.getCreatedAt());
+        body.put("updatedAt", p.getUpdatedAt());
+        return body;
+    }
+
+    private String stripeMessage(StripeException ex) {
+        String message = ex.getStripeError() != null ? ex.getStripeError().getMessage() : ex.getMessage();
+        return message == null || message.isBlank() ? "Stripe payment processing failed." : message;
     }
 }

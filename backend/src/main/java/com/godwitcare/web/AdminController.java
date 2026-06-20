@@ -207,7 +207,11 @@ public class AdminController {
             m.put("amount", p.getAmount());
             m.put("currency", p.getCurrency());
             m.put("cardLast4", p.getCardLast4());
-            m.put("cardExpiry", p.getCardExpiry());
+            m.put("cardBrand", p.getCardBrand());
+            m.put("stripePaymentIntentId", p.getStripePaymentIntentId());
+            m.put("stripeChargeId", p.getStripeChargeId());
+            m.put("status", p.getStatus());
+            m.put("failureMessage", p.getFailureMessage());
             m.put("createdAt", p.getCreatedAt());
             return m;
         }).toList();
@@ -367,8 +371,7 @@ public class AdminController {
 
         boolean hasPaymentPatch = req.paymentMethod() != null
                 || req.paymentAmount() != null
-                || req.paymentCurrency() != null
-                || req.cardExpiry() != null;
+                || req.paymentCurrency() != null;
 
         if (!hasPaymentPatch) return;
 
@@ -386,7 +389,6 @@ public class AdminController {
         if (req.paymentCurrency() != null && !req.paymentCurrency().isBlank()) {
             payment.setCurrency(req.paymentCurrency().trim().toUpperCase(Locale.ROOT));
         }
-        if (req.cardExpiry() != null) payment.setCardExpiry(req.cardExpiry().trim());
         payments.save(payment);
     }
 }
