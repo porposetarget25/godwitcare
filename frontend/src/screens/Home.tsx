@@ -77,6 +77,13 @@ function loadStripeSdk() {
   return stripeSdkPromise
 }
 
+function getStripeReturnUrl() {
+  if (typeof window === 'undefined') return undefined
+  const { origin, pathname, search, protocol } = window.location
+  if (protocol !== 'http:' && protocol !== 'https:') return undefined
+  return `${origin}${pathname}${search}`
+}
+
 function normalizeReg(r: RegApi | null | undefined) {
   if (!r) return null
   const from = r['Travelling From'] ?? r.travellingFrom ?? ''
@@ -300,9 +307,10 @@ export default function Home() {
         return
       }
 
+      const returnUrl = getStripeReturnUrl()
       const result = await stripeRef.current.confirmPayment({
         elements: elementsRef.current,
-        confirmParams: { return_url: window.location.href },
+        confirmParams: returnUrl ? { return_url: returnUrl } : undefined,
         redirect: 'if_required',
       })
 
