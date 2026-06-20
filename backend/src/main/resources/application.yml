@@ -46,5 +46,5 @@ app:
     issuer: godwitcare
   stripe:
     environment: ${STRIPE_ENVIRONMENT:test}
-    secret-key: ${STRIPE_SECRET_KEY:xxxxx}
-    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+    secret-key: ${STRIPE_SECRET_KEY}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY}
