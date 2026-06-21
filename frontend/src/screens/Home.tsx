@@ -1,7 +1,7 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { authFetch, confirmPaymentIntent, createPaymentIntent, getStripePaymentConfig, me, type UserDto } from '../api'
+import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -84,6 +84,31 @@ function getStripeReturnUrl() {
   return `${origin}${pathname}${search}`
 }
 
+function formatPaymentAmount(payment: PaymentHistoryResponse) {
+  const value = Number(payment.amount)
+  const currency = (payment.currency || 'GBP').toUpperCase()
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(value)
+  } catch {
+    return `${currency} ${Number.isFinite(value) ? value.toFixed(2) : payment.amount}`
+  }
+}
+
+function formatPaymentDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+
+function paymentStatusCopy(status?: string) {
+  const normalized = (status || '').toLowerCase()
+  if (normalized === 'succeeded') return 'successful'
+  if (normalized === 'failed' || normalized === 'canceled' || normalized === 'cancelled' || normalized === 'requires_payment_method') return 'unsuccessful'
+  if (normalized === 'processing') return 'processing'
+  return status ? status.replace(/_/g, ' ').toLowerCase() : 'unknown'
+}
+
 function normalizeReg(r: RegApi | null | undefined) {
   if (!r) return null
   const from = r['Travelling From'] ?? r.travellingFrom ?? ''
@@ -117,6 +142,10 @@ export default function Home() {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
+  const [paymentComplete, setPaymentComplete] = useState(false)
+  const [latestPayment, setLatestPayment] = useState<PaymentHistoryResponse | null>(null)
+  const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false)
+  const [paymentHistoryError, setPaymentHistoryError] = useState<string | null>(null)
   const stripeRef = useRef<StripeInstance | null>(null)
   const elementsRef = useRef<StripeElementsInstance | null>(null)
   const paymentElementRef = useRef<{ unmount: () => void; destroy?: () => void } | null>(null)
@@ -195,6 +224,32 @@ export default function Home() {
     }
   }, [location.hash, isTravelerUser])
 
+  useEffect(() => {
+    if (!showPaymentsModal) return
+    let alive = true
+    setPaymentHistoryLoading(true)
+    setPaymentHistoryError(null)
+    ;(async () => {
+      try {
+        const payment = await getLatestPayment()
+        if (alive) setLatestPayment(payment)
+      } catch (err: any) {
+        if (alive) setPaymentHistoryError(err?.message || 'Unable to load payment history.')
+      } finally {
+        if (alive) setPaymentHistoryLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [showPaymentsModal])
+
+  useEffect(() => {
+    if (!showPaymentsModal || !paymentComplete) return
+    const timer = window.setTimeout(() => {
+      closePaymentsModal()
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [showPaymentsModal, paymentComplete])
+
 
   const resetStripePaymentElement = () => {
     paymentElementRef.current?.unmount()
@@ -207,6 +262,9 @@ export default function Home() {
 
   const closePaymentsModal = () => {
     resetStripePaymentElement()
+    setPaymentComplete(false)
+    setPaymentSuccess(null)
+    setPaymentError(null)
     setShowPaymentsModal(false)
     if (location.hash.startsWith('#payments')) {
       navigate('/home', { replace: true })
@@ -273,6 +331,7 @@ export default function Home() {
   async function submitPayment() {
     setPaymentError(null)
     setPaymentSuccess(null)
+    setPaymentComplete(false)
 
     const parsedAmount = Number(amount)
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -323,7 +382,9 @@ export default function Home() {
       const synced = await confirmPaymentIntent(paymentIntentId)
       const status = (synced.status || result.paymentIntent?.status || '').toLowerCase()
       if (status === 'succeeded') {
-        setPaymentSuccess('Payment completed successfully.')
+        setLatestPayment(synced)
+        setPaymentComplete(true)
+        setPaymentSuccess('Payment completed successfully. This window will close automatically in 3 seconds.')
       } else if (status === 'processing') {
         setPaymentSuccess('Payment is processing. We will update your account when Stripe confirms it.')
       } else {
@@ -935,6 +996,23 @@ export default function Home() {
 
             <p className="payment-subtitle">Select a payment method and proceed securely.</p>
 
+            <div className="payment-history-summary">
+              {paymentHistoryLoading ? (
+                <span>Loading previous payment status…</span>
+              ) : paymentHistoryError ? (
+                <span>{paymentHistoryError}</span>
+              ) : latestPayment ? (
+                <span>
+                  Previous payment of {formatPaymentAmount(latestPayment)} was {paymentStatusCopy(latestPayment.status)}
+                  {formatPaymentDate(latestPayment.updatedAt || latestPayment.createdAt) ? ` on ${formatPaymentDate(latestPayment.updatedAt || latestPayment.createdAt)}` : ''}.
+                </span>
+              ) : (
+                <span>No payment history available.</span>
+              )}
+            </div>
+
+            {!paymentComplete && (
+              <>
             <div className="payment-methods">
               {[
                 { code: 'CARD', label: 'Card' },
@@ -951,6 +1029,7 @@ export default function Home() {
                     resetStripePaymentElement()
                     setPaymentError(null)
                     setPaymentSuccess(null)
+                    setPaymentComplete(false)
                   }}
                 >
                   {m.label}
@@ -966,7 +1045,7 @@ export default function Home() {
                   step="0.01"
                   min="0"
                   value={amount}
-                  onChange={(e) => { setAmount(e.target.value); resetStripePaymentElement() }}
+                  onChange={(e) => { setAmount(e.target.value); resetStripePaymentElement(); setPaymentComplete(false) }}
                   placeholder="49.99"
                 />
               </div>
@@ -976,7 +1055,7 @@ export default function Home() {
                   type="text"
                   value={currency}
                   maxLength={3}
-                  onChange={(e) => { setCurrency(e.target.value.toUpperCase()); resetStripePaymentElement() }}
+                  onChange={(e) => { setCurrency(e.target.value.toUpperCase()); resetStripePaymentElement(); setPaymentComplete(false) }}
                   placeholder="GBP"
                 />
               </div>
@@ -992,12 +1071,17 @@ export default function Home() {
               </div>
             )}
 
+              </>
+            )}
+
             {paymentError && <div className="payment-error">{paymentError}</div>}
             {paymentSuccess && <div className="payment-success">{paymentSuccess}</div>}
 
-            <button className="btn block" onClick={submitPayment} disabled={paymentLoading}>
-              {paymentLoading ? 'Processing…' : clientSecret ? 'Pay securely with Stripe' : 'Continue to secure checkout'}
-            </button>
+            {!paymentComplete && (
+              <button className="btn block payment-submit-btn" onClick={submitPayment} disabled={paymentLoading}>
+                {paymentLoading ? 'Processing…' : clientSecret ? 'Pay securely with Stripe' : 'Continue to secure checkout'}
+              </button>
+            )}
           </div>
         </div>
       )}
