@@ -18,6 +18,7 @@ import ConsultationDetails from './screens/ConsultationDetails';
 import DoctorLogin from './screens/DoctorLogin';
 import DoctorConsultations from './screens/DoctorConsultations';
 import DoctorConsultationDetails from './screens/DoctorConsultationDetails';
+import DoctorAppointments from './screens/DoctorAppointments';
 import { RequireRole } from './screens/RequireRole';
 import CareHistory from './screens/CareHistory';
 import ReferralLetter from './screens/ReferralLetter';
@@ -274,6 +275,16 @@ function AppRoutes() {
           <Shell>
             <RequireRole user={user} role="DOCTOR" loading={loading}>
               <DoctorConsultationDetails />
+            </RequireRole>
+          </Shell>
+        }
+      />
+      <Route
+        path="/doctor/appointments"
+        element={
+          <Shell>
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorAppointments />
             </RequireRole>
           </Shell>
         }

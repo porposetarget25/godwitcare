@@ -548,6 +548,9 @@ export default function Home() {
               <Link to="/doctor/consultations" className="btn">
                 Open Consultation Requests
               </Link>
+              <Link to="/doctor/appointments" className="btn secondary">
+                View Appointments
+              </Link>
             </div>
           </div>
         </div>
