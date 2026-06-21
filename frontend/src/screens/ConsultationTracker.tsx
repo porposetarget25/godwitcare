@@ -11,11 +11,25 @@ type DoctorOption = { id: number; name: string }
 type Slot = { startTime: string; endTime: string; label: string; available: boolean }
 type AvailabilityDay = { date: string; slots: Slot[] }
 
+type BookingPeriod = 'morning' | 'afternoon'
+
+const BOOKING_PERIODS: Array<{ id: BookingPeriod; label: string; range: string; startHour: number; endHour: number }> = [
+  { id: 'morning', label: 'Morning', range: '9:00 AM – 12:00 PM', startHour: 9, endHour: 12 },
+  { id: 'afternoon', label: 'Afternoon', range: '12:00 PM – 5:00 PM', startHour: 12, endHour: 17 },
+]
+
+function slotHour(slot: Slot) {
+  return new Date(slot.startTime).getHours()
+}
+
 function AppointmentBooking({ consultationId }: { consultationId: number }) {
   const [doctors, setDoctors] = useState<DoctorOption[]>([])
   const [doctorId, setDoctorId] = useState<number | null>(null)
   const [days, setDays] = useState<AvailabilityDay[]>([])
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [selectedPeriod, setSelectedPeriod] = useState<BookingPeriod | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string>('')
+  const [slotsModalOpen, setSlotsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -45,17 +59,52 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
       const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.')
-      setDays(Array.isArray(data?.days) ? data.days : [])
+      const nextDays = Array.isArray(data?.days) ? data.days : []
+      setDays(nextDays)
+      setSelectedDate(nextDays[0]?.date ?? '')
+      setSelectedPeriod(null)
       setSelectedSlot('')
+      setSlotsModalOpen(false)
     } catch (e: any) {
       setError(e?.message || 'Unable to load appointment slots.')
       setDays([])
+      setSelectedDate('')
+      setSelectedPeriod(null)
+      setSelectedSlot('')
+      setSlotsModalOpen(false)
     } finally {
       setLoading(false)
     }
   }, [doctorId])
 
   useEffect(() => { loadAvailability() }, [loadAvailability])
+
+  const selectedDay = useMemo(() => days.find(day => day.date === selectedDate) ?? null, [days, selectedDate])
+
+  const periodSlots = useMemo(() => {
+    if (!selectedDay || !selectedPeriod) return []
+    const period = BOOKING_PERIODS.find(p => p.id === selectedPeriod)
+    if (!period) return []
+    return selectedDay.slots.filter(slot => {
+      const hour = slotHour(slot)
+      return hour >= period.startHour && hour < period.endHour
+    })
+  }, [selectedDay, selectedPeriod])
+
+  const selectedSlotDetails = useMemo(() => days.flatMap(day => day.slots).find(slot => slot.startTime === selectedSlot) ?? null, [days, selectedSlot])
+
+  function chooseDate(date: string) {
+    setSelectedDate(date)
+    setSelectedPeriod(null)
+    setSelectedSlot('')
+    setSlotsModalOpen(false)
+  }
+
+  function choosePeriod(period: BookingPeriod) {
+    setSelectedPeriod(period)
+    setSelectedSlot('')
+    setSlotsModalOpen(true)
+  }
 
   async function confirmBooking() {
     if (!doctorId || !selectedSlot) return
@@ -80,10 +129,10 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
   }
 
   return (
-    <div style={{ marginTop: 14, width: '100%' }}>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+    <div className="appointment-booking">
+      <div className="appointment-booking-header">
         <label style={{ fontWeight: 700 }}>Doctor</label>
-        <select className="input" value={doctorId ?? ''} onChange={e => setDoctorId(Number(e.target.value))} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db' }}>
+        <select className="input appointment-doctor-select" value={doctorId ?? ''} onChange={e => setDoctorId(Number(e.target.value))}>
           {doctors.map(d => <option key={d.id} value={d.id}>{d.name || `Doctor #${d.id}`}</option>)}
         </select>
         <span className="muted small">10-minute appointment slots</span>
@@ -91,23 +140,91 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
       {loading && <div className="muted">Loading available slots…</div>}
       {error && <div style={{ color: '#991b1b', marginBottom: 10 }}>{error}</div>}
       {message && <div style={{ color: '#047857', marginBottom: 10, fontWeight: 700 }}>{message}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        {days.map(day => (
-          <div key={day.date} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12 }}>
-            <div style={{ fontWeight: 800, marginBottom: 10 }}>{new Date(`${day.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-              {day.slots.map(slot => (
-                <button key={slot.startTime} type="button" disabled={!slot.available} onClick={() => setSelectedSlot(slot.startTime)} className={'btn ' + (selectedSlot === slot.startTime ? '' : 'secondary')} style={!slot.available ? { opacity: .45, cursor: 'not-allowed', background: '#e5e7eb', color: '#6b7280' } : { padding: '8px 10px' }}>
-                  {slot.label}
-                </button>
-              ))}
+
+      <div className="booking-flow-card">
+        <div className="booking-step-heading">
+          <span>1</span>
+          <div>
+            <h4>Select a date</h4>
+            <p>Choose a future date first to keep appointment options focused.</p>
+          </div>
+        </div>
+        <div className="booking-date-grid" aria-label="Available appointment dates">
+          {days.map(day => {
+            const date = new Date(`${day.date}T00:00:00`)
+            const availableCount = day.slots.filter(slot => slot.available).length
+            return (
+              <button key={day.date} type="button" className={'booking-date-card ' + (selectedDate === day.date ? 'active' : '')} onClick={() => chooseDate(day.date)}>
+                <span>{date.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
+                <strong>{date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</strong>
+                <small>{availableCount} available</small>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {selectedDay && (
+        <div className="booking-flow-card">
+          <div className="booking-step-heading">
+            <span>2</span>
+            <div>
+              <h4>Select a time period</h4>
+              <p>Only slots for this period will open in a popup.</p>
             </div>
           </div>
-        ))}
-      </div>
+          <div className="booking-period-grid">
+            {BOOKING_PERIODS.map(period => {
+              const slots = selectedDay.slots.filter(slot => {
+                const hour = slotHour(slot)
+                return hour >= period.startHour && hour < period.endHour
+              })
+              const availableCount = slots.filter(slot => slot.available).length
+              return (
+                <button key={period.id} type="button" className={'booking-period-card ' + (selectedPeriod === period.id ? 'active' : '')} onClick={() => choosePeriod(period.id)} disabled={slots.length === 0}>
+                  <strong>{period.label}</strong>
+                  <span>{period.range}</span>
+                  <small>{availableCount} available slots</small>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {selectedSlotDetails && (
+        <div className="booking-selection-summary">
+          <span>Selected appointment</span>
+          <strong>{new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(selectedSlotDetails.startTime))}</strong>
+        </div>
+      )}
       <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>
         {booking ? 'Booking…' : 'Confirm Appointment'}
       </button>
+
+      {slotsModalOpen && selectedPeriod && (
+        <div className="booking-modal-backdrop" role="presentation" onClick={() => setSlotsModalOpen(false)}>
+          <div className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-slots-title" onClick={e => e.stopPropagation()}>
+            <div className="booking-modal-header">
+              <div>
+                <span className="muted small">Step 3</span>
+                <h3 id="booking-slots-title">Select an available slot</h3>
+                <p>{new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {BOOKING_PERIODS.find(p => p.id === selectedPeriod)?.label}</p>
+              </div>
+              <button type="button" className="booking-modal-close" aria-label="Close slot picker" onClick={() => setSlotsModalOpen(false)}>×</button>
+            </div>
+            <div className="booking-slot-grid">
+              {periodSlots.map(slot => (
+                <button key={slot.startTime} type="button" disabled={!slot.available} onClick={() => { setSelectedSlot(slot.startTime); setSlotsModalOpen(false) }} className={'booking-slot-button ' + (selectedSlot === slot.startTime ? 'active' : '')}>
+                  {slot.label}
+                </button>
+              ))}
+              {periodSlots.length === 0 && <div className="muted">No slots are configured for this period.</div>}
+            </div>
+            <div className="booking-modal-footer">Booked slots are disabled. Select an available time, then confirm your appointment.</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
