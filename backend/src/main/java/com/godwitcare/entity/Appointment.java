@@ -39,7 +39,7 @@ public class Appointment {
     private Instant endTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 32)
     private Status status = Status.SCHEDULED;
 
     @Column(nullable = false)
