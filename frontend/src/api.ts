@@ -785,7 +785,7 @@ export async function confirmPaymentIntent(paymentIntentId: string): Promise<Pay
 }
 
 export async function getLatestPayment(): Promise<PaymentHistoryResponse | null> {
-  const res = await authFetch(resolveApiUrl('/payments/latest'), { method: 'GET' })
+  const res = await authFetch(resolveApiUrl(API_BASE, '/payments/latest'), { method: 'GET' })
   if (res.status === 204 || res.status === 404) return null
 
   const contentType = res.headers.get('content-type') || ''
