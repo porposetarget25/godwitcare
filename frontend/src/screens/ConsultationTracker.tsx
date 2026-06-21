@@ -7,6 +7,111 @@ type ContactChoice = 'SAME' | 'DIFFERENT'
 
 type CountryCode = { code: string; country: string; label: string }
 
+type DoctorOption = { id: number; name: string }
+type Slot = { startTime: string; endTime: string; label: string; available: boolean }
+type AvailabilityDay = { date: string; slots: Slot[] }
+
+function AppointmentBooking({ consultationId }: { consultationId: number }) {
+  const [doctors, setDoctors] = useState<DoctorOption[]>([])
+  const [doctorId, setDoctorId] = useState<number | null>(null)
+  const [days, setDays] = useState<AvailabilityDay[]>([])
+  const [selectedSlot, setSelectedSlot] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [booking, setBooking] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const res = await authFetch(`${API_BASE_URL}/appointments/doctors`, { cache: 'no-store' })
+      const data = res.ok ? ((await res.json()) as DoctorOption[]) : []
+      if (!alive) return
+      setDoctors(Array.isArray(data) ? data : [])
+      setDoctorId(data?.[0]?.id ?? null)
+    })()
+    return () => { alive = false }
+  }, [])
+
+  const loadAvailability = React.useCallback(async () => {
+    if (!doctorId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const from = new Date().toISOString().slice(0, 10)
+      const toDate = new Date()
+      toDate.setDate(toDate.getDate() + 6)
+      const to = toDate.toISOString().slice(0, 10)
+      const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.')
+      setDays(Array.isArray(data?.days) ? data.days : [])
+      setSelectedSlot('')
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load appointment slots.')
+      setDays([])
+    } finally {
+      setLoading(false)
+    }
+  }, [doctorId])
+
+  useEffect(() => { loadAvailability() }, [loadAvailability])
+
+  async function confirmBooking() {
+    if (!doctorId || !selectedSlot) return
+    setBooking(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await authFetch(`${API_BASE_URL}/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consultationId, doctorId, startTime: selectedSlot }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
+      setMessage(`Appointment booked for ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.startTime))}.`)
+      await loadAvailability()
+    } catch (e: any) {
+      setError(e?.message || 'Unable to book that slot.')
+    } finally {
+      setBooking(false)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 14, width: '100%' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <label style={{ fontWeight: 700 }}>Doctor</label>
+        <select className="input" value={doctorId ?? ''} onChange={e => setDoctorId(Number(e.target.value))} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #d1d5db' }}>
+          {doctors.map(d => <option key={d.id} value={d.id}>{d.name || `Doctor #${d.id}`}</option>)}
+        </select>
+        <span className="muted small">10-minute appointment slots</span>
+      </div>
+      {loading && <div className="muted">Loading available slots…</div>}
+      {error && <div style={{ color: '#991b1b', marginBottom: 10 }}>{error}</div>}
+      {message && <div style={{ color: '#047857', marginBottom: 10, fontWeight: 700 }}>{message}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {days.map(day => (
+          <div key={day.date} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, padding: 12 }}>
+            <div style={{ fontWeight: 800, marginBottom: 10 }}>{new Date(`${day.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+              {day.slots.map(slot => (
+                <button key={slot.startTime} type="button" disabled={!slot.available} onClick={() => setSelectedSlot(slot.startTime)} className={'btn ' + (selectedSlot === slot.startTime ? '' : 'secondary')} style={!slot.available ? { opacity: .45, cursor: 'not-allowed', background: '#e5e7eb', color: '#6b7280' } : { padding: '8px 10px' }}>
+                  {slot.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>
+        {booking ? 'Booking…' : 'Confirm Appointment'}
+      </button>
+    </div>
+  )
+}
+
 // A practical “full” list (covers essentially all calling codes in common use).
 // If you want, you can later move this into a separate file (e.g., src/constants/countryCodes.ts).
 const COUNTRY_CODES: CountryCode[] = [
@@ -545,7 +650,7 @@ export default function ConsultationTracker() {
             alignItems: 'center',
           }}
         >
-          <span>✅ Your call has been logged. A doctor will contact you shortly.</span>
+          <span>✅ Your consultation has been logged. Please choose an appointment slot below.</span>
           <button
             onClick={() => setShowToast(false)}
             aria-label="Dismiss notification"
@@ -739,28 +844,14 @@ export default function ConsultationTracker() {
       <div style={cardStyle}>
         <div className="consultation-step-row">
           <div>
-            <div style={titleStyle}>Step 3: Receive a call from Clinician</div>
+            <div style={titleStyle}>Step 3: Book an Appointment</div>
             <div style={textStyle}>
-              A clinician will contact you shortly via WhatsApp call to discuss your health concerns and provide expert
-              medical advice.
+              Choose a future 10-minute appointment slot with an available doctor. Booked slots are disabled to prevent double-booking.
             </div>
           </div>
-          {canOpenUpcoming ? (
-            <Link
-              to={travelerQueryString ? `/consultation/details?${travelerQueryString}` : '/consultation/details'}
-              className="btn secondary consultation-action-btn consultation-action-main"
-            >
-              Upcoming
-            </Link>
-          ) : (
-            <button
-              type="button"
-              className="btn secondary consultation-action-btn consultation-action-main"
-              style={disabledButtonStyle}
-              disabled
-              aria-disabled="true"
-            >
-              Upcoming
+          {latestCid ? <AppointmentBooking consultationId={latestCid} /> : (
+            <button type="button" className="btn secondary consultation-action-btn consultation-action-main" style={disabledButtonStyle} disabled aria-disabled="true">
+              Complete Step 1 first
             </button>
           )}
         </div>
