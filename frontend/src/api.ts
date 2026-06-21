@@ -311,6 +311,28 @@ export const API_BASE_URL = API_BASE
 
 // ---------- Generic request helper (resilient to HTML error pages) ----------
 // ---------- Generic request helper (resilient to HTML error pages) ----------
+function isHtmlResponse(contentType: string, text: string): boolean {
+  return contentType.includes('text/html') || /^\s*<!doctype\s+html/i.test(text) || /^\s*<html[\s>]/i.test(text)
+}
+
+function apiResponseMessage(status?: number): string {
+  const statusSuffix = status ? ` (HTTP ${status})` : ''
+  return `The backend API returned a web page instead of JSON${statusSuffix}. Please check that the API server is running and the frontend API base URL/proxy points to it.`
+}
+
+function parseJsonResponse<T>(text: string, contentType: string, status?: number): T {
+  if (!text) return {} as T
+  if (isHtmlResponse(contentType, text)) throw new Error(apiResponseMessage(status))
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    if (contentType.includes('application/json')) {
+      throw new Error(`The backend API returned malformed JSON${status ? ` (HTTP ${status})` : ''}.`)
+    }
+    return text as unknown as T
+  }
+}
+
 async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
   const res = await authFetch(url, {
@@ -323,21 +345,21 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   const text = await res.text()
 
   if (!res.ok) {
+    if (isHtmlResponse(contentType, text)) throw new Error(apiResponseMessage(res.status))
+
     let message = text.slice(0, 200)
     if (contentType.includes('application/json')) {
       try {
         const parsed = JSON.parse(text)
         message = parsed?.message || message
       } catch {
-        // fall back to raw response text
+        message = `The backend API returned malformed JSON (HTTP ${res.status}).`
       }
     }
     throw new Error(message || `HTTP ${res.status}`)
   }
 
-  if (!text) return {} as T
-  if (contentType.includes('application/json')) return JSON.parse(text) as T
-  try { return JSON.parse(text) as T } catch { return text as unknown as T }
+  return parseJsonResponse<T>(text, contentType, res.status)
 }
 
 
@@ -761,13 +783,24 @@ export async function confirmPaymentIntent(paymentIntentId: string): Promise<Pay
 export async function getLatestPayment(): Promise<PaymentHistoryResponse | null> {
   const res = await authFetch(resolveApiUrl('/payments/latest'), { method: 'GET' })
   if (res.status === 204 || res.status === 404) return null
+
+  const contentType = res.headers.get('content-type') || ''
+  const text = await res.text()
+
   if (!res.ok) {
+    if (isHtmlResponse(contentType, text)) throw new Error(apiResponseMessage(res.status))
+
     let message = 'Unable to load payment history.'
-    try {
-      const data = await res.json()
-      message = data?.message || message
-    } catch {}
+    if (contentType.includes('application/json')) {
+      try {
+        const data = JSON.parse(text)
+        message = data?.message || message
+      } catch {
+        message = `The backend API returned malformed JSON (HTTP ${res.status}).`
+      }
+    }
     throw new Error(message)
   }
-  return res.json()
+
+  return parseJsonResponse<PaymentHistoryResponse>(text, contentType, res.status)
 }
