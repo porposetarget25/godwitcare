@@ -243,6 +243,8 @@ export type PaymentTransactionResponse = Omit<PaymentIntentResponse, 'clientSecr
   cardBrand?: string
 }
 
+export type PaymentHistoryResponse = PaymentTransactionResponse
+
 // ---------- Model -> Backend payload mapper ----------
 function toBackend(r: Registration | any) {
   const base = {
@@ -754,4 +756,18 @@ export async function confirmPaymentIntent(paymentIntentId: string): Promise<Pay
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+export async function getLatestPayment(): Promise<PaymentHistoryResponse | null> {
+  const res = await authFetch(resolveApiUrl('/payments/latest'), { method: 'GET' })
+  if (res.status === 204 || res.status === 404) return null
+  if (!res.ok) {
+    let message = 'Unable to load payment history.'
+    try {
+      const data = await res.json()
+      message = data?.message || message
+    } catch {}
+    throw new Error(message)
+  }
+  return res.json()
 }
