@@ -302,9 +302,13 @@ const isGithubPages =
 const DEFAULT_DEV_BASE = '/api'
 const RENDER_BASE = 'https://godwitcare-1.onrender.com/api' // update if Render URL changes
 
-const API_BASE_RAW = isGithubPages
-  ? RENDER_BASE
-  : (import.meta.env?.VITE_API_BASE ?? DEFAULT_DEV_BASE)
+const isLocalDevHost =
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+
+const configuredApiBase = import.meta.env?.VITE_API_BASE?.trim()
+
+const API_BASE_RAW = configuredApiBase || (isGithubPages || !isLocalDevHost ? RENDER_BASE : DEFAULT_DEV_BASE)
 
 const API_BASE = API_BASE_RAW.replace(/\/$/, '')
 export const API_BASE_URL = API_BASE
