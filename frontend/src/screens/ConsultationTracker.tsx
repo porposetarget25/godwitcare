@@ -10,6 +10,7 @@ type CountryCode = { code: string; country: string; label: string }
 type DoctorOption = { id: number; name: string }
 type Slot = { startTime: string; endTime: string; label: string; available: boolean }
 type AvailabilityDay = { date: string; slots: Slot[] }
+type AvailabilityResponse = { days?: AvailabilityDay[]; timeZone?: string }
 
 type BookingPeriod = 'morning' | 'afternoon'
 
@@ -18,14 +19,20 @@ const BOOKING_PERIODS: Array<{ id: BookingPeriod; label: string; range: string; 
   { id: 'afternoon', label: 'Afternoon', range: '12:00 PM – 5:00 PM', startHour: 12, endHour: 17 },
 ]
 
-function slotHour(slot: Slot) {
-  return new Date(slot.startTime).getHours()
+function slotHour(slot: Slot, timeZone: string) {
+  const hourPart = new Intl.DateTimeFormat('en-GB', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone,
+  }).formatToParts(new Date(slot.startTime)).find(part => part.type === 'hour')?.value
+  return Number(hourPart ?? Number.NaN)
 }
 
 function AppointmentBooking({ consultationId }: { consultationId: number }) {
   const [doctors, setDoctors] = useState<DoctorOption[]>([])
   const [doctorId, setDoctorId] = useState<number | null>(null)
   const [days, setDays] = useState<AvailabilityDay[]>([])
+  const [availabilityTimeZone, setAvailabilityTimeZone] = useState('Europe/London')
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [selectedPeriod, setSelectedPeriod] = useState<BookingPeriod | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string>('')
@@ -57,10 +64,11 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
       toDate.setDate(toDate.getDate() + 6)
       const to = toDate.toISOString().slice(0, 10)
       const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
-      const data = await res.json().catch(() => null)
+      const data = await res.json().catch(() => null) as AvailabilityResponse | null
       if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.')
       const nextDays = Array.isArray(data?.days) ? data.days : []
       setDays(nextDays)
+      setAvailabilityTimeZone(data?.timeZone || 'Europe/London')
       setSelectedDate(nextDays[0]?.date ?? '')
       setSelectedPeriod(null)
       setSelectedSlot('')
@@ -68,6 +76,7 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
     } catch (e: any) {
       setError(e?.message || 'Unable to load appointment slots.')
       setDays([])
+      setAvailabilityTimeZone('Europe/London')
       setSelectedDate('')
       setSelectedPeriod(null)
       setSelectedSlot('')
@@ -86,10 +95,10 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
     const period = BOOKING_PERIODS.find(p => p.id === selectedPeriod)
     if (!period) return []
     return selectedDay.slots.filter(slot => {
-      const hour = slotHour(slot)
+      const hour = slotHour(slot, availabilityTimeZone)
       return hour >= period.startHour && hour < period.endHour
     })
-  }, [selectedDay, selectedPeriod])
+  }, [selectedDay, selectedPeriod, availabilityTimeZone])
 
   const selectedSlotDetails = useMemo(() => days.flatMap(day => day.slots).find(slot => slot.startTime === selectedSlot) ?? null, [days, selectedSlot])
 
@@ -176,15 +185,15 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
           <div className="booking-period-grid">
             {BOOKING_PERIODS.map(period => {
               const slots = selectedDay.slots.filter(slot => {
-                const hour = slotHour(slot)
+                const hour = slotHour(slot, availabilityTimeZone)
                 return hour >= period.startHour && hour < period.endHour
               })
               const availableCount = slots.filter(slot => slot.available).length
               return (
-                <button key={period.id} type="button" className={'booking-period-card ' + (selectedPeriod === period.id ? 'active' : '')} onClick={() => choosePeriod(period.id)} disabled={slots.length === 0}>
+                <button key={period.id} type="button" className={'booking-period-card ' + (selectedPeriod === period.id ? 'active' : '')} onClick={() => choosePeriod(period.id)} disabled={availableCount === 0}>
                   <strong>{period.label}</strong>
                   <span>{period.range}</span>
-                  <small>{availableCount} available slots</small>
+                  <small>{availableCount > 0 ? `${availableCount} available slots` : 'No available slots'}</small>
                 </button>
               )
             })}
