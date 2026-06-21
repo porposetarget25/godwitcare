@@ -60,6 +60,17 @@ public class PaymentController {
         ));
     }
 
+    @GetMapping("/latest")
+    public ResponseEntity<?> latestPayment(Authentication auth) {
+        Optional<User> ou = currentUser(auth);
+        if (ou.isEmpty()) return ResponseEntity.status(401).build();
+
+        return payments.findByUserIdOrderByIdDesc(ou.get().getId()).stream()
+                .findFirst()
+                .<ResponseEntity<?>>map(payment -> ResponseEntity.ok(toPaymentDto(payment)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @PostMapping("/payment-intents")
     public ResponseEntity<?> createPaymentIntent(Authentication auth, @RequestBody PaymentIntentRequest req) {
         Optional<User> ou = currentUser(auth);
