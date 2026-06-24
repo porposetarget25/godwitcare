@@ -61,7 +61,7 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
     try {
       const from = new Date().toISOString().slice(0, 10)
       const toDate = new Date()
-      toDate.setDate(toDate.getDate() + 6)
+      toDate.setDate(toDate.getDate() + 9)
       const to = toDate.toISOString().slice(0, 10)
       const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
       const data = await res.json().catch(() => null) as AvailabilityResponse | null
@@ -968,8 +968,8 @@ export default function ConsultationTracker() {
 
       {/* Step 3 */}
       <div style={cardStyle}>
-        <div className="consultation-step-row">
-          <div>
+        <div className="consultation-step-row consultation-step-row--booking">
+          <div className="consultation-step-copy consultation-step-copy--booking">
             <div style={titleStyle}>Step 3: Book an Appointment</div>
             <div style={textStyle}>
               Choose a future 10-minute appointment slot with an available doctor. Booked slots are disabled to prevent double-booking.

@@ -1572,14 +1572,30 @@ html { scroll-behavior: smooth; }
 }
 
 /* Patient appointment booking flow */
+.consultation-step-copy {
+  min-width: 0;
+}
+
+.consultation-step-row--booking {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(520px, 1.6fr);
+  align-items: start;
+  column-gap: clamp(20px, 3vw, 40px);
+}
+
+.consultation-step-copy--booking {
+  max-width: 430px;
+}
+
 .appointment-booking {
-  margin-top: 14px;
+  margin-top: 0;
   width: 100%;
+  min-width: 0;
 }
 
 .appointment-booking-header {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   align-items: center;
   margin-bottom: 12px;
@@ -1596,16 +1612,16 @@ html { scroll-behavior: smooth; }
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 16px;
-  padding: 16px;
+  padding: 14px;
   margin-top: 12px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
 
 .booking-step-heading {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .booking-step-heading > span {
@@ -1640,11 +1656,11 @@ html { scroll-behavior: smooth; }
 }
 
 .booking-date-grid {
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
 }
 
 .booking-period-grid {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
 .booking-date-card,
@@ -1654,7 +1670,7 @@ html { scroll-behavior: smooth; }
   border: 1px solid #dbeafe;
   border-radius: 14px;
   color: #0f172a;
-  padding: 12px;
+  padding: 10px 12px;
   text-align: left;
   transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease, background .2s ease;
 }
@@ -1685,8 +1701,8 @@ html { scroll-behavior: smooth; }
 .booking-date-card strong,
 .booking-period-card strong {
   display: block;
-  font-size: 18px;
-  margin: 3px 0;
+  font-size: 17px;
+  margin: 2px 0;
 }
 
 .booking-date-card small,
@@ -1770,6 +1786,17 @@ html { scroll-behavior: smooth; }
   padding-top: 12px;
 }
 
+@media (max-width: 1024px) {
+  .consultation-step-row--booking {
+    grid-template-columns: 1fr;
+    row-gap: 14px;
+  }
+
+  .consultation-step-copy--booking {
+    max-width: 760px;
+  }
+}
+
 @media (max-width: 640px) {
   .appointment-booking-header,
   .booking-modal-header {
@@ -1781,7 +1808,15 @@ html { scroll-behavior: smooth; }
     width: 100%;
   }
 
-  .booking-date-grid {
+  .booking-date-grid,
+  .booking-period-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .booking-date-grid,
+  .booking-period-grid {
+    grid-template-columns: 1fr;
   }
 }
