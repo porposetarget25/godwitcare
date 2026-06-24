@@ -1570,3 +1570,509 @@ html { scroll-behavior: smooth; }
   margin: 12px 0;
   padding: 14px;
 }
+
+/* Patient appointment booking flow */
+.consultation-step-copy {
+  min-width: 0;
+}
+
+.consultation-step-row--booking {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(520px, 1.6fr);
+  align-items: start;
+  column-gap: clamp(20px, 3vw, 40px);
+}
+
+.consultation-step-copy--booking {
+  max-width: 430px;
+}
+
+.appointment-booking {
+  margin-top: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.appointment-booking-header {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.appointment-doctor-select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+}
+
+.booking-flow-card,
+.booking-selection-summary {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px;
+  margin-top: 12px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.booking-step-heading {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.booking-step-heading > span {
+  align-items: center;
+  background: var(--brand);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 800;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.booking-step-heading h4,
+.booking-modal-header h3 {
+  margin: 0;
+}
+
+.booking-step-heading p,
+.booking-modal-header p {
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.booking-date-grid,
+.booking-period-grid,
+.booking-slot-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.booking-date-grid {
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+}
+
+.booking-period-grid {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.booking-date-card,
+.booking-period-card,
+.booking-slot-button {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  color: #0f172a;
+  padding: 10px 12px;
+  text-align: left;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease, background .2s ease;
+}
+
+.booking-date-card:hover,
+.booking-period-card:hover,
+.booking-slot-button:hover {
+  border-color: var(--brand);
+  box-shadow: 0 10px 24px rgba(0, 128, 128, 0.14);
+  transform: translateY(-1px);
+}
+
+.booking-date-card.active,
+.booking-period-card.active,
+.booking-slot-button.active {
+  background: #e6fffb;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(0, 128, 128, 0.12);
+}
+
+.booking-date-card span,
+.booking-date-card small,
+.booking-period-card span,
+.booking-period-card small {
+  display: block;
+}
+
+.booking-date-card strong,
+.booking-period-card strong {
+  display: block;
+  font-size: 17px;
+  margin: 2px 0;
+}
+
+.booking-date-card small,
+.booking-period-card small,
+.booking-selection-summary span,
+.booking-modal-footer {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.booking-period-card:disabled,
+.booking-slot-button:disabled {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: .55;
+  transform: none;
+  box-shadow: none;
+}
+
+.booking-selection-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.booking-modal-backdrop {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 80;
+}
+
+.booking-modal {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.32);
+  max-height: calc(100vh - 36px);
+  max-width: 560px;
+  overflow: auto;
+  padding: 18px;
+  width: 100%;
+}
+
+.booking-modal-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.booking-modal-close {
+  background: #f1f5f9;
+  border: 0;
+  border-radius: 999px;
+  color: #0f172a;
+  font-size: 26px;
+  height: 38px;
+  line-height: 1;
+  width: 38px;
+}
+
+.booking-slot-grid {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.booking-slot-button {
+  font-weight: 800;
+  text-align: center;
+}
+
+.booking-modal-footer {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+@media (max-width: 1024px) {
+  .consultation-step-row--booking {
+    grid-template-columns: 1fr;
+    row-gap: 14px;
+  }
+
+  .consultation-step-copy--booking {
+    max-width: 760px;
+  }
+}
+
+@media (max-width: 640px) {
+  .appointment-booking-header,
+  .booking-modal-header {
+    align-items: stretch;
+  }
+
+  .appointment-doctor-select,
+  .booking-period-grid {
+    width: 100%;
+  }
+
+  .booking-date-grid,
+  .booking-period-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .booking-date-grid,
+  .booking-period-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Doctor appointment calendar */
+.doctor-appointments-page .page-head,
+.doctor-calendar-layout,
+.doctor-appointment-details,
+.doctor-appointments-status {
+  max-width: 1180px;
+}
+
+.doctor-appointments-status {
+  margin: 0 auto 16px;
+}
+
+.doctor-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, .85fr);
+  gap: 18px;
+  margin: 0 auto;
+}
+
+.doctor-calendar-card,
+.doctor-day-panel,
+.doctor-appointment-details {
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.doctor-calendar-toolbar,
+.doctor-day-panel-head,
+.doctor-detail-head {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.doctor-calendar-title,
+.doctor-day-panel h2,
+.doctor-detail-head h2 {
+  margin: 0;
+  text-align: left;
+}
+
+.doctor-calendar-nav {
+  align-items: center;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  border-radius: 999px;
+  color: #075985;
+  display: inline-flex;
+  font-size: 34px;
+  font-weight: 800;
+  height: 46px;
+  justify-content: center;
+  line-height: 1;
+  width: 46px;
+}
+
+.doctor-calendar-weekdays,
+.doctor-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.doctor-calendar-weekdays {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+  margin: 18px 0 8px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.doctor-calendar-grid {
+  gap: 8px;
+}
+
+.doctor-calendar-day {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  color: #0f172a;
+  min-height: 86px;
+  padding: 10px;
+  position: relative;
+  text-align: left;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.doctor-calendar-day:hover {
+  border-color: #7ecde3;
+  box-shadow: 0 12px 24px rgba(14, 116, 144, 0.12);
+  transform: translateY(-1px);
+}
+
+.doctor-calendar-day.is-muted {
+  color: #94a3b8;
+  opacity: .72;
+}
+
+.doctor-calendar-day.has-appointments {
+  background: linear-gradient(135deg, #ecfeff, #dbeafe);
+  border-color: #67e8f9;
+}
+
+.doctor-calendar-day.is-selected {
+  background: #008080;
+  border-color: #008080;
+  color: #ffffff;
+}
+
+.doctor-calendar-day.is-today:not(.is-selected) {
+  box-shadow: inset 0 0 0 2px #0f766e;
+}
+
+.doctor-calendar-date-number {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.doctor-calendar-badge {
+  align-items: center;
+  background: #0f172a;
+  border-radius: 999px;
+  bottom: 10px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  height: 24px;
+  justify-content: center;
+  min-width: 24px;
+  padding: 0 7px;
+  position: absolute;
+  right: 10px;
+}
+
+.doctor-calendar-day.is-selected .doctor-calendar-badge {
+  background: #ffffff;
+  color: #008080;
+}
+
+.doctor-day-count {
+  background: #eef2ff;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.doctor-empty-day {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.doctor-appointment-list,
+.doctor-detail-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.doctor-appointment-item {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.doctor-appointment-time {
+  color: #075985;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.doctor-appointment-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.doctor-appointment-summary span:not(.doctor-status) {
+  color: #475569;
+  font-size: 14px;
+}
+
+.doctor-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 4px 9px;
+  width: fit-content;
+}
+
+.doctor-status--scheduled { background: #dbeafe; color: #1d4ed8; }
+.doctor-status--completed { background: #dcfce7; color: #166534; }
+.doctor-status--cancelled { background: #fee2e2; color: #991b1b; }
+
+.doctor-view-details {
+  white-space: nowrap;
+}
+
+.doctor-appointment-details {
+  margin: 18px auto 0;
+}
+
+.doctor-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .doctor-calendar-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .doctor-calendar-day {
+    border-radius: 12px;
+    min-height: 58px;
+    padding: 7px;
+  }
+
+  .doctor-calendar-date-number {
+    font-size: 15px;
+  }
+
+  .doctor-calendar-badge {
+    bottom: 6px;
+    font-size: 11px;
+    height: 20px;
+    min-width: 20px;
+    right: 6px;
+  }
+
+  .doctor-appointment-item,
+  .doctor-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .doctor-view-details {
+    justify-content: center;
+    width: 100%;
+  }
+}
