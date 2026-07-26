@@ -219,7 +219,7 @@ public class ConsultationController {
         java.time.Instant toInstant = to == null
                 ? null : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         List<Consultation> all = consultations.searchForDoctor(
-                filterStatus, normalizedName, fromInstant, toInstant);
+                filterStatus, normalizedName, from != null, fromInstant, to != null, toInstant);
 
         List<Map<String, Object>> out = new ArrayList<>(all.size());
         for (Consultation c : all) {
