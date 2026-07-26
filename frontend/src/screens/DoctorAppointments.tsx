@@ -2,209 +2,40 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL, authFetch } from '../api'
 
-type Appointment = {
-  id: number
-  startTime: string
-  endTime: string
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
-  patientName: string
-  patientEmail?: string
-  contactPhone?: string
-  contactAddress?: string
-  consultationId: number
-  reason?: string
+type Appointment = { id:number; startTime:string; endTime:string; status:'SCHEDULED'|'COMPLETED'|'CANCELLED'; patientName:string; patientEmail?:string; contactPhone?:string; contactAddress?:string; consultationId:number; reason?:string }
+type Availability = { id:number; startDate:string; endDate:string; startTime:string; endTime:string; activeDays:number[] }
+type TimeBlock = { id:number; startTime:string; endTime:string; reason?:string }
+type Schedule = { availability:Availability[]; blocks:TimeBlock[] }
+const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+const dateKey=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+const monthStart=(d:Date)=>new Date(d.getFullYear(),d.getMonth(),1)
+const calendarDays=(month:Date)=>{const first=monthStart(month), start=new Date(first);start.setDate(first.getDate()-((first.getDay()+6)%7));return Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d})}
+const when=(s:string)=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short'}).format(new Date(s))
+const time=(s:string)=>new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit'}).format(new Date(s))
+
+export default function DoctorAppointments(){
+ const [tab,setTab]=React.useState<'calendar'|'availability'|'blocks'>('calendar'), [items,setItems]=React.useState<Appointment[]>([]), [schedule,setSchedule]=React.useState<Schedule>({availability:[],blocks:[]})
+ const [selected,setSelected]=React.useState<Appointment|null>(null),[loading,setLoading]=React.useState(true),[message,setMessage]=React.useState('')
+ const [month,setMonth]=React.useState(()=>monthStart(new Date())),[selectedDate,setSelectedDate]=React.useState(()=>dateKey(new Date()))
+ const [availabilityForm,setAvailabilityForm]=React.useState({startDate:dateKey(new Date()),endDate:dateKey(new Date()),startTime:'09:00',endTime:'17:00',activeDays:[1,2,3,4,5]})
+ const [blockForm,setBlockForm]=React.useState({date:dateKey(new Date(Date.now()+86400000)),startTime:'09:00',endTime:'17:00',reason:''})
+ const load=React.useCallback(async()=>{setLoading(true);try{const [a,s]=await Promise.all([authFetch(`${API_BASE_URL}/doctor/appointments`,{cache:'no-store'}),authFetch(`${API_BASE_URL}/doctor/schedule`,{cache:'no-store'})]);if(a.ok)setItems(await a.json());if(s.ok)setSchedule(await s.json())}finally{setLoading(false)}},[])
+ React.useEffect(()=>{void load()},[load])
+ const grouped=React.useMemo(()=>items.reduce<Record<string,Appointment[]>>((o,a)=>{(o[a.startTime.slice(0,10)]??=[]).push(a);return o},{}),[items])
+ const selectedItems=(grouped[selectedDate]||[]).sort((a,b)=>a.startTime.localeCompare(b.startTime))
+ async function request(url:string,init:RequestInit){setMessage('');const r=await authFetch(`${API_BASE_URL}${url}`,{...init,headers:{'Content-Type':'application/json',...(init.headers||{})}});if(!r.ok){let text='Unable to save changes.';try{text=(await r.json()).message||text}catch{}setMessage(text);return}setMessage('Schedule updated successfully.');await load()}
+ function localInstant(date:string,value:string){return new Date(`${date}T${value}:00`).toISOString()}
+ return <section className="section doctor-appointments-page">
+  <div className="page-head page-head--split"><div><div className="kicker">Doctor workspace</div><h1 className="page-title">My Schedule</h1></div><Link className="btn secondary" to="/doctor/consultations">Consultation Requests</Link></div>
+  <nav className="doctor-schedule-tabs" aria-label="Schedule sections">{([['calendar','Calendar'],['availability','Availability Setup'],['blocks','Leave & Exceptions']] as const).map(([id,label])=><button key={id} className={tab===id?'is-active':''} onClick={()=>setTab(id)}>{label}</button>)}</nav>
+  {message&&<div className="doctor-schedule-message" role="status">{message}</div>}{loading&&<div className="muted doctor-appointments-status">Loading schedule…</div>}
+  {tab==='calendar'&&<div className="doctor-calendar-layout"><div className="card doctor-calendar-card">
+   <div className="doctor-calendar-toolbar"><button className="doctor-calendar-nav" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}>‹</button><div><div className="kicker">Monthly view</div><h2 className="h2 doctor-calendar-title">{month.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</h2></div><button className="doctor-calendar-nav" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}>›</button></div>
+   <div className="doctor-calendar-weekdays">{dayNames.map(d=><span key={d}>{d}</span>)}</div><div className="doctor-calendar-grid">{calendarDays(month).map(d=>{const key=dateKey(d),count=grouped[key]?.length||0,blocked=schedule.blocks.some(b=>key>=b.startTime.slice(0,10)&&key<=b.endTime.slice(0,10));return <button key={key} className={['doctor-calendar-day',count?'has-appointments':'',blocked?'is-blocked':'',key===selectedDate?'is-selected':'',d.getMonth()!==month.getMonth()?'is-muted':''].filter(Boolean).join(' ')} onClick={()=>setSelectedDate(key)}><span className="doctor-calendar-date-number">{d.getDate()}</span>{count>0&&<span className="doctor-calendar-badge">{count}</span>}{blocked&&<small>Blocked</small>}</button>})}</div>
+  </div><aside className="card doctor-day-panel"><div className="doctor-day-panel-head"><div><div className="kicker">Selected date</div><h2 className="h3">{new Date(`${selectedDate}T00:00`).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</h2></div><span className="doctor-day-count">{selectedItems.length} appointment{selectedItems.length===1?'':'s'}</span></div>{!selectedItems.length?<div className="muted doctor-empty-day">No appointments scheduled for this date.</div>:<div className="doctor-appointment-list">{selectedItems.map(a=><article className="doctor-appointment-item" key={a.id}><div className="doctor-appointment-time">{time(a.startTime)}</div><div className="doctor-appointment-summary"><strong>{a.patientName||'Patient'}</strong><span>Consultation #{a.consultationId}</span><span className={`doctor-status doctor-status--${a.status.toLowerCase()}`}>{a.status}</span></div><button className="btn secondary doctor-view-details" onClick={()=>setSelected(a)}>View details</button></article>)}</div>}</aside></div>}
+  {tab==='availability'&&<div className="doctor-management-grid"><form className="card doctor-schedule-form" onSubmit={e=>{e.preventDefault();void request('/doctor/schedule/availability',{method:'POST',body:JSON.stringify(availabilityForm)})}}><h2 className="h3">New availability</h2><div className="doctor-form-grid"><label>From<input type="date" value={availabilityForm.startDate} onChange={e=>setAvailabilityForm({...availabilityForm,startDate:e.target.value})}/></label><label>To<input type="date" value={availabilityForm.endDate} onChange={e=>setAvailabilityForm({...availabilityForm,endDate:e.target.value})}/></label><label>Opens at<input type="time" step="600" value={availabilityForm.startTime} onChange={e=>setAvailabilityForm({...availabilityForm,startTime:e.target.value})}/></label><label>Closes at<input type="time" step="600" value={availabilityForm.endTime} onChange={e=>setAvailabilityForm({...availabilityForm,endTime:e.target.value})}/></label></div><fieldset><legend>Active days</legend><div className="doctor-day-chips">{dayNames.map((d,i)=><button type="button" key={d} className={availabilityForm.activeDays.includes(i+1)?'is-active':''} onClick={()=>setAvailabilityForm({...availabilityForm,activeDays:availabilityForm.activeDays.includes(i+1)?availabilityForm.activeDays.filter(x=>x!==i+1):[...availabilityForm.activeDays,i+1]})}>{d}</button>)}</div></fieldset><button className="btn" type="submit">Save availability</button></form><ScheduleList title="Active schedules" empty="No availability configured. The existing 09:00–17:00 clinic schedule remains active." rows={schedule.availability.map(a=>({id:a.id,title:`${a.startDate} – ${a.endDate}`,detail:`${a.startTime.slice(0,5)} – ${a.endTime.slice(0,5)} · ${a.activeDays.map(d=>dayNames[d-1]).join(', ')}`}))} onDelete={id=>request(`/doctor/schedule/availability/${id}`,{method:'DELETE'})}/></div>}
+  {tab==='blocks'&&<div className="doctor-management-grid"><form className="card doctor-schedule-form" onSubmit={e=>{e.preventDefault();void request('/doctor/schedule/blocks',{method:'POST',body:JSON.stringify({startTime:localInstant(blockForm.date,blockForm.startTime),endTime:localInstant(blockForm.date,blockForm.endTime),reason:blockForm.reason})})}}><h2 className="h3">Block time</h2><p className="muted">Add leave, training or another exception. Periods containing appointments cannot be blocked.</p><div className="doctor-form-grid"><label>Date<input type="date" value={blockForm.date} onChange={e=>setBlockForm({...blockForm,date:e.target.value})}/></label><span/><label>From<input type="time" value={blockForm.startTime} onChange={e=>setBlockForm({...blockForm,startTime:e.target.value})}/></label><label>To<input type="time" value={blockForm.endTime} onChange={e=>setBlockForm({...blockForm,endTime:e.target.value})}/></label></div><label>Reason (optional)<input value={blockForm.reason} maxLength={255} placeholder="Conference, annual leave…" onChange={e=>setBlockForm({...blockForm,reason:e.target.value})}/></label><button className="btn" type="submit">Block selected time</button></form><ScheduleList title="Leave & exceptions" empty="No blocked periods." rows={schedule.blocks.map(b=>({id:b.id,title:`${when(b.startTime)} – ${time(b.endTime)}`,detail:b.reason||'No reason provided'}))} onDelete={id=>request(`/doctor/schedule/blocks/${id}`,{method:'DELETE'})}/></div>}
+  {selected&&<div className="card doctor-appointment-details"><div className="page-head page-head--split doctor-detail-head"><h2 className="h3">Appointment Details</h2><button className="btn secondary" onClick={()=>setSelected(null)}>Close</button></div><div className="doctor-detail-grid"><div><strong>Patient:</strong> {selected.patientName}</div><div><strong>Date/time:</strong> {when(selected.startTime)}</div><div><strong>Status:</strong> {selected.status}</div><div><strong>Consultation:</strong> <Link to={`/doctor/consultations/${selected.consultationId}`}>#{selected.consultationId}</Link></div><div><strong>Reason/details:</strong> {selected.reason||'—'}</div><div><strong>Contact:</strong> {[selected.contactPhone,selected.patientEmail,selected.contactAddress].filter(Boolean).join(' • ')||'—'}</div></div></div>}
+ </section>
 }
-
-function formatWhen(value: string) {
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? value : new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(d)
-}
-
-function formatTime(value: string) {
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? value : new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(d)
-}
-
-function formatDateKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function readableDate(dateKey: string) {
-  const date = new Date(`${dateKey}T00:00:00`)
-  return Number.isNaN(date.getTime()) ? dateKey : date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function buildCalendarDays(month: Date) {
-  const first = startOfMonth(month)
-  const firstWeekday = (first.getDay() + 6) % 7
-  const start = new Date(first)
-  start.setDate(first.getDate() - firstWeekday)
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(start)
-    day.setDate(start.getDate() + index)
-    return day
-  })
-}
-
-export default function DoctorAppointments() {
-  const [items, setItems] = React.useState<Appointment[]>([])
-  const [selected, setSelected] = React.useState<Appointment | null>(null)
-  const [loading, setLoading] = React.useState(false)
-  const [visibleMonth, setVisibleMonth] = React.useState(() => startOfMonth(new Date()))
-  const [selectedDate, setSelectedDate] = React.useState(() => formatDateKey(new Date()))
-
-  React.useEffect(() => {
-    let alive = true
-    ;(async () => {
-      setLoading(true)
-      try {
-        const res = await authFetch(`${API_BASE_URL}/doctor/appointments`, { cache: 'no-store' })
-        const data = res.ok ? ((await res.json()) as Appointment[]) : []
-        if (alive) {
-          const nextItems = Array.isArray(data) ? data : []
-          setItems(nextItems)
-          if (nextItems.length > 0) {
-            const firstAppointment = [...nextItems].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0]
-            const firstDate = firstAppointment.startTime.slice(0, 10)
-            setSelectedDate(firstDate)
-            setVisibleMonth(startOfMonth(new Date(`${firstDate}T00:00:00`)))
-          }
-        }
-      } finally {
-        if (alive) setLoading(false)
-      }
-    })()
-    return () => { alive = false }
-  }, [])
-
-  const grouped = React.useMemo(() => {
-    return items.reduce<Record<string, Appointment[]>>((acc, appt) => {
-      const key = appt.startTime.slice(0, 10)
-      acc[key] = acc[key] || []
-      acc[key].push(appt)
-      acc[key].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-      return acc
-    }, {})
-  }, [items])
-
-  const calendarDays = React.useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth])
-  const selectedAppointments = grouped[selectedDate] || []
-  const todayKey = formatDateKey(new Date())
-  const monthLabel = visibleMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-
-  function moveMonth(offset: number) {
-    setVisibleMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1))
-  }
-
-  function selectDay(day: Date) {
-    const key = formatDateKey(day)
-    setSelectedDate(key)
-    setSelected(null)
-    if (day.getMonth() !== visibleMonth.getMonth() || day.getFullYear() !== visibleMonth.getFullYear()) {
-      setVisibleMonth(startOfMonth(day))
-    }
-  }
-
-  return (
-    <section className="section doctor-appointments-page">
-      <div className="page-head page-head--split">
-        <h1 className="page-title">Appointment Calendar</h1>
-        <Link className="btn secondary" to="/doctor/consultations">Consultation Requests</Link>
-      </div>
-
-      {loading && <div className="muted doctor-appointments-status">Loading appointments…</div>}
-      {!loading && items.length === 0 && <div className="card doctor-appointments-status"><div className="muted">No upcoming appointments booked.</div></div>}
-
-      <div className="doctor-calendar-layout">
-        <div className="card doctor-calendar-card">
-          <div className="doctor-calendar-toolbar">
-            <button className="doctor-calendar-nav" type="button" onClick={() => moveMonth(-1)} aria-label="Previous month">‹</button>
-            <div>
-              <div className="kicker">Monthly view</div>
-              <h2 className="h2 doctor-calendar-title">{monthLabel}</h2>
-            </div>
-            <button className="doctor-calendar-nav" type="button" onClick={() => moveMonth(1)} aria-label="Next month">›</button>
-          </div>
-
-          <div className="doctor-calendar-weekdays" aria-hidden="true">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <span key={day}>{day}</span>)}
-          </div>
-
-          <div className="doctor-calendar-grid">
-            {calendarDays.map(day => {
-              const key = formatDateKey(day)
-              const appointments = grouped[key] || []
-              const isSelected = key === selectedDate
-              const isOutsideMonth = day.getMonth() !== visibleMonth.getMonth()
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={['doctor-calendar-day', appointments.length ? 'has-appointments' : '', isSelected ? 'is-selected' : '', isOutsideMonth ? 'is-muted' : '', key === todayKey ? 'is-today' : ''].filter(Boolean).join(' ')}
-                  onClick={() => selectDay(day)}
-                  aria-pressed={isSelected}
-                >
-                  <span className="doctor-calendar-date-number">{day.getDate()}</span>
-                  {appointments.length > 0 && <span className="doctor-calendar-badge">{appointments.length}</span>}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <aside className="card doctor-day-panel">
-          <div className="doctor-day-panel-head">
-            <div>
-              <div className="kicker">Selected date</div>
-              <h2 className="h3">{readableDate(selectedDate)}</h2>
-            </div>
-            <span className="doctor-day-count">{selectedAppointments.length} appointment{selectedAppointments.length === 1 ? '' : 's'}</span>
-          </div>
-
-          {selectedAppointments.length === 0 ? (
-            <div className="muted doctor-empty-day">No appointments scheduled for this date.</div>
-          ) : (
-            <div className="doctor-appointment-list">
-              {selectedAppointments.map(appt => (
-                <article key={appt.id} className="doctor-appointment-item">
-                  <div className="doctor-appointment-time">{formatTime(appt.startTime)}</div>
-                  <div className="doctor-appointment-summary">
-                    <strong>{appt.patientName || 'Patient'}</strong>
-                    <span>Consultation #{appt.consultationId || '—'}</span>
-                    <span className={`doctor-status doctor-status--${appt.status.toLowerCase()}`}>{appt.status}</span>
-                  </div>
-                  <button className="btn secondary doctor-view-details" type="button" onClick={() => setSelected(appt)}>View details</button>
-                </article>
-              ))}
-            </div>
-          )}
-        </aside>
-      </div>
-
-      {selected && (
-        <div className="card doctor-appointment-details">
-          <div className="page-head page-head--split doctor-detail-head">
-            <h2 className="h3">Appointment Details</h2>
-            <button className="btn secondary" type="button" onClick={() => setSelected(null)}>Close</button>
-          </div>
-          <div className="doctor-detail-grid">
-            <div><strong>Patient:</strong> {selected.patientName || '—'}</div>
-            <div><strong>Date/time:</strong> {formatWhen(selected.startTime)}</div>
-            <div><strong>Status:</strong> {selected.status}</div>
-            <div><strong>Consultation:</strong> <Link to={`/doctor/consultations/${selected.consultationId}`}>#{selected.consultationId}</Link></div>
-            <div><strong>Reason/details:</strong> {selected.reason || '—'}</div>
-            <div><strong>Contact:</strong> {[selected.contactPhone, selected.patientEmail, selected.contactAddress].filter(Boolean).join(' • ') || '—'}</div>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
+function ScheduleList({title,empty,rows,onDelete}:{title:string;empty:string;rows:{id:number;title:string;detail:string}[];onDelete:(id:number)=>void}){return <div className="card doctor-schedule-list"><div className="doctor-list-heading"><h2 className="h3">{title}</h2><span>{rows.length} entries</span></div>{!rows.length?<p className="muted">{empty}</p>:rows.map(r=><div className="doctor-schedule-row" key={r.id}><div><strong>{r.title}</strong><span>{r.detail}</span></div><button className="btn secondary" onClick={()=>onDelete(r.id)}>Remove</button></div>)}</div>}
