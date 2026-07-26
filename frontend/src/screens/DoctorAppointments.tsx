@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL, authFetch } from '../api'
 import { clinicDateKey, clinicDateTime, clinicTime, clinicTodayLabel } from '../lib/appointmentTime'
 
@@ -15,6 +15,7 @@ const when=clinicDateTime
 const time=clinicTime
 
 export default function DoctorAppointments(){
+ const navigate=useNavigate()
  const [tab,setTab]=React.useState<'today'|'calendar'|'availability'|'blocks'>('today'), [items,setItems]=React.useState<Appointment[]>([]), [schedule,setSchedule]=React.useState<Schedule>({availability:[],blocks:[]})
  const [selected,setSelected]=React.useState<Appointment|null>(null),[loading,setLoading]=React.useState(true),[message,setMessage]=React.useState('')
  const [month,setMonth]=React.useState(()=>{const [year,month]=clinicDateKey().split('-').map(Number);return new Date(year,month-1,1)}),[selectedDate,setSelectedDate]=React.useState(()=>clinicDateKey())
@@ -31,8 +32,8 @@ export default function DoctorAppointments(){
  async function request(url:string,init:RequestInit){setMessage('');const r=await authFetch(`${API_BASE_URL}${url}`,{...init,headers:{'Content-Type':'application/json',...(init.headers||{})}});if(!r.ok){let text='Unable to save changes.';try{text=(await r.json()).message||text}catch{}setMessage(text);return}setMessage('Schedule updated successfully.');await load()}
  function localInstant(date:string,value:string){return new Date(`${date}T${value}:00`).toISOString()}
  return <section className="section doctor-appointments-page">
-  <div className="page-head page-head--split"><div><div className="kicker">Doctor workspace</div><h1 className="page-title">My Schedule</h1></div><Link className="btn secondary" to="/doctor/consultations">Consultation Requests</Link></div>
-  <nav className="doctor-schedule-tabs" aria-label="Schedule sections">{([['today',"Today's Schedule"],['calendar','My Calendar'],['availability','Availability Setup'],['blocks','Leave & Exceptions']] as const).map(([id,label])=><button key={id} className={tab===id?'is-active':''} onClick={()=>setTab(id)}>{label}</button>)}</nav>
+  <div className="page-head page-head--split"><div><div className="kicker">Doctor workspace</div><h1 className="page-title">My Schedule</h1></div><button className="btn secondary" type="button" onClick={()=>navigate(-1)}>← Back</button></div>
+  <nav className="doctor-schedule-tabs" aria-label="Schedule sections"><button className={tab==='today'?'is-active':''} onClick={()=>setTab('today')}>Today's Schedule</button><button className={tab==='calendar'?'is-active':''} onClick={()=>setTab('calendar')}>My Calendar</button><Link to="/doctor/consultations">Consultations</Link><button className={tab==='availability'?'is-active':''} onClick={()=>setTab('availability')}>Availability Setup</button><button className={tab==='blocks'?'is-active':''} onClick={()=>setTab('blocks')}>Leave &amp; Exceptions</button></nav>
   {message&&<div className="doctor-schedule-message" role="status">{message}</div>}{loading&&<div className="muted doctor-appointments-status">Loading schedule…</div>}
   {tab==='today'&&!loading&&<div className="doctor-today-view">
    <div className="doctor-today-heading"><div><div className="kicker">Doctor workspace</div><h2>Today's Schedule</h2></div><time dateTime={todayKey}>{clinicTodayLabel()}</time></div>
