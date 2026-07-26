@@ -24,13 +24,15 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
               and (:patientName = ''
                    or lower(c.contactName) like lower(concat('%', :patientName, '%'))
                    or lower(u.email) like lower(concat('%', :patientName, '%')))
-              and (:fromDate is null or c.createdAt >= :fromDate)
-              and (:toDate is null or c.createdAt < :toDate)
+              and (:hasFromDate = false or c.createdAt >= :fromDate)
+              and (:hasToDate = false or c.createdAt < :toDate)
             order by c.createdAt desc, c.id desc
             """)
     List<Consultation> searchForDoctor(
             @Param("status") Consultation.Status status,
             @Param("patientName") String patientName,
+            @Param("hasFromDate") boolean hasFromDate,
             @Param("fromDate") Instant fromDate,
+            @Param("hasToDate") boolean hasToDate,
             @Param("toDate") Instant toDate);
 }
