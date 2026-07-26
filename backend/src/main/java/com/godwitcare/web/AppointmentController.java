@@ -7,6 +7,7 @@ import com.godwitcare.entity.User;
 import com.godwitcare.repo.AppointmentRepository;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.UserRepository;
+import com.godwitcare.service.DoctorScheduleService;
 import java.time.*;
 import java.util.*;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,11 +27,13 @@ public class AppointmentController {
     private final AppointmentRepository appointments;
     private final ConsultationRepository consultations;
     private final UserRepository users;
+    private final DoctorScheduleService schedules;
 
-    public AppointmentController(AppointmentRepository appointments, ConsultationRepository consultations, UserRepository users) {
+    public AppointmentController(AppointmentRepository appointments, ConsultationRepository consultations, UserRepository users, DoctorScheduleService schedules) {
         this.appointments = appointments;
         this.consultations = consultations;
         this.users = users;
+        this.schedules = schedules;
     }
 
     @GetMapping("/appointments/doctors")
@@ -70,7 +73,7 @@ public class AppointmentController {
             List<Map<String, Object>> slots = new ArrayList<>();
             for (LocalDateTime cursor = LocalDateTime.of(day, DAY_START); cursor.toLocalTime().isBefore(DAY_END); cursor = cursor.plusMinutes(SLOT_MINUTES)) {
                 Instant start = cursor.atZone(CLINIC_ZONE).toInstant();
-                boolean disabled = !start.isAfter(now) || booked.contains(start);
+                boolean disabled = !start.isAfter(now) || booked.contains(start) || !schedules.isAvailable(doctor.getId(), start, start.plus(Duration.ofMinutes(SLOT_MINUTES)));
                 slots.add(Map.of(
                         "startTime", start.toString(),
                         "endTime", start.plus(Duration.ofMinutes(SLOT_MINUTES)).toString(),
@@ -111,6 +114,7 @@ public class AppointmentController {
         catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("message", "Invalid appointment time.")); }
         if (!start.isAfter(Instant.now())) return ResponseEntity.badRequest().body(Map.of("message", "Please choose a future appointment time."));
         if (!isClinicSlot(start)) return ResponseEntity.badRequest().body(Map.of("message", "Please choose one of the available appointment slots."));
+        if (!schedules.isAvailable(doctor.getId(), start, start.plus(Duration.ofMinutes(SLOT_MINUTES)))) return ResponseEntity.status(409).body(Map.of("message", "The doctor is not available at this time."));
         if (appointments.findByConsultationId(consultationId).isPresent()) return ResponseEntity.badRequest().body(Map.of("message", "This consultation already has an appointment."));
         if (appointments.existsByDoctorIdAndStartTimeAndStatusNot(doctor.getId(), start, Appointment.Status.CANCELLED)) return ResponseEntity.status(409).body(Map.of("message", "This appointment slot was just booked. Please choose another time."));
 
