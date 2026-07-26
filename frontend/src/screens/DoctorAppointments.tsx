@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL, authFetch } from '../api'
+import { clinicDateKey, clinicDateTime, clinicTime, clinicTodayLabel } from '../lib/appointmentTime'
 
 type Appointment = { id:number; startTime:string; endTime:string; status:'SCHEDULED'|'COMPLETED'|'CANCELLED'; patientName:string; patientEmail?:string; contactPhone?:string; contactAddress?:string; consultationId:number; reason?:string }
 type Availability = { id:number; startDate:string; endDate:string; startTime:string; endTime:string; activeDays:number[] }
@@ -10,21 +11,21 @@ const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 const dateKey=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 const monthStart=(d:Date)=>new Date(d.getFullYear(),d.getMonth(),1)
 const calendarDays=(month:Date)=>{const first=monthStart(month), start=new Date(first);start.setDate(first.getDate()-((first.getDay()+6)%7));return Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d})}
-const when=(s:string)=>new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short'}).format(new Date(s))
-const time=(s:string)=>new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit'}).format(new Date(s))
+const when=clinicDateTime
+const time=clinicTime
 
 export default function DoctorAppointments(){
  const [tab,setTab]=React.useState<'today'|'calendar'|'availability'|'blocks'>('today'), [items,setItems]=React.useState<Appointment[]>([]), [schedule,setSchedule]=React.useState<Schedule>({availability:[],blocks:[]})
  const [selected,setSelected]=React.useState<Appointment|null>(null),[loading,setLoading]=React.useState(true),[message,setMessage]=React.useState('')
- const [month,setMonth]=React.useState(()=>monthStart(new Date())),[selectedDate,setSelectedDate]=React.useState(()=>dateKey(new Date()))
+ const [month,setMonth]=React.useState(()=>{const [year,month]=clinicDateKey().split('-').map(Number);return new Date(year,month-1,1)}),[selectedDate,setSelectedDate]=React.useState(()=>clinicDateKey())
  const [availabilityForm,setAvailabilityForm]=React.useState({startDate:dateKey(new Date()),endDate:dateKey(new Date()),startTime:'09:00',endTime:'17:00',activeDays:[1,2,3,4,5]})
  const [blockForm,setBlockForm]=React.useState({date:dateKey(new Date(Date.now()+86400000)),startTime:'09:00',endTime:'17:00',reason:''})
  const load=React.useCallback(async()=>{setLoading(true);try{const [a,s]=await Promise.all([authFetch(`${API_BASE_URL}/doctor/appointments`,{cache:'no-store'}),authFetch(`${API_BASE_URL}/doctor/schedule`,{cache:'no-store'})]);if(a.ok)setItems(await a.json());if(s.ok)setSchedule(await s.json())}finally{setLoading(false)}},[])
  React.useEffect(()=>{void load()},[load])
- const grouped=React.useMemo(()=>items.reduce<Record<string,Appointment[]>>((o,a)=>{(o[a.startTime.slice(0,10)]??=[]).push(a);return o},{}),[items])
+ const grouped=React.useMemo(()=>items.reduce<Record<string,Appointment[]>>((o,a)=>{(o[clinicDateKey(a.startTime)]??=[]).push(a);return o},{}),[items])
  const selectedItems=(grouped[selectedDate]||[]).sort((a,b)=>a.startTime.localeCompare(b.startTime))
- const todayKey=dateKey(new Date())
- const todayItems=React.useMemo(()=>items.filter(a=>dateKey(new Date(a.startTime))===todayKey&&a.status!=='CANCELLED').sort((a,b)=>a.startTime.localeCompare(b.startTime)),[items,todayKey])
+ const todayKey=clinicDateKey()
+ const todayItems=React.useMemo(()=>items.filter(a=>clinicDateKey(a.startTime)===todayKey&&a.status!=='CANCELLED').sort((a,b)=>a.startTime.localeCompare(b.startTime)),[items,todayKey])
  const nextAppointment=todayItems.find(a=>new Date(a.endTime).getTime()>Date.now())
  const todayQueue=nextAppointment?todayItems.filter(a=>a.id!==nextAppointment.id):todayItems
  async function request(url:string,init:RequestInit){setMessage('');const r=await authFetch(`${API_BASE_URL}${url}`,{...init,headers:{'Content-Type':'application/json',...(init.headers||{})}});if(!r.ok){let text='Unable to save changes.';try{text=(await r.json()).message||text}catch{}setMessage(text);return}setMessage('Schedule updated successfully.');await load()}
@@ -34,7 +35,7 @@ export default function DoctorAppointments(){
   <nav className="doctor-schedule-tabs" aria-label="Schedule sections">{([['today',"Today's Schedule"],['calendar','My Calendar'],['availability','Availability Setup'],['blocks','Leave & Exceptions']] as const).map(([id,label])=><button key={id} className={tab===id?'is-active':''} onClick={()=>setTab(id)}>{label}</button>)}</nav>
   {message&&<div className="doctor-schedule-message" role="status">{message}</div>}{loading&&<div className="muted doctor-appointments-status">Loading schedule…</div>}
   {tab==='today'&&!loading&&<div className="doctor-today-view">
-   <div className="doctor-today-heading"><div><div className="kicker">Doctor workspace</div><h2>Today's Schedule</h2></div><time dateTime={todayKey}>{new Date().toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})}</time></div>
+   <div className="doctor-today-heading"><div><div className="kicker">Doctor workspace</div><h2>Today's Schedule</h2></div><time dateTime={todayKey}>{clinicTodayLabel()}</time></div>
    {nextAppointment?<article className="doctor-next-card"><div className="doctor-next-copy"><div className="doctor-next-label"><span aria-hidden="true">▶</span> Next up</div><h3>{nextAppointment.patientName||'Patient'}</h3><p>{time(nextAppointment.startTime)} – {time(nextAppointment.endTime)} <span>·</span> <span className={`doctor-status doctor-status--${nextAppointment.status.toLowerCase()}`}>{nextAppointment.status}</span></p></div><div className="doctor-next-action"><strong>{appointmentCountdown(nextAppointment.startTime)}</strong><Link className="btn" to={`/doctor/consultations/${nextAppointment.consultationId}`}><span aria-hidden="true">▷</span> Start</Link></div></article>:<div className="doctor-today-empty"><strong>No more appointments today</strong><span>Your upcoming schedule is clear.</span></div>}
    <section className="doctor-today-queue"><div className="doctor-queue-heading"><h3>Today's Queue</h3><span>{todayQueue.length} remaining</span></div>{todayQueue.length===0?<p className="muted">There are no other appointments in today's queue.</p>:todayQueue.map(a=><article className="doctor-queue-row" key={a.id}><strong>{time(a.startTime)} – {time(a.endTime)}</strong><span>{a.patientName||'Patient'}</span><Link className="btn secondary" to={`/doctor/consultations/${a.consultationId}`}><span aria-hidden="true">◉</span> View</Link></article>)}</section>
   </div>}
