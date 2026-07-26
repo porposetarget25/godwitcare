@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { authFetch, API_BASE_URL, resolveApiUrl, getMe } from '../api'
+import { clinicDateKey, clinicDateTime, clinicTime } from '../lib/appointmentTime'
 
 type ContactChoice = 'SAME' | 'DIFFERENT'
 
@@ -59,9 +60,9 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
     setLoading(true)
     setError(null)
     try {
-      const from = new Date().toISOString().slice(0, 10)
-      const toDate = new Date()
-      toDate.setDate(toDate.getDate() + 9)
+      const from = clinicDateKey()
+      const [year, month, day] = from.split('-').map(Number)
+      const toDate = new Date(Date.UTC(year, month - 1, day + 9, 12))
       const to = toDate.toISOString().slice(0, 10)
       const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
       const data = await res.json().catch(() => null) as AvailabilityResponse | null
@@ -128,7 +129,7 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
-      setMessage(`Appointment booked for ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(data.startTime))}.`)
+      setMessage(`Appointment booked for ${clinicDateTime(data.startTime)}.`)
       await loadAvailability()
     } catch (e: any) {
       setError(e?.message || 'Unable to book that slot.')
@@ -204,7 +205,7 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
       {selectedSlotDetails && (
         <div className="booking-selection-summary">
           <span>Selected appointment</span>
-          <strong>{new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(selectedSlotDetails.startTime))}</strong>
+          <strong>{new Intl.DateTimeFormat('en-GB', { timeZone: availabilityTimeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(selectedSlotDetails.startTime))} {clinicTime(selectedSlotDetails.startTime)}</strong>
         </div>
       )}
       <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>

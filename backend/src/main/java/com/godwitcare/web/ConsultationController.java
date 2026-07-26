@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 
 
 import java.util.*;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 
 @RestController
@@ -201,17 +203,23 @@ public class ConsultationController {
     @GetMapping("/doctor/consultations")
     @PreAuthorize("hasRole('DOCTOR')")
     public List<Map<String, Object>> listAll(
-            @RequestParam(name = "status", required = false, defaultValue = "ALL") String statusParam
+            @RequestParam(name = "status", required = false, defaultValue = "ALL") String statusParam,
+            @RequestParam(name = "patientName", required = false) String patientName,
+            @RequestParam(name = "from", required = false) LocalDate from,
+            @RequestParam(name = "to", required = false) LocalDate to
     ) {
-        List<Consultation> all = consultations.findAll();
-        all.sort(Comparator.comparingLong(Consultation::getId).reversed());
-
         final Consultation.Status filterStatus = parseFilterStatus(statusParam);
-        if (filterStatus != null) {
-            all = all.stream()
-                    .filter(c -> c.getStatus() == filterStatus)
-                    .collect(java.util.stream.Collectors.toList());
-        }
+        // Keep the search parameter a non-null String. PostgreSQL can otherwise infer a
+        // null parameter used by lower(concat(...)) as bytea and reject lower(bytea).
+        String normalizedName = patientName == null || patientName.isBlank()
+                ? "" : patientName.trim();
+        java.time.Instant fromInstant = from == null
+                ? null : from.atStartOfDay(ZoneOffset.UTC).toInstant();
+        // The upper bound is exclusive, so the selected "To" calendar day is included.
+        java.time.Instant toInstant = to == null
+                ? null : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        List<Consultation> all = consultations.searchForDoctor(
+                filterStatus, normalizedName, from != null, fromInstant, to != null, toInstant);
 
         List<Map<String, Object>> out = new ArrayList<>(all.size());
         for (Consultation c : all) {
@@ -301,6 +309,9 @@ public class ConsultationController {
     ) throws Exception {
         Consultation c = consultations.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
+        if (c.getStatus() == Consultation.Status.COMPLETED) {
+            return ResponseEntity.status(409).body(Map.of("error", "Completed consultations are read-only"));
+        }
 
         String history = (String) body.getOrDefault("history", "");
         String diagnosis = (String) body.getOrDefault("diagnosis", "");
@@ -361,6 +372,9 @@ public class ConsultationController {
     ) throws Exception {
         Consultation c = consultations.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
+        if (c.getStatus() == Consultation.Status.COMPLETED) {
+            return ResponseEntity.status(409).body(Map.of("error", "Consultation is already completed"));
+        }
 
         c.setStatus(Consultation.Status.COMPLETED);
         c.setHistoryOfPresentingComplaint((String) body.getOrDefault("history", c.getHistoryOfPresentingComplaint()));
@@ -381,6 +395,9 @@ public class ConsultationController {
     ) throws Exception {
         Consultation c = consultations.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
+        if (c.getStatus() == Consultation.Status.COMPLETED) {
+            return ResponseEntity.status(409).body(Map.of("error", "Completed consultations are read-only"));
+        }
 
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         @SuppressWarnings("unchecked")
