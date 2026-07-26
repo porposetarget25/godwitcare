@@ -37,9 +37,11 @@ import { logout } from './api';
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
-  const logoSrc = `${import.meta.env.BASE_URL}assets/logo.png`;
+  const logoSrc = `${import.meta.env.BASE_URL}assets/logo-header.png`;
+  const logoColorSrc = `${import.meta.env.BASE_URL}assets/logo-header-color.png`;
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
 
   React.useEffect(() => {
@@ -55,6 +57,11 @@ function Shell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('mousedown', handleDocumentClick);
   }, [menuOpen]);
 
+  React.useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
+
   async function handleLogout() {
     await logout();
     await refresh();
@@ -63,6 +70,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   }
 
   async function handleTopNavClick(hash: '#top' | '#how' | '#features' | '#testimonials') {
+    setMobileMenuOpen(false);
     if (user) {
       await logout();
       await refresh();
@@ -74,21 +82,22 @@ function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="container">
+    <>
       <header>
         <div className="nav">
           <div className="nav-left">
-            <div className="logoBadge">
-              <img className="logo" src={logoSrc} alt="GodwitCare" />
-            </div>
-            <span className="envBadge">GodwitCare - Test Environment</span>
+            <img className="logo" src={logoSrc} alt="GodwitCare" />
+            <span className="envBadge">Test Environment</span>
           </div>
 
-          <div className="navlinks">
-            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
-            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#how')}>How it Works</button>
-            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
-            <button type="button" className="top-nav-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
+          <nav className="navlinks">
+            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
+            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#how')}>How It Works</button>
+            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
+            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
+          </nav>
+
+          <div className="nav-right">
             {user ? (
               <div className="menu-wrap" ref={menuRef}>
                 <button
@@ -98,10 +107,26 @@ function Shell({ children }: { children: React.ReactNode }) {
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen(prev => !prev)}
                 >
-                  ☰
+                  <span className="menu-btn-avatar-wrap">
+                    {user.photoUrl ? (
+                      <img className="menu-btn-avatar" src={user.photoUrl} alt="" />
+                    ) : (
+                      <span className="menu-btn-initials">
+                        {`${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
+                          || (user.email?.[0]?.toUpperCase() ?? '?')}
+                      </span>
+                    )}
+                  </span>
+                  <span className="menu-btn-name">{user.firstName}</span>
+                  <span className="menu-btn-chevron" aria-hidden="true">▾</span>
                 </button>
                 {menuOpen ? (
                   <div className="menu-dropdown">
+                    <div className="menu-dropdown-header">
+                      <span className="menu-dropdown-name">{user.firstName} {user.lastName}</span>
+                      <span className="menu-dropdown-email">{user.email}</span>
+                    </div>
+                    <div className="menu-dropdown-divider" />
                     <Link to="/profile" onClick={() => setMenuOpen(false)}>Update Profile</Link>
                     <button type="button" className="dropdown-action-btn" onClick={() => { setMenuOpen(false); navigate(`/home?openPayments=${Date.now()}#payments`); }}>Payments</button>
                     <Link to="/change-password" onClick={() => setMenuOpen(false)}>Change Password</Link>
@@ -109,12 +134,65 @@ function Shell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : null}
               </div>
+            ) : (
+              <div className="nav-auth-desktop">
+                <Link to="/login" className="nav-login-link">Login</Link>
+                <Link to="/register/1" className="nav-signup-btn">Register</Link>
+              </div>
+            )}
+            {!user ? (
+              <Link to="/login" className="nav-mobile-login-btn" onClick={() => setMobileMenuOpen(false)}>Log in</Link>
             ) : null}
+            <button
+              type="button"
+              className="mobile-menu-toggle"
+              aria-label="Open menu"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <span className="hamburger-icon">
+                <span /><span /><span />
+              </span>
+            </button>
           </div>
         </div>
       </header>
-      <main>{children}</main>
-    </div>
+
+      {mobileMenuOpen ? (
+        <div className="mobile-menu-overlay">
+          <div className="mobile-menu-topbar">
+            <img className="mobile-menu-logo" src={logoColorSrc} alt="GodwitCare" />
+            <div className="mobile-menu-topbar-actions">
+              {!user ? (
+                <Link to="/login" className="nav-mobile-login-btn" onClick={() => setMobileMenuOpen(false)}>Log in</Link>
+              ) : null}
+              <button
+                type="button"
+                className="mobile-menu-close"
+                aria-label="Close menu"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <nav className="mobile-menu-list">
+            <button type="button" onClick={() => void handleTopNavClick('#top')}>Home</button>
+            <button type="button" onClick={() => void handleTopNavClick('#how')}>How It Works</button>
+            <button type="button" onClick={() => void handleTopNavClick('#features')}>Features</button>
+            <button type="button" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
+          </nav>
+
+          <div className="mobile-menu-cta">
+            <Link to="/register/1" className="mobile-menu-cta-btn" onClick={() => setMobileMenuOpen(false)}>Register</Link>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="container">
+        <main>{children}</main>
+      </div>
+    </>
   );
 }
 
