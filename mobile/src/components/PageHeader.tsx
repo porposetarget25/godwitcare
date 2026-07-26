@@ -59,11 +59,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: 12,
     minHeight: 58,
-    elevation: 6,
+    elevation: 2,
     shadowColor: colors.brandDark,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
   },
   sideLeft: {
     width: 44,
@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
   title: {
     color: colors.white,
     fontSize: typography.md,
-    fontWeight: '700',
-    letterSpacing: 0.4,
+    fontWeight: '600',
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
   subtitle: {

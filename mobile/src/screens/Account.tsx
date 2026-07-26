@@ -323,7 +323,7 @@ const s = StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 60, gap: spacing.md },
 
   // Header icon buttons
-  iconBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFD580', alignItems: 'center', justifyContent: 'center' },
+  iconBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.amber, alignItems: 'center', justifyContent: 'center' },
   iconBtnTick:   { fontSize: 18, fontWeight: '900', color: colors.brandDark },
   iconBtnOutline:{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   iconBtnPencil: { fontSize: 16 },
@@ -380,7 +380,7 @@ const s = StyleSheet.create({
 const ps = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet:     { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36 },
-  handle:    { width: 36, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
+  handle:    { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   title:     { fontSize: typography.md, fontWeight: '700', color: colors.text, textAlign: 'center', paddingVertical: spacing.lg },
   sep:       { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl },
   option:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 16, gap: spacing.md },

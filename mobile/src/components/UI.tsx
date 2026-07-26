@@ -28,25 +28,30 @@ export function Btn({
 }: BtnProps) {
 
   const bg =
-    disabled    ? '#c8d1db'
+    disabled    ? colors.surface
     : variant === 'primary'   ? colors.brand
-    : variant === 'secondary' ? colors.brandMid
-    : variant === 'danger'    ? colors.error
+    : variant === 'secondary' ? colors.surface
+    : variant === 'danger'    ? colors.errorBg
     : 'transparent';
 
   const tc =
-    disabled    ? '#8898aa'
+    disabled    ? colors.mutedLight
     : variant === 'primary'   ? '#fff'
-    : variant === 'secondary' ? colors.brandDark
-    : variant === 'danger'    ? '#fff'
+    : variant === 'secondary' ? colors.text
+    : variant === 'danger'    ? colors.error
     : variant === 'outline'   ? colors.brand
     : colors.brand;
 
-  const borderColor  = variant === 'outline' ? colors.brand : 'transparent';
-  const borderWidth  = variant === 'outline' ? 1.5 : 0;
+  const borderColor  =
+    disabled    ? colors.lineMid
+    : variant === 'outline'   ? colors.brand
+    : variant === 'secondary' ? colors.lineMid
+    : variant === 'danger'    ? colors.errorBorder
+    : 'transparent';
+  const borderWidth  = variant === 'ghost' || variant === 'primary' ? 0 : 1;
 
-  const padV  = size === 'sm' ? 8  : size === 'lg' ? 16 : 12;
-  const padH  = size === 'sm' ? 14 : size === 'lg' ? 28 : 20;
+  const padV  = size === 'sm' ? 7  : size === 'lg' ? 14 : 11;
+  const padH  = size === 'sm' ? 14 : size === 'lg' ? 26 : 18;
   const fSize = size === 'sm' ? typography.sm : size === 'lg' ? typography.md : typography.base;
 
   return (
@@ -57,7 +62,6 @@ export function Btn({
       style={[
         styles.btn,
         { backgroundColor: bg, borderColor, borderWidth, paddingVertical: padV, paddingHorizontal: padH },
-        variant === 'primary' && !disabled && shadow.brand,
         fullWidth && { width: '100%', alignSelf: 'stretch' },
         style,
       ]}
@@ -210,10 +214,10 @@ export function SectionHeader({ title, sub }: { title: string; sub?: string }) {
 const styles = StyleSheet.create({
   // Button
   btn: {
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 46,
     minWidth: 80,
   },
   btnInner: {
@@ -222,16 +226,16 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   btnText: {
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
 
   // Card
   card: {
     backgroundColor: colors.bgCard,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: colors.lineMid,
     padding: spacing.lg,
     marginBottom: spacing.md,
     ...shadow.sm,
@@ -239,7 +243,7 @@ const styles = StyleSheet.create({
 
   // Field
   fieldLabel: {
-    fontWeight: '600',
+    fontWeight: '500',
     fontSize: typography.sm,
     color: colors.textSec,
     marginBottom: spacing.xs,
@@ -254,26 +258,26 @@ const styles = StyleSheet.create({
 
   // Input
   input: {
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.lineMid,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     fontSize: typography.base,
     color: colors.text,
-    backgroundColor: colors.white,
-    minHeight: 48,
+    backgroundColor: colors.surface,
+    minHeight: 46,
   },
   inputErr: { borderColor: colors.error },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.lineMid,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
-    minHeight: 48,
+    minHeight: 46,
     gap: spacing.sm,
   },
   inputRowErr: { borderColor: colors.error },
@@ -287,7 +291,7 @@ const styles = StyleSheet.create({
 
   // Text
   muted: { color: colors.muted, fontSize: typography.base, lineHeight: typography.base * 1.55 },
-  strong: { fontWeight: '700', color: colors.text, fontSize: typography.base },
+  strong: { fontWeight: '600', color: colors.text, fontSize: typography.base },
 
   // Error Banner
   errorBanner: {
@@ -317,8 +321,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: spacing.lg,
   },
   pageTitle: {
-    fontSize: typography.xl, fontWeight: '700',
-    color: colors.text, flex: 1, letterSpacing: -0.3,
+    fontSize: typography.xl, fontWeight: '500',
+    color: colors.text, flex: 1, letterSpacing: -0.2,
   },
 
   // Section
@@ -332,12 +336,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm, paddingVertical: 3,
     borderRadius: radius.full, borderWidth: 1, alignSelf: 'flex-start',
   },
-  badgeText: { fontSize: typography.xs, fontWeight: '600', letterSpacing: 0.2 },
+  badgeText: { fontSize: typography.xs, fontWeight: '500', letterSpacing: 0.2 },
 
   // Section Header
   sectionHeaderWrap: { marginBottom: spacing.lg, gap: 3 },
   sectionHeaderTitle: {
-    fontSize: typography.lg, fontWeight: '700', color: colors.text, letterSpacing: -0.3,
+    fontSize: typography.lg, fontWeight: '500', color: colors.text, letterSpacing: -0.2,
   },
   sectionHeaderSub: { fontSize: typography.sm, color: colors.muted },
 });

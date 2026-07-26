@@ -74,8 +74,8 @@ const styles = StyleSheet.create({
   },
   envText: {
     fontSize: typography.xs,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontWeight: '600',
+    color: colors.text,
   },
   navLinks: {
     flexDirection: 'row',
@@ -83,9 +83,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   navLink: {
-    color: '#eaf2ff',
+    color: colors.brandLight,
     fontSize: typography.sm,
-    fontWeight: '700',
+    fontWeight: '600',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },

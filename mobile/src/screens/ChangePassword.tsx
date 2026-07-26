@@ -236,9 +236,9 @@ const s = StyleSheet.create({
   progressDecor1: { position: 'absolute', top: -30, right: -30, width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.08)' },
   progressDecor2: { position: 'absolute', bottom: -20, left: -20, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.06)' },
   progressLine:     { flex: 1, height: 2, backgroundColor: 'rgba(255,255,255,0.25)', marginHorizontal: spacing.xs },
-  progressLineDone: { backgroundColor: '#FFD580' },
+  progressLineDone: { backgroundColor: colors.amber },
   progressDot:      { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
-  progressDotActive:{ backgroundColor: '#FFD580', borderColor: '#FFD580' },
+  progressDotActive:{ backgroundColor: colors.amber, borderColor: colors.amber },
   progressDotDone:  { backgroundColor: '#fff', borderColor: '#fff' },
   progressDotNum:   { fontSize: typography.sm, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
   progressDotNumActive: { color: colors.brandDark },
@@ -269,7 +269,7 @@ const s = StyleSheet.create({
   matchErr:   { fontSize: typography.xs, color: colors.error, marginTop: 2 },
 
   // Buttons
-  primaryBtn:     { backgroundColor: '#FFD580', borderRadius: radius.full, paddingVertical: 14, alignItems: 'center', ...shadow.brand },
+  primaryBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 14, alignItems: 'center', ...shadow.brand },
   primaryBtnText: { fontSize: typography.base, fontWeight: '800', color: colors.brandDark },
 
   // Resend

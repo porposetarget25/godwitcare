@@ -43,7 +43,7 @@ function TravellerRow({ traveler, index }: { traveler: Traveler; index: number }
     .split(' ').map(w => w[0] || '').slice(0, 2).join('').toUpperCase() || '?';
 
   // Pick a deterministic accent colour from the brand palette
-  const ACCENTS = ['#008080','#00a0a0','#006060','#0099cc','#007755'];
+  const ACCENTS = [colors.brand, '#1B8494', colors.brandDark, '#2F8FA0', '#0F5C50'];
   const accent  = ACCENTS[index % ACCENTS.length];
 
   function toggle() {
@@ -382,11 +382,11 @@ const tc = StyleSheet.create({
   headerTitle:      { color: colors.white, fontSize: typography.xl, fontWeight: '800', marginBottom: spacing.xl, letterSpacing: -0.3 },
   routeRow:         { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   routeStop:        { alignItems: 'center', gap: 4, flex: 1 },
-  stopDot:          { color: '#FFD580', fontSize: 10 },
+  stopDot:          { color: colors.amber, fontSize: 10 },
   stopName:         { color: colors.white, fontSize: typography.sm, fontWeight: '700', textAlign: 'center' },
   routeLine:        { flex: 2, flexDirection: 'row', alignItems: 'center', gap: 4 },
   line:             { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.35)' },
-  planeIcon:        { color: '#FFD580', fontSize: 18 },
+  planeIcon:        { color: colors.amber, fontSize: 18 },
   dateStrip:        { flexDirection: 'row', backgroundColor: colors.bgGray, paddingVertical: spacing.md },
   dateBlock:        { flex: 1, alignItems: 'center', gap: 2 },
   dateDivider:      { width: 1, backgroundColor: colors.line },

@@ -12,11 +12,11 @@ const TABS = [
 ];
 
 function HomeIcon({ active }: { active: boolean }) {
-  const c = active ? colors.brand : '#94a3b8';
+  const c = active ? colors.brand : colors.muted;
   return (
     <View style={{ width: 24, height: 22, alignItems: 'center' }}>
       <View style={{ width: 0, height: 0, borderLeftWidth: 12, borderRightWidth: 12, borderBottomWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: c, position: 'absolute', top: 0 }} />
-      <View style={{ position: 'absolute', bottom: 0, width: 16, height: 12, backgroundColor: active ? colors.brandLight : '#f1f5f9', borderWidth: 2, borderColor: c, borderTopWidth: 0 }}>
+      <View style={{ position: 'absolute', bottom: 0, width: 16, height: 12, backgroundColor: active ? colors.brandLight : colors.surface, borderWidth: 2, borderColor: c, borderTopWidth: 0 }}>
         <View style={{ position: 'absolute', bottom: 0, left: '50%', marginLeft: -3, width: 6, height: 7, backgroundColor: c, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} />
       </View>
     </View>
@@ -24,17 +24,17 @@ function HomeIcon({ active }: { active: boolean }) {
 }
 
 function ProfileIcon({ active }: { active: boolean }) {
-  const c = active ? colors.brand : '#94a3b8';
+  const c = active ? colors.brand : colors.muted;
   return (
     <View style={{ width: 22, height: 22, alignItems: 'center' }}>
-      <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: c, backgroundColor: active ? colors.brandLight : '#f1f5f9', position: 'absolute', top: 0 }} />
-      <View style={{ position: 'absolute', bottom: 0, width: 20, height: 11, borderTopLeftRadius: 11, borderTopRightRadius: 11, borderWidth: 2, borderColor: c, borderBottomWidth: 0, backgroundColor: active ? colors.brandLight : '#f1f5f9' }} />
+      <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: c, backgroundColor: active ? colors.brandLight : colors.surface, position: 'absolute', top: 0 }} />
+      <View style={{ position: 'absolute', bottom: 0, width: 20, height: 11, borderTopLeftRadius: 11, borderTopRightRadius: 11, borderWidth: 2, borderColor: c, borderBottomWidth: 0, backgroundColor: active ? colors.brandLight : colors.surface }} />
     </View>
   );
 }
 
 function MoreIcon({ active }: { active: boolean }) {
-  const c = active ? colors.brand : '#94a3b8';
+  const c = active ? colors.brand : colors.muted;
   return (
     <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center', height: 22, justifyContent: 'center' }}>
       {[0,1,2].map(i => <View key={i} style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: c, opacity: i === 1 ? 1 : 0.7 }} />)}
@@ -74,12 +74,12 @@ export function BottomNav() {
 }
 
 const s = StyleSheet.create({
-  container:    { flexDirection: 'row', backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: '#e8edf2', paddingBottom: 8, paddingTop: 4, elevation: 16, shadowColor: '#1a2e4a', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 10 },
+  container:    { flexDirection: 'row', backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, paddingBottom: 8, paddingTop: 4, elevation: 16, shadowColor: colors.brandDark, shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.05, shadowRadius: 8 },
   tab:          { flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3, position: 'relative' },
   topBar:       { position: 'absolute', top: 0, width: 28, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: 'transparent' },
   topBarActive: { backgroundColor: colors.brand },
   iconWrap:     { width: 46, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   iconWrapActive:{ backgroundColor: colors.brandLight },
-  label:        { fontSize: 10, color: '#94a3b8', fontWeight: '500', letterSpacing: 0.3 },
+  label:        { fontSize: 10, color: colors.muted, fontWeight: '500', letterSpacing: 0.3 },
   labelActive:  { color: colors.brand, fontWeight: '700' },
 });

@@ -141,10 +141,10 @@ const s = StyleSheet.create({
 
   // Answer badge
   answerBadge:     { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full, alignSelf: 'flex-start' },
-  answerYes:       { backgroundColor: '#fff3cd' },
+  answerYes:       { backgroundColor: colors.warningBg },
   answerNo:        { backgroundColor: colors.successBg },
   answerBadgeText: { fontSize: typography.xs, fontWeight: '700' },
-  answerYesText:   { color: '#92400e' },
+  answerYesText:   { color: colors.warning },
   answerNoText:    { color: colors.success },
 
   // Yes/No toggle — matches app button style
@@ -154,7 +154,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.bgGray,
   },
-  toggleBtnYes:       { backgroundColor: '#FFD580', borderColor: '#FFD580' },
+  toggleBtnYes:       { backgroundColor: colors.amber, borderColor: colors.amber },
   toggleBtnNo:        { backgroundColor: colors.brand, borderColor: colors.brand },
   toggleBtnText:      { fontSize: typography.base, fontWeight: '600', color: colors.muted },
   toggleBtnTextActive:{ color: colors.brandDark },
@@ -162,7 +162,7 @@ const s = StyleSheet.create({
 
   // Save button
   saveBtn: {
-    backgroundColor: '#FFD580', borderRadius: radius.full,
+    backgroundColor: colors.amber, borderRadius: radius.full,
     paddingVertical: 15, alignItems: 'center', marginTop: spacing.sm,
     ...shadow.brand,
   },

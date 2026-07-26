@@ -166,7 +166,7 @@ const s = StyleSheet.create({
   input:        { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 12 },
   eyeIcon:      { fontSize: 16 },
   matchErr:     { fontSize: typography.xs, color: colors.error, marginTop: 2 },
-  submitBtn:    { backgroundColor: '#FFD580', borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
+  submitBtn:    { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   submitBtnText:{ fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
   backRow:      { alignItems: 'center', paddingVertical: spacing.xs },
   backText:     { fontSize: typography.sm, color: colors.muted },

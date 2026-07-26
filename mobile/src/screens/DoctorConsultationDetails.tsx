@@ -104,7 +104,7 @@ export default function DoctorConsultationDetails() {
             const note = (data.detailsByQuestion || {})[qid];
             const isYes = String(ans).toLowerCase() === 'yes';
             return (
-              <View key={qid} style={[styles.answerRow, isYes && { backgroundColor: '#fef3c7' }]}>
+              <View key={qid} style={[styles.answerRow, isYes && { backgroundColor: colors.errorBg }]}>
                 <Text style={styles.qid}>{qid}</Text>
                 <Text style={{ fontWeight: isYes ? '700' : '400' }}>{String(ans)}</Text>
                 {note && <Muted style={{ fontSize: 12 }}>{note}</Muted>}

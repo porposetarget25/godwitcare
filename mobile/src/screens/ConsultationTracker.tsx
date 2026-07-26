@@ -337,15 +337,15 @@ const s = StyleSheet.create({
   progressHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   progressTitle:      { fontSize: typography.sm, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.8 },
   progressSub:        { fontSize: typography.lg, fontWeight: '800', color: '#fff', marginTop: 2 },
-  progressBadge:      { backgroundColor: '#FFD580', borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  progressBadge:      { backgroundColor: colors.amber, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
   progressBadgeText:  { fontSize: typography.sm, fontWeight: '800', color: colors.brandDark },
   progressBarBg:      { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill:    { height: 6, backgroundColor: '#FFD580', borderRadius: 3 },
+  progressBarFill:    { height: 6, backgroundColor: colors.amber, borderRadius: 3 },
 
   // Dot row
   dotRow:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dot:              { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
-  dotActive:        { backgroundColor: '#FFD580', borderColor: '#FFD580' },
+  dotActive:        { backgroundColor: colors.amber, borderColor: colors.amber },
   dotDone:          { backgroundColor: '#fff', borderColor: '#fff' },
   dotNum:           { fontSize: typography.xs, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
   dotNumActive:     { color: colors.brandDark },
@@ -359,7 +359,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line,
     padding: spacing.lg, gap: spacing.md, ...shadow.sm,
   },
-  stepCardActive: { borderColor: colors.brand + '60', backgroundColor: '#f0fafa' },
+  stepCardActive: { borderColor: colors.brand + '60', backgroundColor: colors.brandLight },
   stepCardDone:   { backgroundColor: colors.bgGray, borderColor: colors.line },
 
   stepRow:            { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -393,7 +393,7 @@ const s = StyleSheet.create({
 const cm = StyleSheet.create({
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet:       { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 32 },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginTop: 12 },
+  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, alignSelf: 'center', marginTop: 12 },
   title:       { fontSize: typography.lg, fontWeight: '700', color: colors.text, textAlign: 'center', paddingTop: spacing.lg, paddingHorizontal: spacing.xl },
   sub:         { fontSize: typography.sm, color: colors.muted, textAlign: 'center', paddingHorizontal: spacing.xl, marginTop: 4, marginBottom: spacing.lg },
   option:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 14, gap: spacing.md },

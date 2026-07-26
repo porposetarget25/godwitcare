@@ -304,7 +304,7 @@ const s = StyleSheet.create({
   digitBoxError:  { borderColor: colors.error, backgroundColor: colors.errorBg },
 
   // Primary button
-  primaryBtn:     { backgroundColor: '#FFD580', borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
+  primaryBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   primaryBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
 
   // Resend

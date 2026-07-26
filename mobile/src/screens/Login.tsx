@@ -190,7 +190,7 @@ const s = StyleSheet.create({
 
   brandRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
   brandGodwit: { fontSize: typography.xxxl, fontWeight: '300', color: '#fff', letterSpacing: 0.5 },
-  brandCare:   { fontSize: typography.xxxl, fontWeight: '800', color: '#FFD580', letterSpacing: 0.5 },
+  brandCare:   { fontSize: typography.xxxl, fontWeight: '800', color: colors.amber, letterSpacing: 0.5 },
   tagline:     { fontSize: typography.xs, color: 'rgba(255,255,255,0.65)', letterSpacing: 2.5, fontWeight: '600' },
 
   // Arc that creates overlap effect
@@ -249,7 +249,7 @@ const s = StyleSheet.create({
 
   // Sign In button — gold like Home's consult CTA
   signInBtn: {
-    backgroundColor: '#FFD580',
+    backgroundColor: colors.amber,
     borderRadius: radius.full,
     paddingVertical: 15,
     alignItems: 'center',

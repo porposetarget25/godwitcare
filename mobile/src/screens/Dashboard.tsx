@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   navTextWrap: { flex: 1 },
   navTitleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 1 },
   navTitleGodwit: { color: '#fff', fontSize: typography.xl, fontWeight: '300', letterSpacing: 0.5 },
-  navTitleCare:   { color: '#FFD580', fontSize: typography.xl, fontWeight: '800', letterSpacing: 0.5 },
+  navTitleCare:   { color: colors.amber, fontSize: typography.xl, fontWeight: '800', letterSpacing: 0.5 },
   navSub: { color: 'rgba(255,255,255,0.72)', fontSize: typography.xs, fontWeight: '500', letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 1 },
 
   scroll: { flex: 1, backgroundColor: colors.white },

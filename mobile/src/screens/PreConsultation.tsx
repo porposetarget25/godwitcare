@@ -146,7 +146,7 @@ function PatientSheet({ visible, options, selected, onSelect, onClose }: {
 function Toggle({ label, value, onChange, critical }: {
   label: string; value: Ans; onChange: (v: YesNo) => void; critical: boolean;
 }) {
-  const labelColor = critical ? '#991b1b' : '#166534';
+  const labelColor = critical ? colors.error : colors.success;
   return (
     <View style={t.wrap}>
       <Text style={[t.label, { color: labelColor }]}>{label}</Text>
@@ -537,11 +537,11 @@ export default function PreConsultation() {
         {/* ── Question sections ── */}
         {FORM.map(section => {
           const isCritical = CRITICAL.has(section.title);
-          const borderColor = isCritical ? '#dc2626' : '#16a34a';
-          const titleColor  = isCritical ? '#991b1b' : '#166534';
+          const borderColor = isCritical ? colors.error : colors.success;
+          const titleColor  = isCritical ? colors.error : colors.success;
           return (
             <View key={section.title} style={[s.sectionCard, { borderColor }]}>
-              <View style={[s.sectionTitleRow, { backgroundColor: isCritical ? '#fff5f5' : '#f0fff4' }]}>
+              <View style={[s.sectionTitleRow, { backgroundColor: isCritical ? colors.errorBg : colors.successBg }]}>
                 <Text style={[s.sectionTitle, { color: titleColor }]}>{section.title}</Text>
               </View>
               <View style={s.sectionBody}>
@@ -625,7 +625,7 @@ const s = StyleSheet.create({
   selectorChevron:{ fontSize: 20, color: colors.muted },
   selectorNote:   { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
 
-  emergencyBanner: { backgroundColor: '#B94A48', borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs, ...shadow.md },
+  emergencyBanner: { backgroundColor: colors.error, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs, ...shadow.md },
   emergencyTitle:  { color: '#fff', fontWeight: '800', fontSize: typography.md },
   emergencyText:   { color: 'rgba(255,255,255,0.9)', fontSize: typography.sm, lineHeight: 20 },
 
@@ -637,7 +637,7 @@ const s = StyleSheet.create({
   detailWrap:  { marginTop: -spacing.sm, marginBottom: spacing.xs },
   detailInput: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 8, fontSize: typography.sm, color: colors.text, backgroundColor: colors.bgGray },
 
-  submitBtn:     { backgroundColor: '#FFD580', borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
+  submitBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   submitBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
 });
 
@@ -649,7 +649,7 @@ const t = StyleSheet.create({
   btn:         { flex: 1, paddingVertical: 10, borderRadius: radius.lg, alignItems: 'center', borderWidth: 1.5 },
   btnUnset:    { backgroundColor: colors.bgGray, borderColor: colors.line },
   btnNo:       { backgroundColor: colors.brand, borderColor: colors.brand },
-  btnYes:      { backgroundColor: '#dc2626', borderColor: '#dc2626' },
+  btnYes:      { backgroundColor: colors.error, borderColor: colors.error },
   btnTxt:      { fontSize: typography.base, fontWeight: '600', color: colors.muted },
   btnTxtActive:{ color: '#fff' },
 });
@@ -657,7 +657,7 @@ const t = StyleSheet.create({
 const ps = StyleSheet.create({
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet:       { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 28 },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginTop: 12 },
+  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, alignSelf: 'center', marginTop: 12 },
   title:       { fontSize: typography.lg, fontWeight: '700', color: colors.text, textAlign: 'center', padding: spacing.lg },
   option:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 14 },
   optionActive:{ backgroundColor: colors.brandLight },

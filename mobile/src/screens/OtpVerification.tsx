@@ -323,7 +323,7 @@ const s = StyleSheet.create({
   card: { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.xl, gap: spacing.md, ...shadow.md },
 
   // Send button (forgot mode initial state)
-  sendBtn:     { backgroundColor: '#FFD580', borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
+  sendBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   sendBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
 
   // Success
@@ -351,7 +351,7 @@ const s = StyleSheet.create({
   errorText:   { color: colors.error, fontSize: typography.sm, flex: 1, lineHeight: 18 },
 
   // Verify button
-  verifyBtn:     { backgroundColor: '#FFD580', borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
+  verifyBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   verifyBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
 
   // Resend

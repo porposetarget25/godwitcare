@@ -478,7 +478,7 @@ const sh = StyleSheet.create({
   },
   handle: {
     width: 36, height: 4, borderRadius: 2,
-    backgroundColor: '#d1d5db',
+    backgroundColor: colors.lineStrong,
     alignSelf: 'center', marginTop: 12, marginBottom: 2,
   },
   sheetHeader: {
@@ -488,10 +488,10 @@ const sh = StyleSheet.create({
   sheetTitle:   { fontSize: typography.lg, fontWeight: '700', color: colors.text },
   closeCircle: {
     width: 30, height: 30, borderRadius: 15,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  closeX:      { fontSize: 13, color: '#555', fontWeight: '700' },
+  closeX:      { fontSize: 13, color: colors.textSec, fontWeight: '700' },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: spacing.xl, marginBottom: spacing.sm,
@@ -501,7 +501,7 @@ const sh = StyleSheet.create({
   },
   searchIcon:  { fontSize: 13, opacity: 0.45 },
   searchInput: { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 10 },
-  sep:         { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: spacing.xl },
+  sep:         { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl },
 
   // Radio row
   radioRow: {
@@ -512,7 +512,7 @@ const sh = StyleSheet.create({
   radioSub:    { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
   radioOuter: {
     width: 22, height: 22, borderRadius: 11,
-    borderWidth: 2, borderColor: '#d1d5db',
+    borderWidth: 2, borderColor: colors.lineStrong,
     alignItems: 'center', justifyContent: 'center',
   },
   radioOuterActive: { borderColor: colors.brand },
@@ -527,7 +527,7 @@ const sh = StyleSheet.create({
     paddingHorizontal: spacing.xl, paddingTop: spacing.lg,
   },
   cancelBtn: {
-    flex: 1, borderWidth: 1.5, borderColor: '#e5e7eb',
+    flex: 1, borderWidth: 1.5, borderColor: colors.lineMid,
     borderRadius: radius.full, paddingVertical: 14,
     alignItems: 'center',
   },
@@ -537,6 +537,6 @@ const sh = StyleSheet.create({
     borderRadius: radius.full, paddingVertical: 14,
     alignItems: 'center',
   },
-  saveBtnDisabled: { backgroundColor: '#9ca3af' },
+  saveBtnDisabled: { backgroundColor: colors.mutedLight },
   saveText:    { fontSize: typography.base, fontWeight: '700', color: '#fff' },
 });

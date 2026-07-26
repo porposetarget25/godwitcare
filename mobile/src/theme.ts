@@ -1,42 +1,57 @@
-// src/theme.ts — Updated to match Visily design system
+// src/theme.ts — Aligned with the GodwitCare doctor-portal web design system
 export const colors = {
-  // Core brand — teal from Visily
-  brand:       '#008080',
-  brandDark:   '#006666',
-  brandLight:  '#e6f4f4',
-  brandMid:    '#CCE8E8',
+  // Core brand — teal derived from the GodwitCare logo
+  brand:       '#0C6E7E',
+  brandDark:   '#074450',
+  brandLight:  '#E4F1F2',
+  brandMid:    '#C7E4E7',
 
-  // Backgrounds
+  // Amber accent (secondary brand color, used sparingly for highlights)
+  amber:       '#EBA545',
+  amberDark:   '#C17F1F',
+
+  // Backgrounds / surfaces
   bg:          '#ffffff',
-  bgGray:      '#f8f9fa',
+  bgGray:      '#F6F8F8',
   bgCard:      '#ffffff',
-  surface:     '#f0f8f8',
+  surface:     '#EEF2F2',
 
   // Text
-  text:        '#1a1a2e',
-  textSec:     '#4a5568',
-  muted:       '#718096',
-  mutedLight:  '#a0aec0',
+  text:        '#132326',
+  textSec:     '#48595D',
+  muted:       '#829296',
+  mutedLight:  '#AAB6B9',
 
-  // UI
+  // UI / borders
   white:       '#ffffff',
-  line:        '#e2e8f0',
-  lineMid:     '#cbd5e0',
-  shadow:      'rgba(0,128,128,0.12)',
+  line:        '#E3E8E9',
+  lineMid:     '#D3DADC',
+  lineStrong:  '#B5C1C4',
+  shadow:      'rgba(12,110,126,0.10)',
 
-  // Semantic
-  error:       '#c53030',
-  errorBg:     '#fff5f5',
-  errorBorder: '#feb2b2',
-  success:     '#276749',
-  successBg:   '#f0fff4',
-  successBorder:'#9ae6b4',
-  warning:     '#c05621',
-  warningBg:   '#fffaf0',
+  // Semantic — accent (info)
+  accentBg:    '#E4F1F2',
+  accentBorder:'#8FC7CE',
+  accentText:  '#0A5A67',
 
-  // Emergency red (from design)
-  emergency:   '#c53030',
-  emergencyBg: '#fff5f5',
+  // Semantic — success
+  success:       '#1C7A3F',
+  successBg:     '#E8F6EC',
+  successBorder: '#8FD6A6',
+
+  // Semantic — warning
+  warning:       '#B3730C',
+  warningBg:     '#FDF1DE',
+  warningBorder: '#F0C987',
+
+  // Semantic — error / danger
+  error:       '#C43D2C',
+  errorBg:     '#FCEAE8',
+  errorBorder: '#EFACA1',
+
+  // Emergency red (alias of danger, kept for existing call sites)
+  emergency:   '#C43D2C',
+  emergencyBg: '#FCEAE8',
 };
 
 export const spacing = {
@@ -53,11 +68,11 @@ export const spacing = {
 
 export const radius = {
   xs:   4,
-  sm:   8,
-  md:   10,
-  lg:   14,
-  xl:   18,
-  xxl:  24,
+  sm:   6,
+  md:   8,
+  lg:   10,
+  xl:   12,
+  xxl:  16,
   full: 999,
 };
 
@@ -75,24 +90,24 @@ export const typography = {
 
 export const shadow = {
   sm: {
-    elevation: 2,
-    shadowColor: '#000',
+    elevation: 1,
+    shadowColor: '#0e2a2f',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.05,
     shadowRadius: 3,
   },
   md: {
-    elevation: 4,
-    shadowColor: '#000',
+    elevation: 2,
+    shadowColor: '#0e2a2f',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   brand: {
-    elevation: 4,
+    elevation: 2,
     shadowColor: colors.brand,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
   },
 };
