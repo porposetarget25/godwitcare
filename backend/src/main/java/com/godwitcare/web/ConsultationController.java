@@ -209,8 +209,10 @@ public class ConsultationController {
             @RequestParam(name = "to", required = false) LocalDate to
     ) {
         final Consultation.Status filterStatus = parseFilterStatus(statusParam);
+        // Keep the search parameter a non-null String. PostgreSQL can otherwise infer a
+        // null parameter used by lower(concat(...)) as bytea and reject lower(bytea).
         String normalizedName = patientName == null || patientName.isBlank()
-                ? null : patientName.trim();
+                ? "" : patientName.trim();
         java.time.Instant fromInstant = from == null
                 ? null : from.atStartOfDay(ZoneOffset.UTC).toInstant();
         // The upper bound is exclusive, so the selected "To" calendar day is included.
