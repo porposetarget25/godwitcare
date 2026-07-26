@@ -123,6 +123,7 @@ export default function DoctorConsultationDetails() {
 
   const phoneDigits = (data.contactPhone || '').replace(/[^\d+]/g, '')
   const waUrl = phoneDigits ? `https://wa.me/${phoneDigits.replace(/^0+/, '')}` : ''
+  const readOnly = data.status === 'COMPLETED'
 
   // ---- helpers for medicine rows
   function setMed(idx: number, val: string) {
@@ -293,6 +294,7 @@ export default function DoctorConsultationDetails() {
           <Link className="btn secondary" to="/doctor/consultations">Back</Link>
         </div>
       </div>
+      {readOnly && <div className="consultation-readonly" role="status">Completed consultation — view only</div>}
 
       {/* Patient summary card (unchanged) */}
       <div className="card" style={{ padding: 16 }}>
@@ -368,6 +370,7 @@ export default function DoctorConsultationDetails() {
                           type="button"
                           className={'btn btn-no ' + (ans === 'No' ? '' : 'secondary')}
                           onClick={() => setAnswer(qid, 'No')}
+                          disabled={readOnly}
                           aria-pressed={ans === 'No'}
                         >
                           No
@@ -376,6 +379,7 @@ export default function DoctorConsultationDetails() {
                           type="button"
                           className={'btn btn-yes ' + (ans === 'Yes' ? '' : 'secondary')}
                           onClick={() => setAnswer(qid, 'Yes')}
+                          disabled={readOnly}
                           aria-pressed={ans === 'Yes'}
                         >
                           Yes
@@ -387,6 +391,7 @@ export default function DoctorConsultationDetails() {
                         <input
                           value={note || ''}
                           onChange={(e) => setDetail(qid, e.target.value)}
+                          disabled={readOnly}
                           placeholder="Describe briefly (optional)"
                           style={{ width: '100%' }}
                         />
@@ -400,9 +405,9 @@ export default function DoctorConsultationDetails() {
           </div>
         ) : <div className="muted">No answers</div>}
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" className="btn" onClick={saveQuestionnaire} disabled={savingConsultation}>
+          {!readOnly && <button type="button" className="btn" onClick={saveQuestionnaire} disabled={savingConsultation}>
             {savingConsultation ? 'Saving…' : 'Save Consultation'}
-          </button>
+          </button>}
           {consultationSaveErr && <span className="muted small" style={{ color: '#b91c1c' }}>{consultationSaveErr}</span>}
           {data?.status === 'COMPLETED' && !consultationSaveErr && (
             <span className="muted small">Consultation completed.</span>
@@ -420,7 +425,7 @@ export default function DoctorConsultationDetails() {
             📞 Call Patient
           </a>
           <button type="button" className="btn secondary" disabled>🔔 Select Notification Type</button>
-          <button type="button" className="btn">🗓️ Schedule a Call</button>
+          <button type="button" className="btn" disabled={readOnly}>🗓️ Schedule a Call</button>
         </div>
       </div>
 
@@ -429,15 +434,16 @@ export default function DoctorConsultationDetails() {
         <div style={{ marginBottom: 10 }}>
           <div className="strong" style={{ marginBottom: 6 }}>Prescription Requirement</div>
           <label style={{ marginRight: 12 }}>
-            <input type="radio" checked={!prescriptionRequired} onChange={() => setPrescriptionRequired(false)} /> No Prescription
+            <input type="radio" checked={!prescriptionRequired} disabled={readOnly} onChange={() => setPrescriptionRequired(false)} /> No Prescription
           </label>
           <label>
-            <input type="radio" checked={prescriptionRequired} onChange={() => setPrescriptionRequired(true)} /> Prescription Required
+            <input type="radio" checked={prescriptionRequired} disabled={readOnly} onChange={() => setPrescriptionRequired(true)} /> Prescription Required
           </label>
         </div>
         <div className="strong" style={{ marginBottom: 8 }}>History of Presenting Complaint</div>
         <textarea
           value={history}
+          disabled={readOnly}
           onChange={(e) => setHistory(e.target.value)}
           placeholder="Detail patient's complaint history here..."
           rows={4}
@@ -450,6 +456,7 @@ export default function DoctorConsultationDetails() {
         <div className="strong" style={{ marginBottom: 8 }}>Diagnosis</div>
         <textarea
           value={diagnosis}
+          disabled={readOnly}
           onChange={(e) => setDiagnosis(e.target.value)}
           placeholder="Enter patient diagnosis…"
           rows={3}
@@ -467,18 +474,18 @@ export default function DoctorConsultationDetails() {
               <textarea
                 value={m}
                 onChange={(e) => setMed(i, e.target.value)}
-                disabled={!prescriptionRequired}
+                disabled={readOnly || !prescriptionRequired}
                 placeholder="e.g., Amoxicillin 500mg – 1 capsule three times daily for 7 days"
                 rows={2}
                 style={{ flex: 1 }}
               />
               {medicines.length > 1 && (
-                <button type="button" className="btn secondary" onClick={() => removeMed(i)} disabled={!prescriptionRequired}>Remove</button>
+                <button type="button" className="btn secondary" onClick={() => removeMed(i)} disabled={readOnly || !prescriptionRequired}>Remove</button>
               )}
             </div>
           ))}
           <div>
-            <button type="button" className="btn secondary" onClick={addMed} disabled={!prescriptionRequired}>Add another medicine</button>
+            {!readOnly && <button type="button" className="btn secondary" onClick={addMed} disabled={!prescriptionRequired}>Add another medicine</button>}
           </div>
         </div>
 
@@ -487,6 +494,7 @@ export default function DoctorConsultationDetails() {
           <div className="strong" style={{ marginBottom: 8 }}>Recommendations</div>
           <textarea
             value={recommendations}
+            disabled={readOnly}
             onChange={(e) => setRecommendations(e.target.value)}
             placeholder="Provide recommendations…"
             rows={3}
@@ -496,7 +504,7 @@ export default function DoctorConsultationDetails() {
 
         {/* Create Prescription */}
         <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {prescriptionRequired && (
+          {prescriptionRequired && !readOnly && (
             <button type="button" className="btn" onClick={createPrescription} disabled={creatingRx}>
               {creatingRx ? 'Creating…' : 'Create Prescription'}
             </button>
@@ -545,7 +553,7 @@ export default function DoctorConsultationDetails() {
           <button className="btn secondary" type="button" disabled={!(data?.status === 'COMPLETED' && !prescriptionRequired)}>View Case History</button>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
           {/* Referral Letter (builder) */}
-          {prescriptionRequired && ((id || data?.id) ? (
+          {prescriptionRequired && !readOnly && ((id || data?.id) ? (
             <Link
               to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}
               className="btn secondary"
