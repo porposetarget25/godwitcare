@@ -21,7 +21,7 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
             select c from Consultation c
             left join c.user u
             where (:status is null or c.status = :status)
-              and (:patientName is null
+              and (:patientName = ''
                    or lower(c.contactName) like lower(concat('%', :patientName, '%'))
                    or lower(u.email) like lower(concat('%', :patientName, '%')))
               and (:fromDate is null or c.createdAt >= :fromDate)
