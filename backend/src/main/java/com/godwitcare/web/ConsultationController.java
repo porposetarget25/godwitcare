@@ -392,36 +392,13 @@ public class ConsultationController {
     public ResponseEntity<?> saveQuestionnaire(
             @PathVariable Long id,
             @RequestBody Map<String, Object> body
-    ) throws Exception {
+    ) {
         Consultation c = consultations.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
-        if (c.getStatus() == Consultation.Status.COMPLETED) {
-            return ResponseEntity.status(409).body(Map.of("error", "Completed consultations are read-only"));
-        }
-
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        @SuppressWarnings("unchecked")
-        Map<String, String> currentAnswers = mapper.readValue(
-                c.getAnswersJson() == null ? "{}" : c.getAnswersJson(), Map.class);
-        @SuppressWarnings("unchecked")
-        Map<String, String> currentDetails = mapper.readValue(
-                c.getDetailsByQuestionJson() == null ? "{}" : c.getDetailsByQuestionJson(), Map.class);
-
-        @SuppressWarnings("unchecked")
-        Map<String, String> changedAnswers = (Map<String, String>) body.getOrDefault("answers", Map.of());
-        @SuppressWarnings("unchecked")
-        Map<String, String> changedDetails = (Map<String, String>) body.getOrDefault("detailsByQuestion", Map.of());
-
-        currentAnswers.putAll(changedAnswers);
-        changedDetails.forEach((k, v) -> {
-            if (v == null || v.isBlank()) currentDetails.remove(k);
-            else currentDetails.put(k, v);
-        });
-
-        c.setAnswersJson(mapper.writeValueAsString(currentAnswers));
-        c.setDetailsByQuestionJson(mapper.writeValueAsString(currentDetails));
-        consultations.save(c);
-        return ResponseEntity.ok(Map.of("id", c.getId(), "updated", true));
+        // Keep the route for older clients, but never permit a doctor to mutate
+        // answers supplied by the patient.
+        return ResponseEntity.status(403).body(Map.of(
+                "error", "Patient questionnaire responses are read-only"));
     }
 
     // ---------- Doctor download any prescription by id ----------
