@@ -1,6 +1,6 @@
 // src/screens/CareHistory.tsx
 import React from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { authFetch, API_BASE_URL, resolveApiUrl } from '../api';
 
 type Item = {
@@ -18,21 +18,25 @@ type Payload = {
     name: string;
     patientId?: string | number;
     dob?: string;                  // yyyy-MM-dd
+    gender?: string;
   };
   items: Item[];
 };
 
 export default function CareHistory() {
+  const { id: doctorConsultationId } = useParams();
   const [params] = useSearchParams();
   const travelerId = params.get('travelerId');
   const patientId = params.get('patientId');
-  const backToHomeHref = React.useMemo(() => {
+  const backHref = React.useMemo(() => {
+    if (doctorConsultationId) return `/doctor/consultations/${encodeURIComponent(doctorConsultationId)}`;
     const qp = new URLSearchParams();
     if (travelerId) qp.set('travelerId', travelerId);
     if (patientId) qp.set('patientId', patientId);
     const q = qp.toString();
     return q ? `/home?${q}` : '/home';
-  }, [travelerId, patientId]);
+  }, [doctorConsultationId, travelerId, patientId]);
+  const isDoctorView = Boolean(doctorConsultationId);
   const [data, setData] = React.useState<Payload | null>(null);
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -46,7 +50,10 @@ export default function CareHistory() {
         const qp = new URLSearchParams();
         if (travelerId) qp.set('travelerId', travelerId);
         if (patientId) qp.set('patientId', patientId);
-        const r = await authFetch(`${API_BASE_URL}/care-history/mine?${qp.toString()}`, {});
+        const historyUrl = doctorConsultationId
+          ? `${API_BASE_URL}/doctor/consultations/${encodeURIComponent(doctorConsultationId)}/care-history`
+          : `${API_BASE_URL}/care-history/mine?${qp.toString()}`;
+        const r = await authFetch(historyUrl, {});
         if (ignore) return;
         if (r.status === 204) {
           setData(null);
@@ -61,7 +68,7 @@ export default function CareHistory() {
       }
 
       // Latest prescription (optional quick link)
-      try {
+      if (!doctorConsultationId) try {
         const qp2 = new URLSearchParams();
         if (travelerId) qp2.set('travelerId', travelerId);
         if (patientId) qp2.set('patientId', patientId);
@@ -81,7 +88,7 @@ export default function CareHistory() {
       if (!ignore) setLoading(false);
     })();
     return () => { ignore = true; };
-  }, [travelerId, patientId]);
+  }, [doctorConsultationId, travelerId, patientId]);
 
   const printPdf = () => window.print();
 
@@ -90,7 +97,7 @@ export default function CareHistory() {
       <section className="section">
         <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
-          <Link to={backToHomeHref} className="btn secondary">Back</Link>
+          <Link to={backHref} className="btn secondary">{isDoctorView ? 'Back to Consultation' : 'Back'}</Link>
         </div>
         <div className="card">Loading…</div>
       </section>
@@ -102,7 +109,7 @@ export default function CareHistory() {
       <section className="section">
         <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
-          <Link to={backToHomeHref} className="btn secondary">Back</Link>
+          <Link to={backHref} className="btn secondary">{isDoctorView ? 'Back to Consultation' : 'Back'}</Link>
         </div>
         <div className="card" style={{ color: '#b91c1c' }}>{err}</div>
       </section>
@@ -114,7 +121,7 @@ export default function CareHistory() {
       <section className="section">
         <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="page-title">Care History</h1>
-          <Link to={backToHomeHref} className="btn secondary">Back</Link>
+          <Link to={backHref} className="btn secondary">{isDoctorView ? 'Back to Consultation' : 'Back'}</Link>
         </div>
         <div className="card">No history available yet.</div>
       </section>
@@ -135,10 +142,16 @@ export default function CareHistory() {
       <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Care History</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to={backToHomeHref} className="btn secondary">Back</Link>
+          <Link to={backHref} className="btn secondary">{isDoctorView ? 'Back to Consultation' : 'Back'}</Link>
           <button className="btn" onClick={printPdf}>Print / Save as PDF</button>
         </div>
       </div>
+
+      {isDoctorView && (
+        <div className="consultation-readonly" role="status">
+          Read-only patient record. Return to the consultation to record new clinical information.
+        </div>
+      )}
 
       {/* Patient Overview */}
       <div className="card" style={{ marginBottom: 12, borderRadius: 16, padding: 20 }}>

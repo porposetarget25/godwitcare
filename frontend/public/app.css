@@ -465,6 +465,12 @@ header img.logo {
   color: #010213;
   border: 1px solid #7ecde3;
 }
+.doctor-consultation-details .btn {
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.25;
+}
 .btn.btn-yes {
   background: #16a34a;
   color: #ffffff;

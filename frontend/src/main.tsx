@@ -358,6 +358,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/doctor/consultations/:id/care-history"
+        element={
+          <Shell>
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <CareHistory />
+            </RequireRole>
+          </Shell>
+        }
+      />
+      <Route
         path="/doctor/appointments"
         element={
           <Shell>

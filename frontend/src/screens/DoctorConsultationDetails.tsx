@@ -39,8 +39,6 @@ export default function DoctorConsultationDetails() {
   // ===== Referral state (for "View generated referral letter") =====
   const [referralId, setReferralId] = useState<number | null>(null)
   const [referralPdfUrl, setReferralPdfUrl] = useState<string | null>(null)
-  const [careHistory, setCareHistory] = useState<any[]>([])
-  const [careHistoryLoading, setCareHistoryLoading] = useState(true)
 
   // Load consultation + latest prescription meta
   useEffect(() => {
@@ -84,23 +82,6 @@ export default function DoctorConsultationDetails() {
           setRxPdfUrl(null)
         }
       } catch { /* handled */ }
-    })()
-    return () => { ignore = true }
-  }, [id])
-
-  useEffect(() => {
-    let ignore = false
-    ;(async () => {
-      setCareHistoryLoading(true)
-      try {
-        const r = await authFetch(`${API_BASE_URL}/doctor/consultations/${Number(id)}/care-history`, {})
-        const payload = r.ok ? await r.json() : { items: [] }
-        if (!ignore) setCareHistory(Array.isArray(payload?.items) ? payload.items : [])
-      } catch {
-        if (!ignore) setCareHistory([])
-      } finally {
-        if (!ignore) setCareHistoryLoading(false)
-      }
     })()
     return () => { ignore = true }
   }, [id])
@@ -436,7 +417,7 @@ export default function DoctorConsultationDetails() {
             aria-disabled={!waUrl} onClick={(e) => { if (!waUrl) e.preventDefault() }}>
             📞 Call Patient
           </a>
-          <a className="btn secondary" href="#patient-care-history">↶ View Patient Care History</a>
+          <Link className="btn secondary" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>↶ Patient Care History</Link>
           <button type="button" className="btn secondary" disabled>🔔 Select Notification Type</button>
           <button type="button" className="btn" disabled={readOnly}>🗓️ Schedule a Call</button>
         </div>
@@ -566,7 +547,7 @@ export default function DoctorConsultationDetails() {
           ) : (
             <button className="btn secondary" type="button" disabled>View Prescription</button>
           )}
-          <button className="btn secondary" type="button" disabled={!(data?.status === 'COMPLETED' && !prescriptionRequired)}>View Case History</button>
+          <Link className="btn secondary" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>Patient Care History</Link>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
           {/* Referral Letter (builder) */}
           {prescriptionRequired && !readOnly && ((id || data?.id) ? (
@@ -606,25 +587,6 @@ export default function DoctorConsultationDetails() {
       </div>
       </div>
 
-      <section id="patient-care-history" className="card care-history-panel">
-        <div className="care-history-heading">
-          <div><div className="strong">Patient Care History</div><div className="muted small">Previous consultations and clinical records</div></div>
-          <span className="history-count">{careHistory.length} records</span>
-        </div>
-        {careHistoryLoading ? <div className="muted">Loading care history…</div> : careHistory.length === 0 ? <div className="muted">No previous care records are available.</div> : (
-          <div className="care-history-timeline">
-            {careHistory.map((item) => <details key={item.consultationId} className="history-item" open={item.consultationId === data.id}>
-              <summary><span>{new Date(item.date).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}</span><strong>Consultation #{item.consultationId}</strong><span className="doctor-status">{String(item.status || '').replace('_', ' ')}</span></summary>
-              <div className="history-item-body">
-                <div><strong>Presenting complaint</strong><p>{item.presentingComplaint || '—'}</p></div>
-                <div><strong>Diagnosis</strong><p>{item.diagnosis || '—'}</p></div>
-                <div><strong>Prescription</strong><p>{item.medicines || '—'}</p></div>
-                <div><strong>Treatment plan</strong><p>{item.recommendations || '—'}</p></div>
-              </div>
-            </details>)}
-          </div>
-        )}
-      </section>
     </section>
   )
 }
