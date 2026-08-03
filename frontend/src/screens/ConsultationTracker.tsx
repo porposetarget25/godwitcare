@@ -28,7 +28,7 @@ function slotHour(slot: Slot, timeZone: string) {
   return Number(hourPart ?? Number.NaN)
 }
 
-function AppointmentBooking({ consultationId, consultationActive, onBooked }: { consultationId: number; consultationActive: boolean; onBooked: (appointment: any) => void }) {
+function AppointmentBooking({ consultationId, consultationActive, patientId, onBooked }: { consultationId: number; consultationActive: boolean; patientId: string; onBooked: (appointment: any) => void }) {
   const [days, setDays] = useState<AvailabilityDay[]>([])
   const [availabilityTimeZone, setAvailabilityTimeZone] = useState('Europe/London')
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -119,7 +119,7 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
       const res = await authFetch(`${API_BASE_URL}/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consultationId, startTime: selectedSlot }),
+        body: JSON.stringify({ consultationId, startTime: selectedSlot, patientId }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
@@ -984,7 +984,7 @@ export default function ConsultationTracker() {
             </div>
           </div>
           {appointmentStatus && <div className="muted small" role="status">Current appointment: {appointmentStatus}</div>}
-          {latestCid ? <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} onBooked={appointment => setAppointmentStatus(appointment.status ?? 'SCHEDULED')} /> : (
+          {latestCid ? <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} patientId={patientId || ''} onBooked={appointment => setAppointmentStatus(appointment.status ?? 'SCHEDULED')} /> : (
             <button type="button" className="btn secondary consultation-action-btn consultation-action-main" style={disabledButtonStyle} disabled aria-disabled="true">
               Complete Step 1 first
             </button>

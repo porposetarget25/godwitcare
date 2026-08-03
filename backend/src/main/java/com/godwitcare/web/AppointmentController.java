@@ -126,6 +126,10 @@ public class AppointmentController {
         if (consultation == null || consultation.getUser() == null || !Objects.equals(consultation.getUser().getId(), patient.getId())) {
             return ResponseEntity.status(403).body(Map.of("message", "Consultation does not belong to the signed-in patient."));
         }
+        String selectedPatientId = body.get("patientId") == null ? "" : String.valueOf(body.get("patientId"));
+        if (selectedPatientId.isBlank() || !Objects.equals(consultation.getPatientId(), selectedPatientId)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Appointment patient context does not match the consultation."));
+        }
         if (consultation.getStatus() == Consultation.Status.COMPLETED
                 || consultation.getCreatedAt().plus(Duration.ofHours(consultationActiveHours)).isBefore(Instant.now())) {
             return ResponseEntity.status(409).body(Map.of("message", "This consultation is closed or has expired."));
