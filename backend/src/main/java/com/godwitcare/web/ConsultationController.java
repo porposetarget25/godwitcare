@@ -17,11 +17,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 
 import java.util.*;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.Duration;
+import java.time.Instant;
 
 
 @RestController
@@ -34,6 +37,8 @@ public class ConsultationController {
     private final PrescriptionRepository prescriptions;
     private RegistrationRepository registrations;
     private final PrescriptionPdfService pdfs;
+    @Value("${app.consultation.active-hours:48}")
+    private long consultationActiveHours;
 
 
     public ConsultationController(UserRepository users,
@@ -60,6 +65,14 @@ public class ConsultationController {
                 .or(() -> users.findByEmail(principal))
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
+
+        boolean hasActiveConsultation = consultations
+                .findByUserIdAndStatusNotOrderByCreatedAtDesc(u.getId(), Consultation.Status.COMPLETED)
+                .stream().anyMatch(this::isActive);
+        if (hasActiveConsultation) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "message", "Your current consultation must be closed or expire before you create another one."));
+        }
 
         Long travelerId = null;
         Object travelerIdVal = body.get("travelerId");
@@ -190,6 +203,10 @@ public class ConsultationController {
         res.put("id", c.getId());
         res.put("createdAt", c.getCreatedAt());
         res.put("status", c.getStatus().name());
+        Instant expiresAt = c.getCreatedAt().plus(Duration.ofHours(consultationActiveHours));
+        res.put("expiresAt", expiresAt);
+        res.put("active", isActive(c));
+        res.put("eligibleForNewConsultation", !isActive(c));
         res.put("contactName", c.getContactName());
         res.put("contactPhone", c.getContactPhone());
         res.put("contactAddress", c.getContactAddress());
@@ -197,6 +214,12 @@ public class ConsultationController {
         res.put("dob", c.getDob() != null ? c.getDob().toString() : null);
         res.put("patientId", c.getPatientId());
         return ResponseEntity.ok(res);
+    }
+
+    private boolean isActive(Consultation consultation) {
+        return consultation.getStatus() != Consultation.Status.COMPLETED
+                && consultation.getCreatedAt() != null
+                && consultation.getCreatedAt().plus(Duration.ofHours(consultationActiveHours)).isAfter(Instant.now());
     }
 
     // ---------- Doctor: list (with optional status filter) ----------

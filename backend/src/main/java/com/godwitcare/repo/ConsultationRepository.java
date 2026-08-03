@@ -16,6 +16,7 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
     List<Consultation> findByUserIdOrderByIdDesc(Long userId);
     boolean existsByTravelerId(Long travelerId);
     void deleteByUserId(Long userId);
+    List<Consultation> findByUserIdAndStatusNotOrderByCreatedAtDesc(Long userId, Consultation.Status status);
 
     @Query("""
             select c from Consultation c
