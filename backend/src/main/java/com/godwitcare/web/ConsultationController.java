@@ -17,11 +17,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 
 import java.util.*;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.Duration;
+import java.time.Instant;
 
 
 @RestController
@@ -34,6 +37,8 @@ public class ConsultationController {
     private final PrescriptionRepository prescriptions;
     private RegistrationRepository registrations;
     private final PrescriptionPdfService pdfs;
+    @Value("${app.consultation.active-hours:48}")
+    private long consultationActiveHours;
 
 
     public ConsultationController(UserRepository users,
@@ -64,32 +69,43 @@ public class ConsultationController {
         Long travelerId = null;
         Object travelerIdVal = body.get("travelerId");
         if (travelerIdVal != null) {
-            travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+            try {
+                travelerId = Long.valueOf(String.valueOf(travelerIdVal));
+            } catch (NumberFormatException ex) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid traveller identifier."));
+            }
+        }
+        Traveler selectedTraveler = resolveOwnedTraveler(u, travelerId);
+        if (travelerId != null && selectedTraveler == null) {
+            return ResponseEntity.status(403).body(Map.of("message", "You are not authorized to manage this traveller."));
         }
         String patientId = buildTravelerPatientId(u, travelerId);
+        Object requestedPatientId = body.get("patientId");
+        if (requestedPatientId == null || !patientId.equals(String.valueOf(requestedPatientId))) {
+            return ResponseEntity.badRequest().body(Map.of("message", "A valid selected patient identifier is required."));
+        }
+
+        boolean hasActiveConsultation = consultations
+                .findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId)
+                .stream().anyMatch(this::isActive);
+        if (hasActiveConsultation) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "message", "This patient's current consultation must be closed or expire before another can be created."));
+        }
+
         Consultation c = new Consultation();
         c.setUser(u);
         c.setPatientId(patientId);
 
         if (travelerId != null) {
-            final Long selectedTravelerId = travelerId;
-            Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(u.getEmail()).orElse(null);
-            if (latest != null) {
-                Traveler selected = latest.getTravelers().stream()
-                        .filter(t -> Objects.equals(t.getId(), selectedTravelerId))
-                        .findFirst()
-                        .orElse(null);
-                c.setTraveler(selected);
-                if (selected != null) {
-                    c.setContactName(selected.getFullName());
-                    c.setDob(selected.getDateOfBirth());
-                }
-            }
+            c.setTraveler(selectedTraveler);
+            c.setContactName(selectedTraveler.getFullName());
+            c.setDob(selectedTraveler.getDateOfBirth());
         } else {
             c.setTraveler(null);
+            c.setContactName(fullName(u));
         }
         c.setCurrentLocation((String) body.getOrDefault("currentLocation", ""));
-        c.setContactName((String) body.getOrDefault("contactName", ""));
         c.setContactPhone((String) body.getOrDefault("contactPhone", ""));
         c.setContactAddress((String) body.getOrDefault("contactAddress", ""));
 
@@ -123,15 +139,35 @@ public class ConsultationController {
         String base = "PV-" + String.format("%09d", user.getId() == null ? 0L : user.getId());
         if (travelerId == null) return base;
 
-        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
-        if (latest == null || latest.getTravelers() == null) return base + "-" + travelerId;
+        // Preserve the identifier already attached to this exact traveller's
+        // records. Older versions derived this suffix from collection position,
+        // which allowed reordered co-travellers to inherit each other's context.
+        String existingPatientId = consultations
+                .findByUserEmailAndTravelerIdOrderByIdDesc(user.getEmail(), travelerId)
+                .stream()
+                .map(Consultation::getPatientId)
+                .filter(id -> id != null && !id.isBlank())
+                .findFirst()
+                .orElse(null);
+        if (existingPatientId != null) return existingPatientId;
 
-        int seq = 1;
-        for (Traveler t : latest.getTravelers()) {
-            if (Objects.equals(t.getId(), travelerId)) return base + "-" + seq;
-            seq++;
-        }
-        return base + "-" + travelerId;
+        // New co-travellers are keyed by their immutable database identifier,
+        // never by their position or object order in a registration payload.
+        return base + "-T" + travelerId;
+    }
+
+    private Traveler resolveOwnedTraveler(User user, Long travelerId) {
+        if (travelerId == null) return null;
+        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
+        if (latest == null || latest.getTravelers() == null) return null;
+        return latest.getTravelers().stream()
+                .filter(t -> Objects.equals(t.getId(), travelerId))
+                .findFirst().orElse(null);
+    }
+
+    private static String fullName(User user) {
+        return ((user.getFirstName() == null ? "" : user.getFirstName()) + " "
+                + (user.getLastName() == null ? "" : user.getLastName())).trim();
     }
 
 
@@ -177,6 +213,9 @@ public class ConsultationController {
                 .or(() -> users.findByEmail(principal))
                 .orElse(null);
         if (u == null) return ResponseEntity.status(401).build();
+        if (!isAuthorizedPatientContext(u, travelerId, patientId)) {
+            return ResponseEntity.status(403).build();
+        }
 
         var list = (patientId != null && !patientId.isBlank())
                 ? consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId)
@@ -190,6 +229,10 @@ public class ConsultationController {
         res.put("id", c.getId());
         res.put("createdAt", c.getCreatedAt());
         res.put("status", c.getStatus().name());
+        Instant expiresAt = c.getCreatedAt().plus(Duration.ofHours(consultationActiveHours));
+        res.put("expiresAt", expiresAt);
+        res.put("active", isActive(c));
+        res.put("eligibleForNewConsultation", !isActive(c));
         res.put("contactName", c.getContactName());
         res.put("contactPhone", c.getContactPhone());
         res.put("contactAddress", c.getContactAddress());
@@ -197,6 +240,18 @@ public class ConsultationController {
         res.put("dob", c.getDob() != null ? c.getDob().toString() : null);
         res.put("patientId", c.getPatientId());
         return ResponseEntity.ok(res);
+    }
+
+    private boolean isAuthorizedPatientContext(User user, Long travelerId, String patientId) {
+        if (travelerId != null && resolveOwnedTraveler(user, travelerId) == null) return false;
+        String expected = buildTravelerPatientId(user, travelerId);
+        return patientId == null || patientId.isBlank() || expected.equals(patientId);
+    }
+
+    private boolean isActive(Consultation consultation) {
+        return consultation.getStatus() != Consultation.Status.COMPLETED
+                && consultation.getCreatedAt() != null
+                && consultation.getCreatedAt().plus(Duration.ofHours(consultationActiveHours)).isAfter(Instant.now());
     }
 
     // ---------- Doctor: list (with optional status filter) ----------

@@ -1,6 +1,7 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { usePatient } from '../state/patient'
 import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
@@ -400,56 +401,21 @@ export default function Home() {
 
 
 
-  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>(searchParams.get('travelerId') || 'PRIMARY');
-  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
-  const travelerSelectOptions = React.useMemo(() => {
-    const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
-    const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
-    return [primary, ...rest];
-  }, [travelerOptions]);
-  const selectedTraveler = React.useMemo(
-    () => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0],
-    [travelerSelectOptions, selectedTravelerId]
-  );
-
-
-  React.useEffect(() => {
-    const travelerFromUrl = new URLSearchParams(location.search).get('travelerId') || 'PRIMARY';
-    setSelectedTravelerId((prev) => (travelerFromUrl !== prev ? travelerFromUrl : prev));
-  }, [location.search]);
-
-  React.useEffect(() => {
-    const currentTraveler = searchParams.get('travelerId') || 'PRIMARY';
-    if (currentTraveler === selectedTravelerId) return;
-
-    const next = new URLSearchParams(searchParams);
-    if (selectedTravelerId === 'PRIMARY') {
-      next.delete('travelerId');
-    } else {
-      next.set('travelerId', selectedTravelerId);
-    }
-    setSearchParams(next, { replace: true });
-  }, [selectedTravelerId, searchParams, setSearchParams]);
-
-  const selectedTravelerQuery = React.useMemo(() => {
-    const qp = new URLSearchParams();
-    const selectedId = String(selectedTravelerId);
-    const selectedPatientId = selectedTraveler?.patientId?.trim();
-
-    // Include both identifiers when available so backend filters can match either path.
-    if (selectedId !== 'PRIMARY') qp.set('travelerId', selectedId);
-    if (selectedPatientId) qp.set('patientId', selectedPatientId);
-    return qp;
-  }, [selectedTravelerId, selectedTraveler?.patientId]);
+  const { patients: travelerSelectOptions, activePatient: selectedTraveler, loading: patientSelectionLoading, selectPatient, queryString } = usePatient();
+  const selectedPatientId = selectedTraveler?.patientId || '';
+  // Keep one primitive snapshot of the active patient's identifiers. This avoids
+  // links and requests retaining a URLSearchParams object from a previous tab.
+  const selectedTravelerQuery = queryString;
 
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (patientSelectionLoading || !selectedTraveler) return;
     let ignore = false;
     (async () => {
       try {
-        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery.toString()}`, {});
+        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery}`, {});
         if (ignore) return;
         if (!res.ok || res.status === 204) { setRxUrl(null); return; }
         const j = await res.json().catch(() => null);
@@ -459,17 +425,25 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerQuery]);
+  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
 
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
+  const [patientContextLoading, setPatientContextLoading] = React.useState(false);
+  const [latestConsultation, setLatestConsultation] = React.useState<any>(null);
 
   React.useEffect(() => {
+    if (patientSelectionLoading || !selectedTraveler) return;
     let ignore = false;
+    setPatientContextLoading(true);
+    setCareHistoryEnabled(false);
+    setRxUrl(null);
+    setReferralUrl(null);
+    setLatestConsultation(null);
     (async () => {
       try {
-        const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery.toString()}`, {
+        const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery}`, {
       });
         if (ignore) return;
 
@@ -498,26 +472,28 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerQuery]);
+  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
 
   React.useEffect(() => {
+    if (patientSelectionLoading || !selectedTraveler) return;
     let ignore = false;
     (async () => {
       try {
-        const tRes = await authFetch(`${API_BASE_URL}/consultations/travelers`, {});
-        if (!ignore && tRes.ok) {
-          const arr = await tRes.json().catch(() => []);
-          setTravelerOptions(Array.isArray(arr) ? arr : []);
-        }
-        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, {});
+        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery}`, {});
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
+        const latestRes = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${selectedTravelerQuery}`, { cache: 'no-store' });
+        if (!ignore && latestRes.ok && latestRes.status !== 204) {
+          setLatestConsultation(await latestRes.json());
+        }
       } catch {
         if (!ignore) setCareHistoryEnabled(false);
+      } finally {
+        if (!ignore) setPatientContextLoading(false);
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerQuery]);
+  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
 
 
 
@@ -584,6 +560,29 @@ export default function Home() {
         </div>
       </div>
 
+      <div className="patient-context" aria-label="Select patient">
+        <div className="patient-tabs" role="tablist">
+          {travelerSelectOptions.map((patient) => {
+            const active = patient.patientId === selectedPatientId
+            return (
+              <button
+                key={patient.patientId}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`patient-tab${active ? ' active' : ''}`}
+                onClick={() => selectPatient(patient.patientId)}
+              >
+                <span className="patient-tab-avatar" aria-hidden="true">
+                  {patient.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
+                <span>{patient.name}{String(patient.id) === 'PRIMARY' ? <small>You</small> : <small>Co-traveller</small>}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Travel details card */}
       {reg && (
         <div className="package-card" style={{ marginBottom: 16 }}>
@@ -638,7 +637,7 @@ export default function Home() {
               WhatsApp
             </a> */}
             <Link
-              to={selectedTravelerQuery.toString() ? `/consultation/tracker?${selectedTravelerQuery.toString()}` : '/consultation/tracker'}
+              to={selectedTravelerQuery ? `/consultation/questionnaire?${selectedTravelerQuery}` : '/consultation/questionnaire'}
               className="btn"
               style={{
                 backgroundColor: '#75b948ff',
@@ -664,9 +663,23 @@ export default function Home() {
                   d="M6.6 10.8c1.2 2.4 3.2 4.4 5.6 5.6l2-2c.3-.3.7-.4 1.1-.3 1.2.4 2.6.6 4 .6.6 0 1 .4 1 1v3.5c0 .6-.4 1-1 1C11.3 20 4 12.7 4 4.5c0-.6.4-1 1-1H8.5c.6 0 1 .4 1 1 0 1.4.2 2.8.6 4 .1.4 0 .8-.3 1.1l-2.2 2.2Z"
                 />
               </svg>
-              I need a Consultation
+              I Need a Consultation
             </Link>
           </div>
+        </div>
+      </div>
+
+      <div className="package-card patient-status-card" aria-live="polite">
+        <div className="pc-body">
+          <div>
+            <div className="muted small">Current consultation · {selectedTraveler?.name}</div>
+            <div className="strong" style={{ marginTop: 4 }}>
+              {patientContextLoading ? 'Loading patient information…' : latestConsultation ? latestConsultation.status.replace(/_/g, ' ') : 'No current consultation'}
+            </div>
+          </div>
+          {latestConsultation && (
+            <Link className="btn secondary" to={`/consultation/tracker?${selectedTravelerQuery}`}>View consultation</Link>
+          )}
         </div>
       </div>
 
@@ -715,18 +728,12 @@ export default function Home() {
 
       {/* Quick Links */}
       <div className="ql-head">Quick Links</div>
-      <div style={{marginBottom:12}}>
-        <label className="muted small">Traveller</label>
-        <select value={selectedTravelerId} onChange={(e)=>setSelectedTravelerId(e.target.value)} style={{marginLeft:8,padding:6,borderRadius:8}}>
-          {travelerSelectOptions.map((t:any)=><option key={String(t.id)} value={String(t.id)}>{t.name}</option>)}
-        </select>
-      </div>
 
       <div className="quick-grid">
         {/* Care History — enabled if care history has at least one item */}
         {careHistoryEnabled ? (
           <Link
-            to={`/care-history?${selectedTravelerQuery.toString()}`}
+            to={`/care-history?${selectedTravelerQuery}`}
             className="quick"
             style={{
               borderRadius: 16,
@@ -790,7 +797,7 @@ export default function Home() {
 
         {/* Tracker */}
         <Link
-          to={`/consultation/tracker?${selectedTravelerQuery.toString()}`}
+          to={`/consultation/tracker?${selectedTravelerQuery}`}
           className="quick"
           style={{
             borderRadius: 16,

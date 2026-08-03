@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authFetch, API_BASE_URL } from '../api'
 import { QUESTIONNAIRE_SECTIONS } from '../questionnaire'
+import { usePatient } from '../state/patient'
 
 type YesNo = 'Yes' | 'No'
 type Ans = YesNo | undefined
@@ -147,16 +148,19 @@ export default function PreConsultation() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const cid = params.get('cid') // if present => edit mode
-  const travelerId = params.get('travelerId')
-  const patientId = params.get('patientId')
+  const { activePatient, loading: patientContextLoading, queryString: activePatientQuery } = usePatient()
+  const travelerId = activePatient?.id === 'PRIMARY' ? null : activePatient?.id || null
+  const patientId = activePatient?.patientId || null
+  const [resolvedPatientId, setResolvedPatientId] = useState(patientId || '')
   const isEdit = !!cid
 
   const travelerQueryString = useMemo(() => {
-    const qp = new URLSearchParams()
-    if (travelerId) qp.set('travelerId', travelerId)
-    if (patientId) qp.set('patientId', patientId)
-    return qp.toString()
-  }, [travelerId, patientId])
+    return activePatientQuery
+  }, [activePatientQuery])
+
+  useEffect(() => {
+    if (patientId) setResolvedPatientId(patientId)
+  }, [patientId])
 
   // Contact fields
   const [location, setLocation] = useState('')
@@ -201,7 +205,7 @@ export default function PreConsultation() {
 
   /* ---------- Prefill (NEW mode): Registration → Latest Consultation → /auth/me ---------- */
   useEffect(() => {
-    if (isEdit) return
+    if (isEdit || patientContextLoading || !activePatient) return
     let ignore = false
     ;(async () => {
       // 1) Try latest Registration (DOB lives here)
@@ -222,8 +226,9 @@ export default function PreConsultation() {
             const opts = buildPatientOptionsFromRegistration(reg)
             if (opts.length > 0) {
               setPatientOptions(opts)
-              setSelectedPatientKey(opts[0].key)
-              const sel = opts[0]
+              const requested = travelerId ? opts.find(opt => opt.key === `trav-${travelerId}`) : opts.find(opt => opt.key === 'primary')
+              const sel = requested || opts[0]
+              setSelectedPatientKey(sel.key)
               const nameOnly = sel.label.replace(/\s*\(Primary\)\s*$/, '')
               setContactName(nameOnly)
               if (sel.dob) setDob(sel.dob)
@@ -234,7 +239,7 @@ export default function PreConsultation() {
 
       // 2) Latest consultation details (address/location; fallback dob)
       try {
-        const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest`, {})
+        const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest${travelerQueryString ? `?${travelerQueryString}` : ''}`, {})
         if (!ignore && r0.ok) {
           const latest = await r0.json().catch(() => null)
           if (latest?.id) {
@@ -250,26 +255,11 @@ export default function PreConsultation() {
         }
       } catch { /* ignore */ }
 
-      // 3) Fallback /auth/me
+      // 3) Shared contact number fallback. Never replace the selected patient's identity.
       try {
         const r = await authFetch(`${API_BASE_URL}/auth/me`, {})
         if (!ignore && r.ok) {
           const me = await r.json()
-          if (people.length === 0) {
-            const nm = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim() || 'Primary Member'
-            const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
-            const ymd = toYMD(rawDob)
-            const list: PersonOption[] = [{
-              key: 'primary',
-              label: `${nm} (Primary)`,
-              name: nm,
-              dob: ymd,
-            }]
-            setPeople(list)
-            setSelectedPersonKey('primary')
-            setContactName(nm)
-            if (ymd) setDob(ymd)
-          }
           const phone = me?.username || me?.phone || ''
           if (!contactPhone && phone) setContactPhone(String(phone))
         }
@@ -277,7 +267,7 @@ export default function PreConsultation() {
     })()
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit])
+  }, [activePatient, activePatientQuery, isEdit, patientContextLoading, travelerId])
 
   /* ---------- Prefill (EDIT mode) ---------- */
   useEffect(() => {
@@ -388,6 +378,7 @@ export default function PreConsultation() {
         detailsByQuestion: details,
         dob: dob || null,
         travelerId: Number.isFinite(travelerId) ? travelerId : null,
+        patientId: resolvedPatientId,
       }
 
       const url = isEdit
@@ -513,19 +504,15 @@ export default function PreConsultation() {
         <div className="card" style={{ marginTop: 12 }}>
           <div className="strong" style={{ marginBottom: 8 }}>Patient Contact &amp; Address</div>
 
-          {/* Patient full width */}
+          {/* Patient context is chosen on the portal tabs and cannot be changed here. */}
           <div className="field">
-            <label>Patient (Primary or Traveller)</label>
+            <label>Consultation for</label>
             {patientOptions.length > 0 ? (
-              <select
-                value={selectedPatientKey}
-                onChange={(e) => setSelectedPatientKey(e.target.value)}
-                style={{ width: '100%' }}
-              >
-                {patientOptions.map((o) => (
-                  <option key={o.key} value={o.key}>{o.label}</option>
-                ))}
-              </select>
+              <div className="selected-patient-summary">
+                <span className="patient-tab-avatar" aria-hidden="true">{contactName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}</span>
+                <strong>{contactName}</strong>
+                <span className="muted small">Selected from Patient Portal</span>
+              </div>
             ) : (
               <input
                 value={contactName}

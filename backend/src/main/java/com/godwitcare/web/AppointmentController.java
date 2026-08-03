@@ -15,11 +15,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api")
 public class AppointmentController {
     private static final int SLOT_MINUTES = 10;
+    private static final int DOCUMENTATION_MINUTES = 5;
+    private static final int RESERVED_MINUTES = SLOT_MINUTES + DOCUMENTATION_MINUTES;
+    private static final int BOOKING_DAYS = 2;
     private static final ZoneId CLINIC_ZONE = ZoneId.of("Europe/London");
     private static final LocalTime DAY_START = LocalTime.of(9, 0);
     private static final LocalTime DAY_END = LocalTime.of(17, 0);
@@ -28,6 +32,8 @@ public class AppointmentController {
     private final ConsultationRepository consultations;
     private final UserRepository users;
     private final DoctorScheduleService schedules;
+    @Value("${app.consultation.active-hours:48}")
+    private long consultationActiveHours;
 
     public AppointmentController(AppointmentRepository appointments, ConsultationRepository consultations, UserRepository users, DoctorScheduleService schedules) {
         this.appointments = appointments;
@@ -53,27 +59,43 @@ public class AppointmentController {
     public ResponseEntity<?> availability(@RequestParam(required = false) Long doctorId,
                                           @RequestParam(required = false) String from,
                                           @RequestParam(required = false) String to) {
-        User doctor = resolveDoctor(doctorId);
-        if (doctor == null) return ResponseEntity.badRequest().body(Map.of("message", "No doctor is available for booking."));
+        List<User> doctors = doctorId == null
+                ? users.findByRoleOrderByIdDesc(Role.DOCTOR).stream().sorted(Comparator.comparing(User::getId)).toList()
+                : Optional.ofNullable(resolveDoctor(doctorId)).map(List::of).orElseGet(List::of);
+        if (doctors.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "No doctor is available for booking."));
 
-        LocalDate fromDate = parseDate(from, LocalDate.now(CLINIC_ZONE));
-        LocalDate toDate = parseDate(to, fromDate.plusDays(6));
+        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        LocalDate lastBookableDate = today.plusDays(BOOKING_DAYS - 1L);
+        LocalDate fromDate = parseDate(from, today);
+        if (fromDate.isBefore(today)) fromDate = today;
+        if (fromDate.isAfter(lastBookableDate)) fromDate = lastBookableDate;
+        LocalDate toDate = parseDate(to, lastBookableDate);
+        if (toDate.isAfter(lastBookableDate)) toDate = lastBookableDate;
         if (toDate.isBefore(fromDate)) toDate = fromDate;
 
         Instant rangeStart = fromDate.atStartOfDay(CLINIC_ZONE).toInstant();
         Instant rangeEnd = toDate.plusDays(1).atStartOfDay(CLINIC_ZONE).toInstant();
-        Set<Instant> booked = new HashSet<>();
-        for (Appointment appt : appointments.findByDoctorIdAndStartTimeBetweenOrderByStartTimeAsc(doctor.getId(), rangeStart, rangeEnd)) {
-            if (appt.getStatus() != Appointment.Status.CANCELLED) booked.add(appt.getStartTime());
+        Map<Long, List<Appointment>> bookedByDoctor = new HashMap<>();
+        for (User doctor : doctors) {
+            List<Appointment> booked = new ArrayList<>();
+            for (Appointment appt : appointments.findByDoctorIdAndStartTimeBetweenOrderByStartTimeAsc(doctor.getId(), rangeStart, rangeEnd)) {
+                if (appt.getStatus() != Appointment.Status.CANCELLED) booked.add(appt);
+            }
+            bookedByDoctor.put(doctor.getId(), booked);
         }
 
         Instant now = Instant.now();
         List<Map<String, Object>> days = new ArrayList<>();
         for (LocalDate day = fromDate; !day.isAfter(toDate); day = day.plusDays(1)) {
             List<Map<String, Object>> slots = new ArrayList<>();
-            for (LocalDateTime cursor = LocalDateTime.of(day, DAY_START); cursor.toLocalTime().isBefore(DAY_END); cursor = cursor.plusMinutes(SLOT_MINUTES)) {
+            for (LocalDateTime cursor = LocalDateTime.of(day, DAY_START); !cursor.plusMinutes(RESERVED_MINUTES).toLocalTime().isAfter(DAY_END); cursor = cursor.plusMinutes(RESERVED_MINUTES)) {
                 Instant start = cursor.atZone(CLINIC_ZONE).toInstant();
-                boolean disabled = !start.isAfter(now) || booked.contains(start) || !schedules.isAvailable(doctor.getId(), start, start.plus(Duration.ofMinutes(SLOT_MINUTES)));
+                Instant reservedEnd = start.plus(Duration.ofMinutes(RESERVED_MINUTES));
+                boolean doctorAvailable = doctors.stream().anyMatch(doctor ->
+                        schedules.isAvailable(doctor.getId(), start, reservedEnd)
+                                && bookedByDoctor.get(doctor.getId()).stream().noneMatch(a -> a.getStartTime().isBefore(reservedEnd)
+                                && a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)).isAfter(start)));
+                boolean disabled = !start.isAfter(now) || !doctorAvailable;
                 slots.add(Map.of(
                         "startTime", start.toString(),
                         "endTime", start.plus(Duration.ofMinutes(SLOT_MINUTES)).toString(),
@@ -85,8 +107,8 @@ public class AppointmentController {
         }
 
         return ResponseEntity.ok(Map.of(
-                "doctor", Map.of("id", doctor.getId(), "name", fullName(doctor)),
                 "slotMinutes", SLOT_MINUTES,
+                "documentationMinutes", DOCUMENTATION_MINUTES,
                 "timeZone", CLINIC_ZONE.toString(),
                 "days", days
         ));
@@ -98,25 +120,38 @@ public class AppointmentController {
         if (patient == null) return ResponseEntity.status(401).build();
 
         Long consultationId = toLong(body.get("consultationId"));
-        Long doctorId = toLong(body.get("doctorId"));
         if (consultationId == null || body.get("startTime") == null) return ResponseEntity.badRequest().body(Map.of("message", "Consultation and start time are required."));
 
         Consultation consultation = consultations.findById(consultationId).orElse(null);
         if (consultation == null || consultation.getUser() == null || !Objects.equals(consultation.getUser().getId(), patient.getId())) {
             return ResponseEntity.status(403).body(Map.of("message", "Consultation does not belong to the signed-in patient."));
         }
-
-        User doctor = resolveDoctor(doctorId);
-        if (doctor == null) return ResponseEntity.badRequest().body(Map.of("message", "Please select an available doctor."));
+        String selectedPatientId = body.get("patientId") == null ? "" : String.valueOf(body.get("patientId"));
+        if (selectedPatientId.isBlank() || !Objects.equals(consultation.getPatientId(), selectedPatientId)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Appointment patient context does not match the consultation."));
+        }
+        if (consultation.getStatus() == Consultation.Status.COMPLETED
+                || consultation.getCreatedAt().plus(Duration.ofHours(consultationActiveHours)).isBefore(Instant.now())) {
+            return ResponseEntity.status(409).body(Map.of("message", "This consultation is closed or has expired."));
+        }
 
         Instant start;
         try { start = Instant.parse(String.valueOf(body.get("startTime"))); }
         catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("message", "Invalid appointment time.")); }
         if (!start.isAfter(Instant.now())) return ResponseEntity.badRequest().body(Map.of("message", "Please choose a future appointment time."));
+        LocalDate appointmentDate = start.atZone(CLINIC_ZONE).toLocalDate();
+        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        if (appointmentDate.isBefore(today) || appointmentDate.isAfter(today.plusDays(BOOKING_DAYS - 1L)))
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointments can only be booked within the next two days."));
         if (!isClinicSlot(start)) return ResponseEntity.badRequest().body(Map.of("message", "Please choose one of the available appointment slots."));
-        if (!schedules.isAvailable(doctor.getId(), start, start.plus(Duration.ofMinutes(SLOT_MINUTES)))) return ResponseEntity.status(409).body(Map.of("message", "The doctor is not available at this time."));
+        Instant reservedEnd = start.plus(Duration.ofMinutes(RESERVED_MINUTES));
+        User doctor = resolveAvailableDoctor(start, reservedEnd);
+        if (doctor == null || !isDoctorAvailable(doctor, start, reservedEnd)) return ResponseEntity.status(409).body(Map.of("message", "No doctor is available at this time."));
+        if (consultation.getStatus() == Consultation.Status.COMPLETED) return ResponseEntity.status(409).body(Map.of("message", "This consultation is already closed."));
         if (appointments.findByConsultationId(consultationId).isPresent()) return ResponseEntity.badRequest().body(Map.of("message", "This consultation already has an appointment."));
-        if (appointments.existsByDoctorIdAndStartTimeAndStatusNot(doctor.getId(), start, Appointment.Status.CANCELLED)) return ResponseEntity.status(409).body(Map.of("message", "This appointment slot was just booked. Please choose another time."));
+        if (appointments.existsByDoctorIdAndStatusNotAndStartTimeLessThanAndEndTimeGreaterThan(
+                doctor.getId(), Appointment.Status.CANCELLED, reservedEnd, start.minus(Duration.ofMinutes(DOCUMENTATION_MINUTES))))
+            return ResponseEntity.status(409).body(Map.of("message", "This time overlaps another appointment or its documentation period."));
 
         Appointment appt = new Appointment();
         appt.setPatient(patient);
@@ -152,6 +187,7 @@ public class AppointmentController {
         row.put("id", a.getId());
         row.put("startTime", a.getStartTime());
         row.put("endTime", a.getEndTime());
+        row.put("documentationEndTime", a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)));
         row.put("status", a.getStatus().name());
         row.put("doctorId", doctor.getId());
         row.put("doctorName", fullName(doctor));
@@ -171,13 +207,27 @@ public class AppointmentController {
         return users.findByUsername(auth.getName()).or(() -> users.findByEmail(auth.getName())).orElse(null);
     }
     private User resolveDoctor(Long id) {
-        if (id != null) return users.findById(id).filter(u -> u.getRole() == Role.DOCTOR).orElse(null);
-        return users.findByRoleOrderByIdDesc(Role.DOCTOR).stream().min(Comparator.comparing(User::getId)).orElse(null);
+        if (id == null) return null;
+        return users.findById(id).filter(u -> u.getRole() == Role.DOCTOR).orElse(null);
+    }
+    private User resolveAvailableDoctor(Instant start, Instant reservedEnd) {
+        return users.findByRoleOrderByIdDesc(Role.DOCTOR).stream()
+                .sorted(Comparator.comparing(User::getId))
+                .filter(doctor -> isDoctorAvailable(doctor, start, reservedEnd))
+                .findFirst()
+                .orElse(null);
+    }
+    private boolean isDoctorAvailable(User doctor, Instant start, Instant reservedEnd) {
+        return schedules.isAvailable(doctor.getId(), start, reservedEnd)
+                && !appointments.existsByDoctorIdAndStatusNotAndStartTimeLessThanAndEndTimeGreaterThan(
+                doctor.getId(), Appointment.Status.CANCELLED, reservedEnd, start.minus(Duration.ofMinutes(DOCUMENTATION_MINUTES)));
     }
     private boolean isClinicSlot(Instant start) {
         ZonedDateTime z = start.atZone(CLINIC_ZONE);
         LocalTime t = z.toLocalTime();
-        return !t.isBefore(DAY_START) && t.isBefore(DAY_END) && t.getMinute() % SLOT_MINUTES == 0 && t.getSecond() == 0 && t.getNano() == 0;
+        long minutesFromOpen = Duration.between(DAY_START, t).toMinutes();
+        return !t.isBefore(DAY_START) && !t.plusMinutes(RESERVED_MINUTES).isAfter(DAY_END)
+                && minutesFromOpen % RESERVED_MINUTES == 0 && t.getSecond() == 0 && t.getNano() == 0;
     }
     private static LocalDate parseDate(String s, LocalDate fallback) { try { return s == null || s.isBlank() ? fallback : LocalDate.parse(s); } catch (Exception e) { return fallback; } }
     private static Long toLong(Object o) { try { return o == null ? null : Long.valueOf(String.valueOf(o)); } catch (Exception e) { return null; } }

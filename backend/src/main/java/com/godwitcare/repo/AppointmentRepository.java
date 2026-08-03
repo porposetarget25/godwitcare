@@ -12,4 +12,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByPatientIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(Long patientId, Instant from);
     Optional<Appointment> findByConsultationId(Long consultationId);
     boolean existsByDoctorIdAndStartTimeAndStatusNot(Long doctorId, Instant startTime, Appointment.Status status);
+    boolean existsByDoctorIdAndStatusNotAndStartTimeLessThanAndEndTimeGreaterThan(
+            Long doctorId, Appointment.Status status, Instant end, Instant start);
 }

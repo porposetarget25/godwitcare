@@ -1075,6 +1075,37 @@ html { scroll-behavior: smooth; }
   line-height: 1.2;
 }
 
+/* Patient context tabs: the active patient drives every portal request. */
+.patient-context { max-width: 980px; margin: 0 auto 18px; overflow: hidden; }
+.patient-tabs {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px;
+  scrollbar-width: thin; scroll-snap-type: x proximity;
+}
+.patient-tab {
+  flex: 0 0 auto; min-width: 168px; display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: #fff; color: #48595d; text-align: left; cursor: pointer;
+  scroll-snap-align: start; font: inherit; font-weight: 700;
+}
+.patient-tab small { display: block; margin-top: 2px; color: #829296; font-size: 11px; font-weight: 500; }
+.patient-tab.active { background: #0c6e7e; border-color: #0c6e7e; color: #fff; box-shadow: 0 4px 12px rgba(12,110,126,.18); }
+.patient-tab.active small { color: #d4ecef; }
+.patient-tab-avatar {
+  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%; display: grid; place-items: center;
+  background: #e4f1f2; color: #0a5a67; font-size: 12px; font-weight: 800;
+}
+.patient-tab.active .patient-tab-avatar { background: rgba(255,255,255,.18); color: #fff; }
+.patient-status-card .pc-body { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+.selected-patient-summary { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #f6f8f8; }
+.selected-patient-summary .muted { margin-left: auto; }
+@media (max-width: 600px) {
+  .patient-context { margin-left: -4px; margin-right: -4px; }
+  .patient-tab { min-width: 148px; }
+  .patient-status-card .pc-body { align-items: flex-start; flex-direction: column; }
+  .selected-patient-summary { align-items: flex-start; flex-wrap: wrap; }
+  .selected-patient-summary .muted { width: 100%; margin-left: 44px; }
+}
+
 .package-card {
   max-width: 980px;
   margin: 0 auto 20px;

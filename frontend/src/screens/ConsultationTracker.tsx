@@ -1,14 +1,14 @@
 // src/screens/ConsultationTracker.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { authFetch, API_BASE_URL, resolveApiUrl, getMe } from '../api'
+import { authFetch, API_BASE_URL, resolveApiUrl } from '../api'
 import { clinicDateKey, clinicDateTime, clinicTime } from '../lib/appointmentTime'
+import { usePatient } from '../state/patient'
 
 type ContactChoice = 'SAME' | 'DIFFERENT'
 
 type CountryCode = { code: string; country: string; label: string }
 
-type DoctorOption = { id: number; name: string }
 type Slot = { startTime: string; endTime: string; label: string; available: boolean }
 type AvailabilityDay = { date: string; slots: Slot[] }
 type AvailabilityResponse = { days?: AvailabilityDay[]; timeZone?: string }
@@ -29,9 +29,7 @@ function slotHour(slot: Slot, timeZone: string) {
   return Number(hourPart ?? Number.NaN)
 }
 
-function AppointmentBooking({ consultationId }: { consultationId: number }) {
-  const [doctors, setDoctors] = useState<DoctorOption[]>([])
-  const [doctorId, setDoctorId] = useState<number | null>(null)
+function AppointmentBooking({ consultationId, consultationActive, patientId, onBooked }: { consultationId: number; consultationActive: boolean; patientId: string; onBooked: (appointment: any) => void }) {
   const [days, setDays] = useState<AvailabilityDay[]>([])
   const [availabilityTimeZone, setAvailabilityTimeZone] = useState('Europe/London')
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -42,29 +40,26 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [bookedAppointment, setBookedAppointment] = useState<any>(null)
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
-      const res = await authFetch(`${API_BASE_URL}/appointments/doctors`, { cache: 'no-store' })
-      const data = res.ok ? ((await res.json()) as DoctorOption[]) : []
-      if (!alive) return
-      setDoctors(Array.isArray(data) ? data : [])
-      setDoctorId(data?.[0]?.id ?? null)
-    })()
+    authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' })
+      .then(async res => res.ok ? res.json() : [])
+      .then(items => { if (alive) setBookedAppointment((Array.isArray(items) ? items : []).find(item => item.consultationId === consultationId) ?? null) })
+      .catch(() => undefined)
     return () => { alive = false }
-  }, [])
+  }, [consultationId])
 
   const loadAvailability = React.useCallback(async () => {
-    if (!doctorId) return
     setLoading(true)
     setError(null)
     try {
       const from = clinicDateKey()
       const [year, month, day] = from.split('-').map(Number)
-      const toDate = new Date(Date.UTC(year, month - 1, day + 9, 12))
+      const toDate = new Date(Date.UTC(year, month - 1, day + 1, 12))
       const to = toDate.toISOString().slice(0, 10)
-      const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
+      const res = await authFetch(`${API_BASE_URL}/appointments/availability?from=${from}&to=${to}`, { cache: 'no-store' })
       const data = await res.json().catch(() => null) as AvailabilityResponse | null
       if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.')
       const nextDays = Array.isArray(data?.days) ? data.days : []
@@ -85,7 +80,7 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
     } finally {
       setLoading(false)
     }
-  }, [doctorId])
+  }, [])
 
   useEffect(() => { loadAvailability() }, [loadAvailability])
 
@@ -117,7 +112,7 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
   }
 
   async function confirmBooking() {
-    if (!doctorId || !selectedSlot) return
+    if (!selectedSlot) return
     setBooking(true)
     setError(null)
     setMessage(null)
@@ -125,11 +120,15 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
       const res = await authFetch(`${API_BASE_URL}/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consultationId, doctorId, startTime: selectedSlot }),
+        body: JSON.stringify({ consultationId, startTime: selectedSlot, patientId }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
+      setBookedAppointment(data)
+      setSlotsModalOpen(false)
+      setSelectedSlot('')
       setMessage(`Appointment booked for ${clinicDateTime(data.startTime)}.`)
+      onBooked(data)
       await loadAvailability()
     } catch (e: any) {
       setError(e?.message || 'Unable to book that slot.')
@@ -140,11 +139,13 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
 
   return (
     <div className="appointment-booking">
+      {bookedAppointment ? (
+        <div className="booking-selection-summary" role="status">
+          <span>Appointment status: {bookedAppointment.status ?? 'SCHEDULED'}</span>
+          <strong>{clinicDateTime(bookedAppointment.startTime)}</strong>
+        </div>
+      ) : null}
       <div className="appointment-booking-header">
-        <label style={{ fontWeight: 700 }}>Doctor</label>
-        <select className="input appointment-doctor-select" value={doctorId ?? ''} onChange={e => setDoctorId(Number(e.target.value))}>
-          {doctors.map(d => <option key={d.id} value={d.id}>{d.name || `Doctor #${d.id}`}</option>)}
-        </select>
         <span className="muted small">10-minute appointment slots</span>
       </div>
       {loading && <div className="muted">Loading available slots…</div>}
@@ -162,12 +163,10 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
         <div className="booking-date-grid" aria-label="Available appointment dates">
           {days.map(day => {
             const date = new Date(`${day.date}T00:00:00`)
-            const availableCount = day.slots.filter(slot => slot.available).length
             return (
               <button key={day.date} type="button" className={'booking-date-card ' + (selectedDate === day.date ? 'active' : '')} onClick={() => chooseDate(day.date)}>
                 <span>{date.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
                 <strong>{date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</strong>
-                <small>{availableCount} available</small>
               </button>
             )
           })}
@@ -194,7 +193,6 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
                 <button key={period.id} type="button" className={'booking-period-card ' + (selectedPeriod === period.id ? 'active' : '')} onClick={() => choosePeriod(period.id)} disabled={availableCount === 0}>
                   <strong>{period.label}</strong>
                   <span>{period.range}</span>
-                  <small>{availableCount > 0 ? `${availableCount} available slots` : 'No available slots'}</small>
                 </button>
               )
             })}
@@ -208,8 +206,8 @@ function AppointmentBooking({ consultationId }: { consultationId: number }) {
           <strong>{new Intl.DateTimeFormat('en-GB', { timeZone: availabilityTimeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(selectedSlotDetails.startTime))} {clinicTime(selectedSlotDetails.startTime)}</strong>
         </div>
       )}
-      <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>
-        {booking ? 'Booking…' : 'Confirm Appointment'}
+      <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking || !!bookedAppointment || !consultationActive} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking || bookedAppointment || !consultationActive ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>
+        {bookedAppointment ? 'Appointment Booked' : !consultationActive ? 'Consultation expired' : booking ? 'Booking…' : 'Confirm Appointment'}
       </button>
 
       {slotsModalOpen && selectedPeriod && (
@@ -455,8 +453,9 @@ function onlyDigits(s: string) {
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
   const isLogged = params.get('logged') === '1'
-  const travelerId = params.get('travelerId')
-  const patientId = params.get('patientId')
+  const { activePatient, loading: patientContextLoading, queryString: activePatientQuery } = usePatient()
+  const travelerId = activePatient?.id === 'PRIMARY' ? null : activePatient?.id || null
+  const patientId = activePatient?.patientId || null
 
   const travelerQueryString = React.useMemo(() => {
     const qp = new URLSearchParams()
@@ -474,6 +473,8 @@ export default function ConsultationTracker() {
   const [latestCid, setLatestCid] = useState<number | null>(null)
   const [latestStatus, setLatestStatus] =
     useState<'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null>(null)
+  const [latestActive, setLatestActive] = useState(false)
+  const [appointmentStatus, setAppointmentStatus] = useState<string | null>(null)
 
   // Patient info for WhatsApp draft message
   const [patientName, setPatientName] = useState<string>('N/A')
@@ -499,6 +500,7 @@ export default function ConsultationTracker() {
 
   // Load basic user info + latest consultation once (single effect, no duplicates)
   useEffect(() => {
+    if (patientContextLoading || !activePatient) return
     let alive = true
 
     const nz = (v: any, fallback = 'N/A') => {
@@ -508,18 +510,7 @@ export default function ConsultationTracker() {
 
     ;(async () => {
       try {
-        // 1) Try to populate from /auth/me (most reliable for name)
-        const me = await getMe().catch(() => null)
-        if (!alive) return
-
-        if (me) {
-          const fullName = [me.firstName, me.lastName].filter(Boolean).join(' ').trim()
-          if (fullName) setPatientName(fullName)
-
-          // Some backends include username in DTO; if yours doesn't, no harm.
-          // @ts-ignore
-          if ((me as any).username) setMobile(nz((me as any).username))
-        }
+        setPatientName(activePatient.name)
 
         // 2) Latest consultation (cid/status + address/mobile if available)
         const qp = new URLSearchParams()
@@ -534,6 +525,7 @@ export default function ConsultationTracker() {
         if (res.status === 204 || !res.ok) {
           setLatestCid(null)
           setLatestStatus(null)
+          setLatestActive(false)
           return
         }
 
@@ -542,6 +534,7 @@ export default function ConsultationTracker() {
         const cid = typeof j?.id === 'number' ? j.id : null
         setLatestCid(cid)
         setLatestStatus(typeof j?.status === 'string' ? j.status : null)
+        setLatestActive(j?.active === true)
 
         // Defensive mapping across likely field names
         setPatientName((prev) => nz(j?.patientName ?? j?.contactName ?? j?.fullName ?? j?.name, prev))
@@ -566,7 +559,7 @@ export default function ConsultationTracker() {
     return () => {
       alive = false
     }
-  }, [travelerId, patientId])
+  }, [activePatient, activePatientQuery, patientContextLoading, patientId, travelerId])
 
   // WhatsApp target (doctor business number)
   const WA_NUMBER = '447783579014' // digits only, country code + number
@@ -606,6 +599,7 @@ export default function ConsultationTracker() {
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = useState<string | null>(null)
   useEffect(() => {
+    if (patientContextLoading || !activePatient) return
     let ignore = false
     ;(async () => {
       try {
@@ -634,7 +628,7 @@ export default function ConsultationTracker() {
     return () => {
       ignore = true
     }
-  }, [travelerId, patientId])
+  }, [activePatient, patientContextLoading, patientId, travelerId])
 
   const hasLatestConsultation = !!latestCid
   const isLatestCompleted = latestStatus === 'COMPLETED'
@@ -813,9 +807,15 @@ export default function ConsultationTracker() {
                   {isLatestCompleted ? 'View Latest Consultation' : 'Edit Consultation'}
                 </Link>
               )}
-              <Link to={travelerQueryString ? `/consultation/questionnaire?${travelerQueryString}` : '/consultation/questionnaire'} className="btn consultation-action-btn consultation-action-main">
-                Create New Consultation
-              </Link>
+              {latestActive ? (
+                <button type="button" className="btn secondary consultation-action-btn consultation-action-main" style={disabledButtonStyle} disabled title="Your current consultation must close or expire first">
+                  Consultation Active
+                </button>
+              ) : (
+                <Link to={travelerQueryString ? `/consultation/questionnaire?${travelerQueryString}` : '/consultation/questionnaire'} className="btn consultation-action-btn consultation-action-main">
+                  Create New Consultation
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -976,7 +976,8 @@ export default function ConsultationTracker() {
               Choose a future 10-minute appointment slot with an available doctor. Booked slots are disabled to prevent double-booking.
             </div>
           </div>
-          {latestCid ? <AppointmentBooking consultationId={latestCid} /> : (
+          {appointmentStatus && <div className="muted small" role="status">Current appointment: {appointmentStatus}</div>}
+          {latestCid ? <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} patientId={patientId || ''} onBooked={appointment => setAppointmentStatus(appointment.status ?? 'SCHEDULED')} /> : (
             <button type="button" className="btn secondary consultation-action-btn consultation-action-main" style={disabledButtonStyle} disabled aria-disabled="true">
               Complete Step 1 first
             </button>
