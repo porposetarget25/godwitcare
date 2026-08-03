@@ -13,7 +13,7 @@ type PatientState = {
   patients: PatientContextOption[]
   activePatient: PatientContextOption | null
   loading: boolean
-  selectPatient: (id: string) => void
+  selectPatient: (patientId: string) => void
   queryString: string
 }
 
@@ -32,7 +32,10 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [patients, setPatients] = useState<PatientContextOption[]>([])
-  const [activeId, setActiveId] = useState('PRIMARY')
+  // Patient selection is deliberately keyed by the public, immutable patient ID.
+  // A traveller's database/list ID is navigation metadata only and must never be
+  // used to decide which patient's clinical records are active.
+  const [activePatientId, setActivePatientId] = useState('')
   const [loading, setLoading] = useState(false)
   const storageKey = user?.email ? `gc_active_patient:${user.email.toLowerCase()}` : ''
   const patientRoute = PATIENT_ROUTES.some(path => location.pathname === path || location.pathname.startsWith(`${path}/`))
@@ -40,7 +43,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user || isDoctorUser(user)) {
       setPatients([])
-      setActiveId('PRIMARY')
+      setActivePatientId('')
       return
     }
     let cancelled = false
@@ -61,8 +64,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         const requested = routePatientId
           ? normalized.find(p => p.patientId === routePatientId)
           : normalized.find(p => p.id === routeTraveler)
-        const selected = requested || normalized.find(p => p.id === stored) || normalized.find(p => p.id === 'PRIMARY') || normalized[0]
-        if (selected) setActiveId(selected.id)
+        const selected = requested || normalized.find(p => p.patientId === stored)
+          || normalized.find(p => p.id === 'PRIMARY') || normalized[0]
+        if (selected) setActivePatientId(selected.patientId)
       })
       .catch(() => { if (!cancelled) setPatients([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -72,8 +76,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   }, [user?.email, storageKey])
 
   const activePatient = useMemo(
-    () => patients.find(patient => patient.id === activeId) || null,
-    [activeId, patients],
+    () => patients.find(patient => patient.patientId === activePatientId) || null,
+    [activePatientId, patients],
   )
 
   const queryString = useMemo(() => {
@@ -86,7 +90,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!activePatient) return
-    if (storageKey) localStorage.setItem(storageKey, activePatient.id)
+    if (storageKey) localStorage.setItem(storageKey, activePatient.patientId)
     if (!patientRoute) return
     const current = new URLSearchParams(location.search)
     const next = new URLSearchParams(current)
@@ -98,8 +102,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activePatient, location.hash, location.pathname, location.search, navigate, patientRoute, storageKey])
 
-  const selectPatient = useCallback((id: string) => {
-    if (patients.some(patient => patient.id === id)) setActiveId(id)
+  const selectPatient = useCallback((patientId: string) => {
+    if (patients.some(patient => patient.patientId === patientId)) setActivePatientId(patientId)
   }, [patients])
 
   const value = useMemo(() => ({ patients, activePatient, loading, selectPatient, queryString }),

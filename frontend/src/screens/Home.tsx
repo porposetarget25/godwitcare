@@ -402,8 +402,10 @@ export default function Home() {
 
 
   const { patients: travelerSelectOptions, activePatient: selectedTraveler, loading: patientSelectionLoading, selectPatient, queryString } = usePatient();
-  const selectedTravelerId = selectedTraveler?.id || 'PRIMARY';
-  const selectedTravelerQuery = React.useMemo(() => new URLSearchParams(queryString), [queryString]);
+  const selectedPatientId = selectedTraveler?.patientId || '';
+  // Keep one primitive snapshot of the active patient's identifiers. This avoids
+  // links and requests retaining a URLSearchParams object from a previous tab.
+  const selectedTravelerQuery = queryString;
 
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
@@ -413,7 +415,7 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery.toString()}`, {});
+        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery}`, {});
         if (ignore) return;
         if (!res.ok || res.status === 204) { setRxUrl(null); return; }
         const j = await res.json().catch(() => null);
@@ -441,7 +443,7 @@ export default function Home() {
     setLatestConsultation(null);
     (async () => {
       try {
-        const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery.toString()}`, {
+        const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery}`, {
       });
         if (ignore) return;
 
@@ -477,10 +479,10 @@ export default function Home() {
     let ignore = false;
     (async () => {
       try {
-        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, {});
+        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery}`, {});
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
-        const latestRes = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${selectedTravelerQuery.toString()}`, { cache: 'no-store' });
+        const latestRes = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${selectedTravelerQuery}`, { cache: 'no-store' });
         if (!ignore && latestRes.ok && latestRes.status !== 204) {
           setLatestConsultation(await latestRes.json());
         }
@@ -561,15 +563,15 @@ export default function Home() {
       <div className="patient-context" aria-label="Select patient">
         <div className="patient-tabs" role="tablist">
           {travelerSelectOptions.map((patient) => {
-            const active = String(patient.id) === String(selectedTravelerId)
+            const active = patient.patientId === selectedPatientId
             return (
               <button
-                key={String(patient.id)}
+                key={patient.patientId}
                 type="button"
                 role="tab"
                 aria-selected={active}
                 className={`patient-tab${active ? ' active' : ''}`}
-                onClick={() => selectPatient(String(patient.id))}
+                onClick={() => selectPatient(patient.patientId)}
               >
                 <span className="patient-tab-avatar" aria-hidden="true">
                   {patient.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
@@ -635,7 +637,7 @@ export default function Home() {
               WhatsApp
             </a> */}
             <Link
-              to={selectedTravelerQuery.toString() ? `/consultation/questionnaire?${selectedTravelerQuery.toString()}` : '/consultation/questionnaire'}
+              to={selectedTravelerQuery ? `/consultation/questionnaire?${selectedTravelerQuery}` : '/consultation/questionnaire'}
               className="btn"
               style={{
                 backgroundColor: '#75b948ff',
@@ -676,7 +678,7 @@ export default function Home() {
             </div>
           </div>
           {latestConsultation && (
-            <Link className="btn secondary" to={`/consultation/tracker?${selectedTravelerQuery.toString()}`}>View consultation</Link>
+            <Link className="btn secondary" to={`/consultation/tracker?${selectedTravelerQuery}`}>View consultation</Link>
           )}
         </div>
       </div>
@@ -731,7 +733,7 @@ export default function Home() {
         {/* Care History — enabled if care history has at least one item */}
         {careHistoryEnabled ? (
           <Link
-            to={`/care-history?${selectedTravelerQuery.toString()}`}
+            to={`/care-history?${selectedTravelerQuery}`}
             className="quick"
             style={{
               borderRadius: 16,
@@ -795,7 +797,7 @@ export default function Home() {
 
         {/* Tracker */}
         <Link
-          to={`/consultation/tracker?${selectedTravelerQuery.toString()}`}
+          to={`/consultation/tracker?${selectedTravelerQuery}`}
           className="quick"
           style={{
             borderRadius: 16,

@@ -139,15 +139,21 @@ public class ConsultationController {
         String base = "PV-" + String.format("%09d", user.getId() == null ? 0L : user.getId());
         if (travelerId == null) return base;
 
-        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
-        if (latest == null || latest.getTravelers() == null) return base + "-" + travelerId;
+        // Preserve the identifier already attached to this exact traveller's
+        // records. Older versions derived this suffix from collection position,
+        // which allowed reordered co-travellers to inherit each other's context.
+        String existingPatientId = consultations
+                .findByUserEmailAndTravelerIdOrderByIdDesc(user.getEmail(), travelerId)
+                .stream()
+                .map(Consultation::getPatientId)
+                .filter(id -> id != null && !id.isBlank())
+                .findFirst()
+                .orElse(null);
+        if (existingPatientId != null) return existingPatientId;
 
-        int seq = 1;
-        for (Traveler t : latest.getTravelers()) {
-            if (Objects.equals(t.getId(), travelerId)) return base + "-" + seq;
-            seq++;
-        }
-        return base + "-" + travelerId;
+        // New co-travellers are keyed by their immutable database identifier,
+        // never by their position or object order in a registration payload.
+        return base + "-T" + travelerId;
     }
 
     private Traveler resolveOwnedTraveler(User user, Long travelerId) {
