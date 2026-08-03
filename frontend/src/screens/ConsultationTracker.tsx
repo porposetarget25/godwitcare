@@ -8,7 +8,6 @@ type ContactChoice = 'SAME' | 'DIFFERENT'
 
 type CountryCode = { code: string; country: string; label: string }
 
-type DoctorOption = { id: number; name: string }
 type Slot = { startTime: string; endTime: string; label: string; available: boolean }
 type AvailabilityDay = { date: string; slots: Slot[] }
 type AvailabilityResponse = { days?: AvailabilityDay[]; timeZone?: string }
@@ -30,8 +29,6 @@ function slotHour(slot: Slot, timeZone: string) {
 }
 
 function AppointmentBooking({ consultationId, consultationActive, onBooked }: { consultationId: number; consultationActive: boolean; onBooked: (appointment: any) => void }) {
-  const [doctors, setDoctors] = useState<DoctorOption[]>([])
-  const [doctorId, setDoctorId] = useState<number | null>(null)
   const [days, setDays] = useState<AvailabilityDay[]>([])
   const [availabilityTimeZone, setAvailabilityTimeZone] = useState('Europe/London')
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -53,20 +50,7 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
     return () => { alive = false }
   }, [consultationId])
 
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      const res = await authFetch(`${API_BASE_URL}/appointments/doctors`, { cache: 'no-store' })
-      const data = res.ok ? ((await res.json()) as DoctorOption[]) : []
-      if (!alive) return
-      setDoctors(Array.isArray(data) ? data : [])
-      setDoctorId(data?.[0]?.id ?? null)
-    })()
-    return () => { alive = false }
-  }, [])
-
   const loadAvailability = React.useCallback(async () => {
-    if (!doctorId) return
     setLoading(true)
     setError(null)
     try {
@@ -74,7 +58,7 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
       const [year, month, day] = from.split('-').map(Number)
       const toDate = new Date(Date.UTC(year, month - 1, day + 1, 12))
       const to = toDate.toISOString().slice(0, 10)
-      const res = await authFetch(`${API_BASE_URL}/appointments/availability?doctorId=${doctorId}&from=${from}&to=${to}`, { cache: 'no-store' })
+      const res = await authFetch(`${API_BASE_URL}/appointments/availability?from=${from}&to=${to}`, { cache: 'no-store' })
       const data = await res.json().catch(() => null) as AvailabilityResponse | null
       if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.')
       const nextDays = Array.isArray(data?.days) ? data.days : []
@@ -95,7 +79,7 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
     } finally {
       setLoading(false)
     }
-  }, [doctorId])
+  }, [])
 
   useEffect(() => { loadAvailability() }, [loadAvailability])
 
@@ -127,7 +111,7 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
   }
 
   async function confirmBooking() {
-    if (!doctorId || !selectedSlot) return
+    if (!selectedSlot) return
     setBooking(true)
     setError(null)
     setMessage(null)
@@ -135,7 +119,7 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
       const res = await authFetch(`${API_BASE_URL}/appointments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consultationId, doctorId, startTime: selectedSlot }),
+        body: JSON.stringify({ consultationId, startTime: selectedSlot }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
@@ -161,10 +145,6 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
         </div>
       ) : null}
       <div className="appointment-booking-header">
-        <label style={{ fontWeight: 700 }}>Doctor</label>
-        <select className="input appointment-doctor-select" value={doctorId ?? ''} onChange={e => setDoctorId(Number(e.target.value))}>
-          {doctors.map(d => <option key={d.id} value={d.id}>{d.name || `Doctor #${d.id}`}</option>)}
-        </select>
         <span className="muted small">10-minute appointment slots</span>
       </div>
       {loading && <div className="muted">Loading available slots…</div>}
@@ -182,12 +162,10 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
         <div className="booking-date-grid" aria-label="Available appointment dates">
           {days.map(day => {
             const date = new Date(`${day.date}T00:00:00`)
-            const availableCount = day.slots.filter(slot => slot.available).length
             return (
               <button key={day.date} type="button" className={'booking-date-card ' + (selectedDate === day.date ? 'active' : '')} onClick={() => chooseDate(day.date)}>
                 <span>{date.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
                 <strong>{date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</strong>
-                <small>{availableCount} available</small>
               </button>
             )
           })}
@@ -214,7 +192,6 @@ function AppointmentBooking({ consultationId, consultationActive, onBooked }: { 
                 <button key={period.id} type="button" className={'booking-period-card ' + (selectedPeriod === period.id ? 'active' : '')} onClick={() => choosePeriod(period.id)} disabled={availableCount === 0}>
                   <strong>{period.label}</strong>
                   <span>{period.range}</span>
-                  <small>{availableCount > 0 ? `${availableCount} available slots` : 'No available slots'}</small>
                 </button>
               )
             })}
