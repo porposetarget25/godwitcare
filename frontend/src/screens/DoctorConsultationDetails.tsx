@@ -4,6 +4,7 @@ import { authFetch, doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
 import { doctorLatestPrescriptionMeta } from '../api'
 import { resolveApiUrl } from '../api'
+import { QUESTIONNAIRE_SECTIONS } from '../questionnaire'
 
 export default function DoctorConsultationDetails() {
   const { id } = useParams()
@@ -15,6 +16,7 @@ export default function DoctorConsultationDetails() {
   const [prescriptionRequired, setPrescriptionRequired] = useState(true)
   const [initialAnswers, setInitialAnswers] = useState<Record<string, 'Yes' | 'No'>>({})
   const [initialDetailsByQuestion, setInitialDetailsByQuestion] = useState<Record<string, string>>({})
+  const [expandedQuestionnaireSections, setExpandedQuestionnaireSections] = useState<Set<string>>(new Set())
 
   // ---- NEW: prescription state
   const [history, setHistory] = useState('')
@@ -40,14 +42,25 @@ export default function DoctorConsultationDetails() {
 
   // Load consultation + latest prescription meta
   useEffect(() => {
-    (async () => {
+    let ignore = false
+    setData(null)
+    ;(async () => {
       try {
         const d = await doctorGetConsultation(Number(id))
+        if (ignore) return
+        const loadedAnswers = (d?.answers || {}) as Record<string, 'Yes' | 'No'>
+        const sectionsWithYesAnswers = QUESTIONNAIRE_SECTIONS
+          .filter(section => section.questions.some(question => loadedAnswers[question.id] === 'Yes'))
+          .map(section => section.title)
+
         setData(d)
-        setAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
+        setAnswers(loadedAnswers)
         setDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
-        setInitialAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
+        setInitialAnswers(loadedAnswers)
         setInitialDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
+        // Initialize this once per loaded consultation. Later changes are driven only
+        // by the doctor's manual expand/collapse actions.
+        setExpandedQuestionnaireSections(new Set(sectionsWithYesAnswers))
         setHistory(d?.historyOfPresentingComplaint || '')
         setDiagnosis(d?.diagnosis || '')
         setRecommendations(d?.recommendations || '')
@@ -70,6 +83,7 @@ export default function DoctorConsultationDetails() {
         }
       } catch { /* handled */ }
     })()
+    return () => { ignore = true }
   }, [id])
 
   // Load latest referral meta for this consultation
@@ -287,17 +301,19 @@ export default function DoctorConsultationDetails() {
   }
 
   return (
-    <section className="section doctor-consultation-details">
+    <section className="section doctor-consultation-details doctor-consult-workspace">
       <div className="page-head doctor-consultation-details-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 className="page-title">Consultation -{data.id}</h1>
+        <h1 className="page-title">Consultation — #{data.id}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link className="btn secondary" to="/doctor/consultations">Back</Link>
         </div>
       </div>
       {readOnly && <div className="consultation-readonly" role="status">Completed consultation — view only</div>}
 
-      {/* Patient summary card (unchanged) */}
-      <div className="card" style={{ padding: 16 }}>
+      <div className="doctor-consult-grid">
+      <div className="doctor-patient-column">
+      {/* Patient summary card */}
+      <div className="card patient-summary-card" style={{ padding: 16 }}>
         {(() => {
           const created = new Date(data.createdAt)
           const timeStr = created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -331,89 +347,66 @@ export default function DoctorConsultationDetails() {
         })()}
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="strong">Patient Contact & Address</div>
+      <details className="card consultation-section" open={Boolean(data.contactPhone || data.contactAddress || data.patient.email)}>
+        <summary>Patient Contact &amp; Address <span>Patient provided · read only</span></summary>
+        <div className="consultation-section-body">
         <div><span className="muted">Phone (WhatsApp):</span> {data.contactPhone || '—'}</div>
         <div><span className="muted">Address:</span> {data.contactAddress || '—'}</div>
         <div><span className="muted">Email:</span> {data.patient.email || '—'}</div>
         {waUrl && <a className="btn" href={waUrl} target="_blank" rel="noreferrer" style={{ marginTop: 8 }}>WhatsApp Patient</a>}
-      </div>
-
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="strong" style={{ marginBottom: 8 }}>Questionnaire</div>
-        {answers && Object.keys(answers).length > 0 ? (
-          <div className="questionnaire-table-wrap">
-            <table className="questionnaire-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-                <th style={{ padding: '6px 8px' }}>Question ID</th>
-                <th style={{ padding: '6px 8px' }}>Answer</th>
-                <th style={{ padding: '6px 8px' }}>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(answers).map(([qid, ans]) => {
-                const note = (detailsByQuestion || {})[qid]
-                const isYes = String(ans).toLowerCase() === 'yes'
-                return (
-                  <tr
-                    key={qid}
-                    style={{
-                      borderTop: '1px solid #e5e7eb',
-                      background: isYes ? '#fef3c7' : 'transparent'
-                    }}
-                  >
-                    <td style={{ padding: '6px 8px', fontSize: 13, fontWeight: 500 }}>{qid}</td>
-                    <td style={{ padding: '6px 8px' }}>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          type="button"
-                          className={'btn btn-no ' + (ans === 'No' ? '' : 'secondary')}
-                          onClick={() => setAnswer(qid, 'No')}
-                          disabled={readOnly}
-                          aria-pressed={ans === 'No'}
-                        >
-                          No
-                        </button>
-                        <button
-                          type="button"
-                          className={'btn btn-yes ' + (ans === 'Yes' ? '' : 'secondary')}
-                          onClick={() => setAnswer(qid, 'Yes')}
-                          disabled={readOnly}
-                          aria-pressed={ans === 'Yes'}
-                        >
-                          Yes
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{ padding: '6px 8px', color: note ? '#374151' : '#9ca3af' }}>
-                      {ans === 'Yes' ? (
-                        <input
-                          value={note || ''}
-                          onChange={(e) => setDetail(qid, e.target.value)}
-                          disabled={readOnly}
-                          placeholder="Describe briefly (optional)"
-                          style={{ width: '100%' }}
-                        />
-                      ) : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            </table>
-          </div>
-        ) : <div className="muted">No answers</div>}
-        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {!readOnly && <button type="button" className="btn" onClick={saveQuestionnaire} disabled={savingConsultation}>
-            {savingConsultation ? 'Saving…' : 'Save Consultation'}
-          </button>}
-          {consultationSaveErr && <span className="muted small" style={{ color: '#b91c1c' }}>{consultationSaveErr}</span>}
-          {data?.status === 'COMPLETED' && !consultationSaveErr && (
-            <span className="muted small">Consultation completed.</span>
-          )}
         </div>
-      </div>
+      </details>
+
+      <details className="card consultation-section" defaultOpen>
+        <summary>Questionnaire <span>{Object.keys(answers || {}).length} responses · read only</span></summary>
+        <div className="consultation-section-body">
+          <div className="doctor-questionnaire-sections">
+            {QUESTIONNAIRE_SECTIONS.map((section) => {
+              const answeredCount = section.questions.filter(({ id }) => answers[id] != null).length
+              return (
+                <details
+                  className="doctor-questionnaire-section"
+                  key={section.title}
+                  open={expandedQuestionnaireSections.has(section.title)}
+                  onToggle={(event) => {
+                    const isOpen = event.currentTarget.open
+                    setExpandedQuestionnaireSections(current => {
+                      if (current.has(section.title) === isOpen) return current
+                      const next = new Set(current)
+                      if (isOpen) next.add(section.title)
+                      else next.delete(section.title)
+                      return next
+                    })
+                  }}
+                >
+                  <summary>
+                    <strong>{section.title}</strong>
+                    <span>{answeredCount} of {section.questions.length} answered</span>
+                  </summary>
+                  <div className="doctor-questionnaire-questions">
+                    {section.questions.map((question) => {
+                      const answer = answers[question.id]
+                      const note = detailsByQuestion[question.id]
+                      return (
+                        <div className={`doctor-questionnaire-question${answer === 'Yes' ? ' is-yes' : ''}`} key={question.id}>
+                          <div>
+                            <strong>{question.label}</strong>
+                            <small>{question.id}</small>
+                            {answer === 'Yes' && <p>{note || 'No additional details'}</p>}
+                          </div>
+                          <span className={`patient-answer${answer === 'Yes' ? ' patient-answer-yes' : ''}`}>
+                            {answer || 'Unanswered'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </details>
+              )
+            })}
+          </div>
+        </div>
+      </details>
 
       {/* ===== NEW: Right column style stack (kept vertical so it fits your layout) ===== */}
       {/* Actions */}
@@ -424,10 +417,14 @@ export default function DoctorConsultationDetails() {
             aria-disabled={!waUrl} onClick={(e) => { if (!waUrl) e.preventDefault() }}>
             📞 Call Patient
           </a>
+          <Link className="btn secondary" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>↶ Patient Care History</Link>
           <button type="button" className="btn secondary" disabled>🔔 Select Notification Type</button>
           <button type="button" className="btn" disabled={readOnly}>🗓️ Schedule a Call</button>
         </div>
       </div>
+      </div>
+
+      <div className="doctor-notes-column">
 
       {/* History of Presenting Complaint */}
       <div className="card" style={{ marginTop: 12 }}>
@@ -550,7 +547,7 @@ export default function DoctorConsultationDetails() {
           ) : (
             <button className="btn secondary" type="button" disabled>View Prescription</button>
           )}
-          <button className="btn secondary" type="button" disabled={!(data?.status === 'COMPLETED' && !prescriptionRequired)}>View Case History</button>
+          <Link className="btn secondary" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>Patient Care History</Link>
           <button className="btn secondary" type="button" disabled>Admin/Miscellaneous Letter</button>
           {/* Referral Letter (builder) */}
           {prescriptionRequired && !readOnly && ((id || data?.id) ? (
@@ -587,6 +584,9 @@ export default function DoctorConsultationDetails() {
           })()}
         </div>
       </div>
+      </div>
+      </div>
+
     </section>
   )
 }

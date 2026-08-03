@@ -102,4 +102,57 @@ public class CareHistoryController {
         body.put("items", items);
         return ResponseEntity.ok(body);
     }
+
+    /**
+     * Gives a doctor the same longitudinal record while they are treating a patient.
+     * The consultation id is deliberately used as the lookup key so a doctor never
+     * has to know (or submit) the patient's account identifier.
+     */
+    @GetMapping("/doctor/consultations/{consultationId}/care-history")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<?> forDoctor(@PathVariable Long consultationId) {
+        Consultation selected = consultations.findById(consultationId).orElse(null);
+        if (selected == null || selected.getUser() == null) return ResponseEntity.notFound().build();
+
+        List<Consultation> list = consultations.findByUserEmailAndPatientIdOrderByIdDesc(
+                selected.getUser().getEmail(), selected.getPatientId());
+        Map<String, Object> body = buildHistory(list);
+        return ResponseEntity.ok(body);
+    }
+
+    private Map<String, Object> buildHistory(List<Consultation> list) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (list.isEmpty()) {
+            body.put("items", List.of());
+            return body;
+        }
+        Consultation latest = list.get(0);
+        Map<String, Object> patient = new LinkedHashMap<>();
+        patient.put("name", Optional.ofNullable(latest.getContactName()).orElse(""));
+        patient.put("patientId", Optional.ofNullable(latest.getPatientId()).orElse(""));
+        patient.put("dob", latest.getDob() != null ? latest.getDob().toString() : "");
+        body.put("patient", patient);
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Consultation c : list) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("consultationId", c.getId());
+            item.put("date", c.getCreatedAt());
+            item.put("status", c.getStatus() != null ? c.getStatus().name() : "LOGGED");
+            item.put("locationTravellingTo", Optional.ofNullable(c.getCurrentLocation()).orElse(""));
+            item.put("presentingComplaint", Optional.ofNullable(c.getHistoryOfPresentingComplaint()).orElse(""));
+            item.put("diagnosis", Optional.ofNullable(c.getDiagnosis()).orElse(""));
+            item.put("recommendations", Optional.ofNullable(c.getRecommendations()).orElse(""));
+            Optional<Prescription> rx = prescriptions.findTopByConsultationIdOrderByIdDesc(c.getId());
+            item.put("medicines", rx.map(Prescription::getMedicines).orElse(""));
+            rx.ifPresent(p -> {
+                item.put("presentingComplaint", Optional.ofNullable(p.getHistoryOfPresentingComplaint()).orElse(""));
+                item.put("diagnosis", Optional.ofNullable(p.getDiagnosis()).orElse(""));
+                item.put("recommendations", Optional.ofNullable(p.getRecommendations()).orElse(""));
+            });
+            items.add(item);
+        }
+        body.put("items", items);
+        return body;
+    }
 }
