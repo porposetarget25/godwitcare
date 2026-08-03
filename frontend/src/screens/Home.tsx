@@ -464,9 +464,16 @@ export default function Home() {
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
   const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
+  const [patientContextLoading, setPatientContextLoading] = React.useState(false);
+  const [latestConsultation, setLatestConsultation] = React.useState<any>(null);
 
   React.useEffect(() => {
     let ignore = false;
+    setPatientContextLoading(true);
+    setCareHistoryEnabled(false);
+    setRxUrl(null);
+    setReferralUrl(null);
+    setLatestConsultation(null);
     (async () => {
       try {
         const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery.toString()}`, {
@@ -512,8 +519,14 @@ export default function Home() {
         const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, {});
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
+        const latestRes = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${selectedTravelerQuery.toString()}`, { cache: 'no-store' });
+        if (!ignore && latestRes.ok && latestRes.status !== 204) {
+          setLatestConsultation(await latestRes.json());
+        }
       } catch {
         if (!ignore) setCareHistoryEnabled(false);
+      } finally {
+        if (!ignore) setPatientContextLoading(false);
       }
     })();
     return () => { ignore = true; };
@@ -584,6 +597,29 @@ export default function Home() {
         </div>
       </div>
 
+      <div className="patient-context" aria-label="Select patient">
+        <div className="patient-tabs" role="tablist">
+          {travelerSelectOptions.map((patient) => {
+            const active = String(patient.id) === String(selectedTravelerId)
+            return (
+              <button
+                key={String(patient.id)}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`patient-tab${active ? ' active' : ''}`}
+                onClick={() => setSelectedTravelerId(String(patient.id))}
+              >
+                <span className="patient-tab-avatar" aria-hidden="true">
+                  {patient.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
+                <span>{patient.name}{String(patient.id) === 'PRIMARY' ? <small>You</small> : <small>Co-traveller</small>}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Travel details card */}
       {reg && (
         <div className="package-card" style={{ marginBottom: 16 }}>
@@ -638,7 +674,7 @@ export default function Home() {
               WhatsApp
             </a> */}
             <Link
-              to={selectedTravelerQuery.toString() ? `/consultation/tracker?${selectedTravelerQuery.toString()}` : '/consultation/tracker'}
+              to={selectedTravelerQuery.toString() ? `/consultation/questionnaire?${selectedTravelerQuery.toString()}` : '/consultation/questionnaire'}
               className="btn"
               style={{
                 backgroundColor: '#75b948ff',
@@ -664,9 +700,23 @@ export default function Home() {
                   d="M6.6 10.8c1.2 2.4 3.2 4.4 5.6 5.6l2-2c.3-.3.7-.4 1.1-.3 1.2.4 2.6.6 4 .6.6 0 1 .4 1 1v3.5c0 .6-.4 1-1 1C11.3 20 4 12.7 4 4.5c0-.6.4-1 1-1H8.5c.6 0 1 .4 1 1 0 1.4.2 2.8.6 4 .1.4 0 .8-.3 1.1l-2.2 2.2Z"
                 />
               </svg>
-              I need a Consultation
+              I Need a Consultation
             </Link>
           </div>
+        </div>
+      </div>
+
+      <div className="package-card patient-status-card" aria-live="polite">
+        <div className="pc-body">
+          <div>
+            <div className="muted small">Current consultation · {selectedTraveler?.name}</div>
+            <div className="strong" style={{ marginTop: 4 }}>
+              {patientContextLoading ? 'Loading patient information…' : latestConsultation ? latestConsultation.status.replace(/_/g, ' ') : 'No current consultation'}
+            </div>
+          </div>
+          {latestConsultation && (
+            <Link className="btn secondary" to={`/consultation/tracker?${selectedTravelerQuery.toString()}`}>View consultation</Link>
+          )}
         </div>
       </div>
 
@@ -715,12 +765,6 @@ export default function Home() {
 
       {/* Quick Links */}
       <div className="ql-head">Quick Links</div>
-      <div style={{marginBottom:12}}>
-        <label className="muted small">Traveller</label>
-        <select value={selectedTravelerId} onChange={(e)=>setSelectedTravelerId(e.target.value)} style={{marginLeft:8,padding:6,borderRadius:8}}>
-          {travelerSelectOptions.map((t:any)=><option key={String(t.id)} value={String(t.id)}>{t.name}</option>)}
-        </select>
-      </div>
 
       <div className="quick-grid">
         {/* Care History — enabled if care history has at least one item */}

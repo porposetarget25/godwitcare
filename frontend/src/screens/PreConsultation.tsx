@@ -149,6 +149,7 @@ export default function PreConsultation() {
   const cid = params.get('cid') // if present => edit mode
   const travelerId = params.get('travelerId')
   const patientId = params.get('patientId')
+  const [resolvedPatientId, setResolvedPatientId] = useState(patientId || '')
   const isEdit = !!cid
 
   const travelerQueryString = useMemo(() => {
@@ -204,6 +205,17 @@ export default function PreConsultation() {
     if (isEdit) return
     let ignore = false
     ;(async () => {
+      // Resolve the canonical backend patient id even on a directly opened URL.
+      try {
+        const contextResponse = await authFetch(`${API_BASE_URL}/consultations/travelers`, {})
+        if (!ignore && contextResponse.ok) {
+          const contexts = await contextResponse.json().catch(() => [])
+          const selected = (Array.isArray(contexts) ? contexts : []).find((item: any) =>
+            travelerId ? String(item.id) === travelerId : String(item.id) === 'PRIMARY')
+          if (selected?.patientId) setResolvedPatientId(String(selected.patientId))
+        }
+      } catch { /* handled by submit validation */ }
+
       // 1) Try latest Registration (DOB lives here)
       try {
         const r = await authFetch(`${API_BASE_URL}/registrations/mine/latest`, {})
@@ -222,8 +234,9 @@ export default function PreConsultation() {
             const opts = buildPatientOptionsFromRegistration(reg)
             if (opts.length > 0) {
               setPatientOptions(opts)
-              setSelectedPatientKey(opts[0].key)
-              const sel = opts[0]
+              const requested = travelerId ? opts.find(opt => opt.key === `trav-${travelerId}`) : opts.find(opt => opt.key === 'primary')
+              const sel = requested || opts[0]
+              setSelectedPatientKey(sel.key)
               const nameOnly = sel.label.replace(/\s*\(Primary\)\s*$/, '')
               setContactName(nameOnly)
               if (sel.dob) setDob(sel.dob)
@@ -234,7 +247,7 @@ export default function PreConsultation() {
 
       // 2) Latest consultation details (address/location; fallback dob)
       try {
-        const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest`, {})
+        const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest${travelerQueryString ? `?${travelerQueryString}` : ''}`, {})
         if (!ignore && r0.ok) {
           const latest = await r0.json().catch(() => null)
           if (latest?.id) {
@@ -388,6 +401,7 @@ export default function PreConsultation() {
         detailsByQuestion: details,
         dob: dob || null,
         travelerId: Number.isFinite(travelerId) ? travelerId : null,
+        patientId: resolvedPatientId,
       }
 
       const url = isEdit
@@ -513,19 +527,15 @@ export default function PreConsultation() {
         <div className="card" style={{ marginTop: 12 }}>
           <div className="strong" style={{ marginBottom: 8 }}>Patient Contact &amp; Address</div>
 
-          {/* Patient full width */}
+          {/* Patient context is chosen on the portal tabs and cannot be changed here. */}
           <div className="field">
-            <label>Patient (Primary or Traveller)</label>
+            <label>Consultation for</label>
             {patientOptions.length > 0 ? (
-              <select
-                value={selectedPatientKey}
-                onChange={(e) => setSelectedPatientKey(e.target.value)}
-                style={{ width: '100%' }}
-              >
-                {patientOptions.map((o) => (
-                  <option key={o.key} value={o.key}>{o.label}</option>
-                ))}
-              </select>
+              <div className="selected-patient-summary">
+                <span className="patient-tab-avatar" aria-hidden="true">{contactName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}</span>
+                <strong>{contactName}</strong>
+                <span className="muted small">Selected from Patient Portal</span>
+              </div>
             ) : (
               <input
                 value={contactName}
