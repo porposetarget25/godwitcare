@@ -46,7 +46,7 @@ export default function DoctorConsultationDetails() {
   useEffect(() => {
     let ignore = false
     setData(null)
-    (async () => {
+    ;(async () => {
       try {
         const d = await doctorGetConsultation(Number(id))
         if (ignore) return
