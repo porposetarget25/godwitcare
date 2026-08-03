@@ -31,6 +31,7 @@ import OtpVerification from './screens/OtpVerification';
 
 // NEW: shared auth context
 import { AuthProvider, useAuth } from './state/auth';
+import { PatientProvider } from './state/patient';
 import { logout } from './api';
 
 // ---------- Shell layout ----------
@@ -400,7 +401,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <HashRouter>
         <ScrollToHash />
         <AuthProvider>
-          <AppRoutes />
+          <PatientProvider>
+            <AppRoutes />
+          </PatientProvider>
         </AuthProvider>
       </HashRouter>
     </RegProvider>
