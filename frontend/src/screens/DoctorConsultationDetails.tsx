@@ -16,6 +16,7 @@ export default function DoctorConsultationDetails() {
   const [prescriptionRequired, setPrescriptionRequired] = useState(true)
   const [initialAnswers, setInitialAnswers] = useState<Record<string, 'Yes' | 'No'>>({})
   const [initialDetailsByQuestion, setInitialDetailsByQuestion] = useState<Record<string, string>>({})
+  const [expandedQuestionnaireSections, setExpandedQuestionnaireSections] = useState<Set<string>>(new Set())
 
   // ---- NEW: prescription state
   const [history, setHistory] = useState('')
@@ -43,14 +44,25 @@ export default function DoctorConsultationDetails() {
 
   // Load consultation + latest prescription meta
   useEffect(() => {
+    let ignore = false
+    setData(null)
     (async () => {
       try {
         const d = await doctorGetConsultation(Number(id))
+        if (ignore) return
+        const loadedAnswers = (d?.answers || {}) as Record<string, 'Yes' | 'No'>
+        const sectionsWithYesAnswers = QUESTIONNAIRE_SECTIONS
+          .filter(section => section.questions.some(question => loadedAnswers[question.id] === 'Yes'))
+          .map(section => section.title)
+
         setData(d)
-        setAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
+        setAnswers(loadedAnswers)
         setDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
-        setInitialAnswers((d?.answers || {}) as Record<string, 'Yes' | 'No'>)
+        setInitialAnswers(loadedAnswers)
         setInitialDetailsByQuestion((d?.detailsByQuestion || {}) as Record<string, string>)
+        // Initialize this once per loaded consultation. Later changes are driven only
+        // by the doctor's manual expand/collapse actions.
+        setExpandedQuestionnaireSections(new Set(sectionsWithYesAnswers))
         setHistory(d?.historyOfPresentingComplaint || '')
         setDiagnosis(d?.diagnosis || '')
         setRecommendations(d?.recommendations || '')
@@ -73,6 +85,7 @@ export default function DoctorConsultationDetails() {
         }
       } catch { /* handled */ }
     })()
+    return () => { ignore = true }
   }, [id])
 
   useEffect(() => {
@@ -368,10 +381,23 @@ export default function DoctorConsultationDetails() {
         <div className="consultation-section-body">
           <div className="doctor-questionnaire-sections">
             {QUESTIONNAIRE_SECTIONS.map((section) => {
-              const hasYes = section.questions.some(({ id }) => answers[id] === 'Yes')
               const answeredCount = section.questions.filter(({ id }) => answers[id] != null).length
               return (
-                <details className="doctor-questionnaire-section" key={section.title} defaultOpen={hasYes}>
+                <details
+                  className="doctor-questionnaire-section"
+                  key={section.title}
+                  open={expandedQuestionnaireSections.has(section.title)}
+                  onToggle={(event) => {
+                    const isOpen = event.currentTarget.open
+                    setExpandedQuestionnaireSections(current => {
+                      if (current.has(section.title) === isOpen) return current
+                      const next = new Set(current)
+                      if (isOpen) next.add(section.title)
+                      else next.delete(section.title)
+                      return next
+                    })
+                  }}
+                >
                   <summary>
                     <strong>{section.title}</strong>
                     <span>{answeredCount} of {section.questions.length} answered</span>
