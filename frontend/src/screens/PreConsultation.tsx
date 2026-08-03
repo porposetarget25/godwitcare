@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authFetch, API_BASE_URL } from '../api'
 import { QUESTIONNAIRE_SECTIONS } from '../questionnaire'
+import { usePatient } from '../state/patient'
 
 type YesNo = 'Yes' | 'No'
 type Ans = YesNo | undefined
@@ -147,17 +148,19 @@ export default function PreConsultation() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const cid = params.get('cid') // if present => edit mode
-  const travelerId = params.get('travelerId')
-  const patientId = params.get('patientId')
+  const { activePatient, loading: patientContextLoading, queryString: activePatientQuery } = usePatient()
+  const travelerId = activePatient?.id === 'PRIMARY' ? null : activePatient?.id || null
+  const patientId = activePatient?.patientId || null
   const [resolvedPatientId, setResolvedPatientId] = useState(patientId || '')
   const isEdit = !!cid
 
   const travelerQueryString = useMemo(() => {
-    const qp = new URLSearchParams()
-    if (travelerId) qp.set('travelerId', travelerId)
-    if (patientId) qp.set('patientId', patientId)
-    return qp.toString()
-  }, [travelerId, patientId])
+    return activePatientQuery
+  }, [activePatientQuery])
+
+  useEffect(() => {
+    if (patientId) setResolvedPatientId(patientId)
+  }, [patientId])
 
   // Contact fields
   const [location, setLocation] = useState('')
@@ -202,20 +205,9 @@ export default function PreConsultation() {
 
   /* ---------- Prefill (NEW mode): Registration → Latest Consultation → /auth/me ---------- */
   useEffect(() => {
-    if (isEdit) return
+    if (isEdit || patientContextLoading || !activePatient) return
     let ignore = false
     ;(async () => {
-      // Resolve the canonical backend patient id even on a directly opened URL.
-      try {
-        const contextResponse = await authFetch(`${API_BASE_URL}/consultations/travelers`, {})
-        if (!ignore && contextResponse.ok) {
-          const contexts = await contextResponse.json().catch(() => [])
-          const selected = (Array.isArray(contexts) ? contexts : []).find((item: any) =>
-            travelerId ? String(item.id) === travelerId : String(item.id) === 'PRIMARY')
-          if (selected?.patientId) setResolvedPatientId(String(selected.patientId))
-        }
-      } catch { /* handled by submit validation */ }
-
       // 1) Try latest Registration (DOB lives here)
       try {
         const r = await authFetch(`${API_BASE_URL}/registrations/mine/latest`, {})
@@ -263,26 +255,11 @@ export default function PreConsultation() {
         }
       } catch { /* ignore */ }
 
-      // 3) Fallback /auth/me
+      // 3) Shared contact number fallback. Never replace the selected patient's identity.
       try {
         const r = await authFetch(`${API_BASE_URL}/auth/me`, {})
         if (!ignore && r.ok) {
           const me = await r.json()
-          if (people.length === 0) {
-            const nm = [me?.firstName, me?.lastName].filter(Boolean).join(' ').trim() || 'Primary Member'
-            const rawDob: string | undefined = me?.dob || me?.dateOfBirth || me?.date_of_birth || me?.birthDate
-            const ymd = toYMD(rawDob)
-            const list: PersonOption[] = [{
-              key: 'primary',
-              label: `${nm} (Primary)`,
-              name: nm,
-              dob: ymd,
-            }]
-            setPeople(list)
-            setSelectedPersonKey('primary')
-            setContactName(nm)
-            if (ymd) setDob(ymd)
-          }
           const phone = me?.username || me?.phone || ''
           if (!contactPhone && phone) setContactPhone(String(phone))
         }
@@ -290,7 +267,7 @@ export default function PreConsultation() {
     })()
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit])
+  }, [activePatient, activePatientQuery, isEdit, patientContextLoading, travelerId])
 
   /* ---------- Prefill (EDIT mode) ---------- */
   useEffect(() => {

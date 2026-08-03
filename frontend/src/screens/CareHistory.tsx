@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { authFetch, API_BASE_URL, resolveApiUrl } from '../api';
+import { usePatient } from '../state/patient';
 
 type Item = {
   consultationId: number;
@@ -26,8 +27,9 @@ type Payload = {
 export default function CareHistory() {
   const { id: doctorConsultationId } = useParams();
   const [params] = useSearchParams();
-  const travelerId = params.get('travelerId');
-  const patientId = params.get('patientId');
+  const { activePatient, loading: patientLoading, queryString } = usePatient();
+  const travelerId = doctorConsultationId ? params.get('travelerId') : (activePatient?.id === 'PRIMARY' ? null : activePatient?.id || null);
+  const patientId = doctorConsultationId ? params.get('patientId') : activePatient?.patientId || null;
   const backHref = React.useMemo(() => {
     if (doctorConsultationId) return `/doctor/consultations/${encodeURIComponent(doctorConsultationId)}`;
     const qp = new URLSearchParams();
@@ -43,7 +45,10 @@ export default function CareHistory() {
   const [err, setErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!doctorConsultationId && (patientLoading || !activePatient)) return;
     let ignore = false;
+    setLoading(true);
+    setErr(null);
     (async () => {
       try {
         // Care history: Patient header + items (only when a Rx exists)
@@ -88,7 +93,7 @@ export default function CareHistory() {
       if (!ignore) setLoading(false);
     })();
     return () => { ignore = true; };
-  }, [doctorConsultationId, travelerId, patientId]);
+  }, [activePatient, doctorConsultationId, patientId, patientLoading, queryString, travelerId]);
 
   const printPdf = () => window.print();
 

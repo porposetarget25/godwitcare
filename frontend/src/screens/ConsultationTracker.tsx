@@ -1,8 +1,9 @@
 // src/screens/ConsultationTracker.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { authFetch, API_BASE_URL, resolveApiUrl, getMe } from '../api'
+import { authFetch, API_BASE_URL, resolveApiUrl } from '../api'
 import { clinicDateKey, clinicDateTime, clinicTime } from '../lib/appointmentTime'
+import { usePatient } from '../state/patient'
 
 type ContactChoice = 'SAME' | 'DIFFERENT'
 
@@ -452,8 +453,9 @@ function onlyDigits(s: string) {
 export default function ConsultationTracker() {
   const [params] = useSearchParams()
   const isLogged = params.get('logged') === '1'
-  const travelerId = params.get('travelerId')
-  const patientId = params.get('patientId')
+  const { activePatient, loading: patientContextLoading, queryString: activePatientQuery } = usePatient()
+  const travelerId = activePatient?.id === 'PRIMARY' ? null : activePatient?.id || null
+  const patientId = activePatient?.patientId || null
 
   const travelerQueryString = React.useMemo(() => {
     const qp = new URLSearchParams()
@@ -498,6 +500,7 @@ export default function ConsultationTracker() {
 
   // Load basic user info + latest consultation once (single effect, no duplicates)
   useEffect(() => {
+    if (patientContextLoading || !activePatient) return
     let alive = true
 
     const nz = (v: any, fallback = 'N/A') => {
@@ -507,18 +510,7 @@ export default function ConsultationTracker() {
 
     ;(async () => {
       try {
-        // 1) Try to populate from /auth/me (most reliable for name)
-        const me = await getMe().catch(() => null)
-        if (!alive) return
-
-        if (me) {
-          const fullName = [me.firstName, me.lastName].filter(Boolean).join(' ').trim()
-          if (fullName) setPatientName(fullName)
-
-          // Some backends include username in DTO; if yours doesn't, no harm.
-          // @ts-ignore
-          if ((me as any).username) setMobile(nz((me as any).username))
-        }
+        setPatientName(activePatient.name)
 
         // 2) Latest consultation (cid/status + address/mobile if available)
         const qp = new URLSearchParams()
@@ -567,7 +559,7 @@ export default function ConsultationTracker() {
     return () => {
       alive = false
     }
-  }, [travelerId, patientId])
+  }, [activePatient, activePatientQuery, patientContextLoading, patientId, travelerId])
 
   // WhatsApp target (doctor business number)
   const WA_NUMBER = '447783579014' // digits only, country code + number
@@ -607,6 +599,7 @@ export default function ConsultationTracker() {
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = useState<string | null>(null)
   useEffect(() => {
+    if (patientContextLoading || !activePatient) return
     let ignore = false
     ;(async () => {
       try {
@@ -635,7 +628,7 @@ export default function ConsultationTracker() {
     return () => {
       ignore = true
     }
-  }, [travelerId, patientId])
+  }, [activePatient, patientContextLoading, patientId, travelerId])
 
   const hasLatestConsultation = !!latestCid
   const isLatestCompleted = latestStatus === 'COMPLETED'

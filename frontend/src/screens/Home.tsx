@@ -1,6 +1,7 @@
 // src/screens/Home.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { usePatient } from '../state/patient'
 import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
@@ -400,52 +401,15 @@ export default function Home() {
 
 
 
-  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string>(searchParams.get('travelerId') || 'PRIMARY');
-  const [travelerOptions, setTravelerOptions] = React.useState<Array<{id:string|number,name:string,patientId?:string}>>([]);
-  const travelerSelectOptions = React.useMemo(() => {
-    const primary = travelerOptions.find((t) => String(t.id) === 'PRIMARY') || { id: 'PRIMARY', name: 'Primary', patientId: '' };
-    const rest = travelerOptions.filter((t) => String(t.id) !== 'PRIMARY');
-    return [primary, ...rest];
-  }, [travelerOptions]);
-  const selectedTraveler = React.useMemo(
-    () => travelerSelectOptions.find((t) => String(t.id) === String(selectedTravelerId)) || travelerSelectOptions[0],
-    [travelerSelectOptions, selectedTravelerId]
-  );
-
-
-  React.useEffect(() => {
-    const travelerFromUrl = new URLSearchParams(location.search).get('travelerId') || 'PRIMARY';
-    setSelectedTravelerId((prev) => (travelerFromUrl !== prev ? travelerFromUrl : prev));
-  }, [location.search]);
-
-  React.useEffect(() => {
-    const currentTraveler = searchParams.get('travelerId') || 'PRIMARY';
-    if (currentTraveler === selectedTravelerId) return;
-
-    const next = new URLSearchParams(searchParams);
-    if (selectedTravelerId === 'PRIMARY') {
-      next.delete('travelerId');
-    } else {
-      next.set('travelerId', selectedTravelerId);
-    }
-    setSearchParams(next, { replace: true });
-  }, [selectedTravelerId, searchParams, setSearchParams]);
-
-  const selectedTravelerQuery = React.useMemo(() => {
-    const qp = new URLSearchParams();
-    const selectedId = String(selectedTravelerId);
-    const selectedPatientId = selectedTraveler?.patientId?.trim();
-
-    // Include both identifiers when available so backend filters can match either path.
-    if (selectedId !== 'PRIMARY') qp.set('travelerId', selectedId);
-    if (selectedPatientId) qp.set('patientId', selectedPatientId);
-    return qp;
-  }, [selectedTravelerId, selectedTraveler?.patientId]);
+  const { patients: travelerSelectOptions, activePatient: selectedTraveler, loading: patientSelectionLoading, selectPatient, queryString } = usePatient();
+  const selectedTravelerId = selectedTraveler?.id || 'PRIMARY';
+  const selectedTravelerQuery = React.useMemo(() => new URLSearchParams(queryString), [queryString]);
 
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (patientSelectionLoading || !selectedTraveler) return;
     let ignore = false;
     (async () => {
       try {
@@ -459,7 +423,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerQuery]);
+  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
 
   // Latest referral URL (if exists)
   const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
@@ -468,6 +432,7 @@ export default function Home() {
   const [latestConsultation, setLatestConsultation] = React.useState<any>(null);
 
   React.useEffect(() => {
+    if (patientSelectionLoading || !selectedTraveler) return;
     let ignore = false;
     setPatientContextLoading(true);
     setCareHistoryEnabled(false);
@@ -505,17 +470,13 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerQuery]);
+  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
 
   React.useEffect(() => {
+    if (patientSelectionLoading || !selectedTraveler) return;
     let ignore = false;
     (async () => {
       try {
-        const tRes = await authFetch(`${API_BASE_URL}/consultations/travelers`, {});
-        if (!ignore && tRes.ok) {
-          const arr = await tRes.json().catch(() => []);
-          setTravelerOptions(Array.isArray(arr) ? arr : []);
-        }
         const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery.toString()}`, {});
         if (ignore) return;
         setCareHistoryEnabled(res.ok && res.status !== 204);
@@ -530,7 +491,7 @@ export default function Home() {
       }
     })();
     return () => { ignore = true; };
-  }, [selectedTravelerQuery]);
+  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
 
 
 
@@ -608,7 +569,7 @@ export default function Home() {
                 role="tab"
                 aria-selected={active}
                 className={`patient-tab${active ? ' active' : ''}`}
-                onClick={() => setSelectedTravelerId(String(patient.id))}
+                onClick={() => selectPatient(String(patient.id))}
               >
                 <span className="patient-tab-avatar" aria-hidden="true">
                   {patient.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
