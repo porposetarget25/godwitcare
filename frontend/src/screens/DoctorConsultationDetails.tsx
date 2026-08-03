@@ -4,6 +4,7 @@ import { authFetch, doctorGetConsultation } from '../api'
 import { API_BASE_URL } from '../api'
 import { doctorLatestPrescriptionMeta } from '../api'
 import { resolveApiUrl } from '../api'
+import { QUESTIONNAIRE_SECTIONS } from '../questionnaire'
 
 export default function DoctorConsultationDetails() {
   const { id } = useParams()
@@ -362,45 +363,41 @@ export default function DoctorConsultationDetails() {
         </div>
       </details>
 
-      <details className="card consultation-section" open={Object.keys(answers || {}).length > 0}>
+      <details className="card consultation-section" defaultOpen>
         <summary>Questionnaire <span>{Object.keys(answers || {}).length} responses · read only</span></summary>
         <div className="consultation-section-body">
-        {answers && Object.keys(answers).length > 0 ? (
-          <div className="questionnaire-table-wrap">
-            <table className="questionnaire-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-                <th style={{ padding: '6px 8px' }}>Question ID</th>
-                <th style={{ padding: '6px 8px' }}>Answer</th>
-                <th style={{ padding: '6px 8px' }}>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(answers).map(([qid, ans]) => {
-                const note = (detailsByQuestion || {})[qid]
-                const isYes = String(ans).toLowerCase() === 'yes'
-                return (
-                  <tr
-                    key={qid}
-                    style={{
-                      borderTop: '1px solid #e5e7eb',
-                      background: isYes ? '#fef3c7' : 'transparent'
-                    }}
-                  >
-                    <td style={{ padding: '6px 8px', fontSize: 13, fontWeight: 500 }}>{qid}</td>
-                    <td style={{ padding: '6px 8px' }}><span className={`patient-answer patient-answer-${String(ans).toLowerCase()}`}>{ans}</span></td>
-                    <td style={{ padding: '6px 8px', color: note ? '#374151' : '#9ca3af' }}>
-                      {ans === 'Yes' ? (
-                        <span>{note || 'No additional details'}</span>
-                      ) : '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            </table>
+          <div className="doctor-questionnaire-sections">
+            {QUESTIONNAIRE_SECTIONS.map((section) => {
+              const hasYes = section.questions.some(({ id }) => answers[id] === 'Yes')
+              const answeredCount = section.questions.filter(({ id }) => answers[id] != null).length
+              return (
+                <details className="doctor-questionnaire-section" key={section.title} defaultOpen={hasYes}>
+                  <summary>
+                    <strong>{section.title}</strong>
+                    <span>{answeredCount} of {section.questions.length} answered</span>
+                  </summary>
+                  <div className="doctor-questionnaire-questions">
+                    {section.questions.map((question) => {
+                      const answer = answers[question.id]
+                      const note = detailsByQuestion[question.id]
+                      return (
+                        <div className={`doctor-questionnaire-question${answer === 'Yes' ? ' is-yes' : ''}`} key={question.id}>
+                          <div>
+                            <strong>{question.label}</strong>
+                            <small>{question.id}</small>
+                            {answer === 'Yes' && <p>{note || 'No additional details'}</p>}
+                          </div>
+                          <span className={`patient-answer${answer === 'Yes' ? ' patient-answer-yes' : ''}`}>
+                            {answer || 'Unanswered'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </details>
+              )
+            })}
           </div>
-        ) : <div className="muted">No answers</div>}
         </div>
       </details>
 
