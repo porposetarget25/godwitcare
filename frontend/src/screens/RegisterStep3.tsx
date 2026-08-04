@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useReg } from '../state/registration'
 import {
+  addTravelerWithDocuments,
   saveRegistration,
   uploadDocument,
   completeRegistrationDocuments,
@@ -244,23 +245,26 @@ export default function Step3() {
         .filter(t => t.fullName.trim() && t.dateOfBirth)
         .map(t => ({ fullName: t.fullName.trim(), dateOfBirth: t.dateOfBirth }))
 
-      // Put travelers onto the draft so api.ts->toBackend can map them
-      const payload = { ...draft, travelers } as any
+      // Create the primary registration first. Each co-traveller is then created
+      // atomically with both required files by the dedicated multipart endpoint.
+      const payload = { ...draft, travelers: [] } as any
 
       // 2) Save the people, then upload each document against its immutable patient ID.
       const created = await saveRegistration(payload)
-      const filePairs = [{ patientId: created.primaryPatientId, passport: primaryPassport!, travelDocument: primaryTravelDocument! },
-        ...(created.travelers || []).map((traveler: any, index: number) => ({
-          patientId: traveler.patientId,
-          passport: [...adults, ...children].filter(t => t.fullName.trim() && t.dateOfBirth)[index].passport!,
-          travelDocument: [...adults, ...children].filter(t => t.fullName.trim() && t.dateOfBirth)[index].travelDocument!,
-        }))]
-      if (filePairs.some(pair => !pair.patientId || pair.passport.size > MAX_DOC_BYTES || pair.travelDocument.size > MAX_DOC_BYTES)) {
+      const completedRows = [...adults, ...children].filter(t => t.fullName.trim() && t.dateOfBirth)
+      if (primaryPassport!.size > MAX_DOC_BYTES || primaryTravelDocument!.size > MAX_DOC_BYTES ||
+          completedRows.some(row => row.passport!.size > MAX_DOC_BYTES || row.travelDocument!.size > MAX_DOC_BYTES)) {
         throw new Error('Each document must be 20MB or smaller.')
       }
-      for (const pair of filePairs) {
-        await uploadDocument(created.id!, pair.patientId, 'PASSPORT', pair.passport)
-        await uploadDocument(created.id!, pair.patientId, 'TRAVEL_DOCUMENT', pair.travelDocument)
+      await uploadDocument(created.id!, created.primaryPatientId, 'PASSPORT', primaryPassport!)
+      await uploadDocument(created.id!, created.primaryPatientId, 'TRAVEL_DOCUMENT', primaryTravelDocument!)
+      for (let index = 0; index < travelers.length; index += 1) {
+        await addTravelerWithDocuments(
+          created.id!,
+          travelers[index],
+          completedRows[index].passport!,
+          completedRows[index].travelDocument!,
+        )
       }
       await completeRegistrationDocuments(created.id!)
 

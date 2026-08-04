@@ -2,7 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 
-type Person = { id?: number; patientId?: string; fullName: string; dateOfBirth: string };
+type Person = {
+  id?: number;
+  patientId?: string;
+  fullName: string;
+  dateOfBirth: string;
+  passport?: File | null;
+  travelDocument?: File | null;
+};
 
 const ALL_COUNTRIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
@@ -35,6 +42,7 @@ const EUROPE_COUNTRIES = [
 ].sort((a, b) => a.localeCompare(b));
 
 import {
+  addTravelerWithDocuments,
   deleteMyAccount,
   getLatestRegistrationByEmail,
   getMyProfile,
@@ -77,6 +85,7 @@ export default function Profile() {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -130,7 +139,7 @@ export default function Profile() {
   );
 
   function addPassenger() {
-    setTravelers((prev) => [...prev, { fullName: '', dateOfBirth: '' }]);
+    setTravelers((prev) => [...prev, { fullName: '', dateOfBirth: '', passport: null, travelDocument: null }]);
   }
 
   function removePassenger(index: number) {
@@ -145,11 +154,34 @@ export default function Profile() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setErr('');
+    setSaving(true);
     const prev = latestReg;
+    try {
+      if (!isDoctor) {
+        const incompleteNewTraveler = travelers.find(t => !t.id &&
+          (!t.fullName.trim() || !t.dateOfBirth || !t.passport || !t.travelDocument));
+        if (incompleteNewTraveler) {
+          throw new Error('Full name, date of birth, passport, and travel document are required for every new co-traveller.');
+        }
+      }
 
-    await updateMyProfile({ firstName, lastName, email, username });
+      await updateMyProfile({ firstName, lastName, email, username });
 
-    if (!isDoctor && regId && prev) {
+      if (!isDoctor && regId && prev) {
+        const savedTravelers: Person[] = [];
+        for (const traveler of validTravelers) {
+          if (traveler.id) {
+            savedTravelers.push(traveler);
+          } else {
+            const created = await addTravelerWithDocuments(
+              regId,
+              traveler,
+              traveler.passport!,
+              traveler.travelDocument!,
+            );
+            savedTravelers.push({ ...created, passport: null, travelDocument: null });
+          }
+        }
       const registrationPayload: RegistrationApi = {
         ...prev,
         id: regId,
@@ -170,16 +202,19 @@ export default function Profile() {
         travelStartDate,
         travelEndDate,
         packageDays: Number.isFinite(packageDays) ? packageDays : 0,
-        travelers: validTravelers,
+        travelers: savedTravelers,
       };
 
       const updated = await updateRegistrationById(regId, registrationPayload);
       setTravelers((updated.travelers || []).map(t => ({ id: t.id, patientId: t.patientId, fullName: t.fullName, dateOfBirth: t.dateOfBirth })));
       setLatestReg(updated);
-    }
-    setShowSuccessPopup(true);
+      const newEntries = await Promise.all(savedTravelers.filter(t => t.patientId).map(async t =>
+        [t.patientId!, await listDocuments(regId, t.patientId!)] as const));
+      setDocs(prevDocs => ({ ...prevDocs, ...Object.fromEntries(newEntries) }));
+      }
+      setShowSuccessPopup(true);
 
-    setLatestReg((prevReg) => prevReg ? ({
+      setLatestReg((prevReg) => prevReg ? ({
       ...prevReg,
       middleName,
       dateOfBirth,
@@ -195,7 +230,10 @@ export default function Profile() {
       travelEndDate,
       packageDays: Number.isFinite(packageDays) ? packageDays : 0,
       travelers: prevReg.travelers,
-    }) : prevReg);
+      }) : prevReg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function onUploadDocument(patientId: string, type: DocumentType, e: React.ChangeEvent<HTMLInputElement>) {
@@ -328,6 +366,22 @@ export default function Profile() {
                         />
                       </div>
                     </div>
+                    {!person.id && (
+                      <div className="grid two">
+                        <div className="field">
+                          <label>Upload Passport *</label>
+                          {person.passport && <div className="help">Selected: {person.passport.name}</div>}
+                          <input type="file" accept=".jpg,.jpeg,.png,.pdf" required
+                            onChange={e => setTravelers(list => list.map((row, i) => i === idx ? { ...row, passport: e.target.files?.[0] || null } : row))} />
+                        </div>
+                        <div className="field">
+                          <label>Upload Travel Document *</label>
+                          {person.travelDocument && <div className="help">Selected: {person.travelDocument.name}</div>}
+                          <input type="file" accept=".jpg,.jpeg,.png,.pdf" required
+                            onChange={e => setTravelers(list => list.map((row, i) => i === idx ? { ...row, travelDocument: e.target.files?.[0] || null } : row))} />
+                        </div>
+                      </div>
+                    )}
                     <button type="button" className="btn secondary profile-remove-passenger" onClick={() => removePassenger(idx)}>Remove</button>
                   </div>
                 ))}
@@ -354,7 +408,7 @@ export default function Profile() {
             </>
           )}
 
-          <button className="btn profile-submit" type="submit">Save Profile</button>
+          <button className="btn profile-submit" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Profile'}</button>
         </form>
 
         <div className="profile-bottom-actions">

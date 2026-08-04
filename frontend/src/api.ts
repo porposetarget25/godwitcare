@@ -397,6 +397,20 @@ export async function uploadDocument(id: number, patientId: string, type: Docume
   return request(`/registrations/${id}/patients/${encodeURIComponent(patientId)}/documents/${type}`, { method: 'POST', body: fd })
 }
 
+export async function addTravelerWithDocuments(
+  registrationId: number,
+  traveler: { fullName: string; dateOfBirth: string },
+  passport: File,
+  travelDocument: File,
+): Promise<Traveler> {
+  const fd = new FormData()
+  fd.append('fullName', traveler.fullName)
+  fd.append('dateOfBirth', traveler.dateOfBirth)
+  fd.append('passport', passport)
+  fd.append('travelDocument', travelDocument)
+  return request<Traveler>(`/registrations/${registrationId}/travelers`, { method: 'POST', body: fd })
+}
+
 // Optional helpers if you want to show/download stored docs later
 export async function listDocuments(registrationId: number, patientId: string): Promise<DocSummary[]> {
   return request<DocSummary[]>(`/registrations/${registrationId}/patients/${encodeURIComponent(patientId)}/documents`, {
