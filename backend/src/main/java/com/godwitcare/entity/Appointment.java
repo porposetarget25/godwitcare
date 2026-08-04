@@ -6,10 +6,6 @@ import java.time.Instant;
 @Entity
 @Table(
         name = "appointments",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_appointment_doctor_start", columnNames = {"doctor_id", "start_time"}),
-                @UniqueConstraint(name = "uk_appointment_consultation", columnNames = {"consultation_id"})
-        },
         indexes = {
                 @Index(name = "idx_appointment_patient", columnList = "patient_id"),
                 @Index(name = "idx_appointment_doctor_time", columnList = "doctor_id,start_time")
@@ -28,7 +24,7 @@ public class Appointment {
     @JoinColumn(name = "doctor_id")
     private User doctor;
 
-    @OneToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "consultation_id")
     private Consultation consultation;
 

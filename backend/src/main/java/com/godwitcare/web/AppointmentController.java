@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api")
@@ -115,6 +116,7 @@ public class AppointmentController {
     }
 
     @PostMapping("/appointments")
+    @Transactional
     public ResponseEntity<?> book(Authentication auth, @RequestBody Map<String, Object> body) {
         User patient = currentUser(auth);
         if (patient == null) return ResponseEntity.status(401).build();
@@ -148,7 +150,7 @@ public class AppointmentController {
         User doctor = resolveAvailableDoctor(start, reservedEnd);
         if (doctor == null || !isDoctorAvailable(doctor, start, reservedEnd)) return ResponseEntity.status(409).body(Map.of("message", "No doctor is available at this time."));
         if (consultation.getStatus() == Consultation.Status.COMPLETED) return ResponseEntity.status(409).body(Map.of("message", "This consultation is already closed."));
-        if (appointments.findByConsultationId(consultationId).isPresent()) return ResponseEntity.badRequest().body(Map.of("message", "This consultation already has an appointment."));
+        if (appointments.existsByConsultationIdAndStatusNot(consultationId, Appointment.Status.CANCELLED)) return ResponseEntity.badRequest().body(Map.of("message", "This consultation already has an appointment."));
         if (appointments.existsByDoctorIdAndStatusNotAndStartTimeLessThanAndEndTimeGreaterThan(
                 doctor.getId(), Appointment.Status.CANCELLED, reservedEnd, start.minus(Duration.ofMinutes(DOCUMENTATION_MINUTES))))
             return ResponseEntity.status(409).body(Map.of("message", "This time overlaps another appointment or its documentation period."));
@@ -159,9 +161,53 @@ public class AppointmentController {
         appt.setConsultation(consultation);
         appt.setStartTime(start);
         appt.setEndTime(start.plus(Duration.ofMinutes(SLOT_MINUTES)));
-        try { appt = appointments.save(appt); }
-        catch (DataIntegrityViolationException e) { return ResponseEntity.status(409).body(Map.of("message", "This appointment slot is no longer available.")); }
+        appt = appointments.saveAndFlush(appt);
         return ResponseEntity.ok(toDto(appt));
+    }
+
+    @PatchMapping("/appointments/{id}/cancel")
+    @Transactional
+    public ResponseEntity<?> cancel(Authentication auth, @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        User patient = currentUser(auth);
+        if (patient == null) return ResponseEntity.status(401).build();
+        Appointment appointment = appointments.findLockedById(id).orElse(null);
+        ResponseEntity<?> eligibilityError = validateChange(patient, appointment, body);
+        if (eligibilityError != null) return eligibilityError;
+
+        appointment.setStatus(Appointment.Status.CANCELLED);
+        appointments.save(appointment);
+        return ResponseEntity.ok(toDto(appointment));
+    }
+
+    @PatchMapping("/appointments/{id}/reschedule")
+    @Transactional
+    public ResponseEntity<?> reschedule(Authentication auth, @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        User patient = currentUser(auth);
+        if (patient == null) return ResponseEntity.status(401).build();
+        Appointment appointment = appointments.findLockedById(id).orElse(null);
+        ResponseEntity<?> eligibilityError = validateChange(patient, appointment, body);
+        if (eligibilityError != null) return eligibilityError;
+
+        Instant start;
+        try { start = Instant.parse(String.valueOf(body.get("startTime"))); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("message", "Invalid appointment time.")); }
+        ResponseEntity<?> slotError = validateSlot(start);
+        if (slotError != null) return slotError;
+
+        Instant reservedEnd = start.plus(Duration.ofMinutes(RESERVED_MINUTES));
+        User doctor = resolveAvailableDoctorForReschedule(appointment, start, reservedEnd);
+        if (doctor == null) return ResponseEntity.status(409).body(Map.of("message", "This appointment slot is no longer available."));
+
+        appointment.setDoctor(doctor);
+        appointment.setStartTime(start);
+        appointment.setEndTime(start.plus(Duration.ofMinutes(SLOT_MINUTES)));
+        appointment = appointments.saveAndFlush(appointment);
+        return ResponseEntity.ok(toDto(appointment));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<?> appointmentConflict(DataIntegrityViolationException ignored) {
+        return ResponseEntity.status(409).body(Map.of("message", "This appointment slot is no longer available."));
     }
 
     @GetMapping("/appointments/mine")
@@ -197,6 +243,7 @@ public class AppointmentController {
         row.put("contactPhone", c.getContactPhone());
         row.put("contactAddress", c.getContactAddress());
         row.put("consultationId", c.getId());
+        row.put("consultationPatientId", c.getPatientId());
         row.put("consultationStatus", c.getStatus().name());
         row.put("reason", c.getHistoryOfPresentingComplaint() != null ? c.getHistoryOfPresentingComplaint() : c.getCurrentLocation());
         return row;
@@ -221,6 +268,42 @@ public class AppointmentController {
         return schedules.isAvailable(doctor.getId(), start, reservedEnd)
                 && !appointments.existsByDoctorIdAndStatusNotAndStartTimeLessThanAndEndTimeGreaterThan(
                 doctor.getId(), Appointment.Status.CANCELLED, reservedEnd, start.minus(Duration.ofMinutes(DOCUMENTATION_MINUTES)));
+    }
+    private User resolveAvailableDoctorForReschedule(Appointment current, Instant start, Instant reservedEnd) {
+        return users.findByRoleOrderByIdDesc(Role.DOCTOR).stream()
+                .sorted(Comparator.comparing(User::getId))
+                .filter(doctor -> schedules.isAvailable(doctor.getId(), start, reservedEnd))
+                .filter(doctor -> appointments.findByDoctorIdAndStartTimeBetweenOrderByStartTimeAsc(
+                                doctor.getId(), start.minus(Duration.ofMinutes(RESERVED_MINUTES)), reservedEnd)
+                        .stream().filter(a -> !Objects.equals(a.getId(), current.getId()))
+                        .filter(a -> a.getStatus() != Appointment.Status.CANCELLED)
+                        .noneMatch(a -> a.getStartTime().isBefore(reservedEnd)
+                                && a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)).isAfter(start)))
+                .findFirst().orElse(null);
+    }
+    private ResponseEntity<?> validateChange(User patient, Appointment appointment, Map<String, Object> body) {
+        if (appointment == null || appointment.getPatient() == null
+                || !Objects.equals(appointment.getPatient().getId(), patient.getId()))
+            return ResponseEntity.status(404).body(Map.of("message", "Appointment was not found."));
+        String patientId = body.get("patientId") == null ? "" : String.valueOf(body.get("patientId"));
+        Consultation consultation = appointment.getConsultation();
+        if (patientId.isBlank() || !Objects.equals(patientId, consultation.getPatientId()))
+            return ResponseEntity.status(403).body(Map.of("message", "Appointment patient context does not match the selected traveller."));
+        Instant now = Instant.now();
+        if (appointment.getStatus() != Appointment.Status.SCHEDULED || !appointment.getStartTime().isAfter(now)
+                || consultation.getStatus() == Consultation.Status.COMPLETED
+                || consultation.getCreatedAt().plus(Duration.ofHours(consultationActiveHours)).isBefore(now))
+            return ResponseEntity.status(409).body(Map.of("message", "This appointment can no longer be changed."));
+        return null;
+    }
+    private ResponseEntity<?> validateSlot(Instant start) {
+        if (!start.isAfter(Instant.now())) return ResponseEntity.badRequest().body(Map.of("message", "Please choose a future appointment time."));
+        LocalDate appointmentDate = start.atZone(CLINIC_ZONE).toLocalDate();
+        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        if (appointmentDate.isBefore(today) || appointmentDate.isAfter(today.plusDays(BOOKING_DAYS - 1L)))
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointments can only be booked within the next two days."));
+        if (!isClinicSlot(start)) return ResponseEntity.badRequest().body(Map.of("message", "Please choose one of the available appointment slots."));
+        return null;
     }
     private boolean isClinicSlot(Instant start) {
         ZonedDateTime z = start.atZone(CLINIC_ZONE);
