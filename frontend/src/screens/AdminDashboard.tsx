@@ -61,6 +61,7 @@ export default function AdminDashboard() {
   const [form, setForm] = React.useState<AdminUserInput>(EMPTY_FORM);
   const [travelers, setTravelers] = React.useState<TravelerForm[]>([]);
   const [editingRegistrationId, setEditingRegistrationId] = React.useState<number | null>(null);
+  const [editingPatientId, setEditingPatientId] = React.useState<string | null>(null);
   const [documents, setDocuments] = React.useState<DocSummary[]>([]);
   const [pendingDocuments, setPendingDocuments] = React.useState<File[]>([]);
   const [docError, setDocError] = React.useState<string | null>(null);
@@ -187,8 +188,9 @@ export default function AdminDashboard() {
     const regId = Number(latestReg?.id);
     if (Number.isFinite(regId) && regId > 0) {
       setEditingRegistrationId(regId);
+      setEditingPatientId(latestReg?.primaryPatientId || null);
       try {
-        const docs = await listDocuments(regId);
+        const docs = latestReg?.primaryPatientId ? await listDocuments(regId, latestReg.primaryPatientId) : [];
         setDocuments(Array.isArray(docs) ? docs : []);
       } catch (e: any) {
         setDocuments([]);
@@ -196,6 +198,7 @@ export default function AdminDashboard() {
       }
     } else {
       setEditingRegistrationId(null);
+      setEditingPatientId(null);
       setDocuments([]);
     }
   }
@@ -216,17 +219,19 @@ export default function AdminDashboard() {
 
     if ((mode === 'addUser' || mode === 'editUser') && pendingDocuments.length > 0) {
       let targetRegistrationId = editingRegistrationId;
+      let targetPatientId = editingPatientId;
       if (!targetRegistrationId && payload.email) {
         const latestRegistration = await getLatestRegistrationByEmail(payload.email);
         targetRegistrationId = latestRegistration?.id ?? null;
+        targetPatientId = latestRegistration?.primaryPatientId ?? null;
       }
 
-      if (!targetRegistrationId) {
+      if (!targetRegistrationId || !targetPatientId) {
         throw new Error('Unable to upload travel documents because no registration was found for this user.');
       }
 
       for (const file of pendingDocuments) {
-        await uploadDocument(targetRegistrationId, file);
+        await uploadDocument(targetRegistrationId, targetPatientId, 'TRAVEL_DOCUMENT', file);
       }
     }
 
@@ -239,19 +244,19 @@ export default function AdminDashboard() {
   }
 
   async function refreshDocuments(registrationId: number) {
-    const docs = await listDocuments(registrationId);
+    const docs = editingPatientId ? await listDocuments(registrationId, editingPatientId) : [];
     setDocuments(Array.isArray(docs) ? docs : []);
   }
 
   async function onUploadDocumentForUser(file: File) {
-    if (!editingRegistrationId) {
+    if (!editingRegistrationId || !editingPatientId) {
       setDocError('No registration found to attach this document.');
       return;
     }
     setDocBusy(true);
     setDocError(null);
     try {
-      await uploadDocument(editingRegistrationId, file);
+      await uploadDocument(editingRegistrationId, editingPatientId, 'TRAVEL_DOCUMENT', file);
       await refreshDocuments(editingRegistrationId);
     } catch (e: any) {
       setDocError(e?.message || 'Failed to upload document');

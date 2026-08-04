@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 
-type Person = { id?: number; fullName: string; dateOfBirth: string };
+type Person = { id?: number; patientId?: string; fullName: string; dateOfBirth: string };
 
 const ALL_COUNTRIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
@@ -35,7 +35,6 @@ const EUROPE_COUNTRIES = [
 ].sort((a, b) => a.localeCompare(b));
 
 import {
-  deleteDocument,
   deleteMyAccount,
   getLatestRegistrationByEmail,
   getMyProfile,
@@ -43,6 +42,7 @@ import {
   logout,
   type RegistrationApi,
   type DocSummary,
+  type DocumentType,
   updateRegistrationById,
   updateMyProfile,
   uploadDocument,
@@ -73,7 +73,7 @@ export default function Profile() {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [regId, setRegId] = useState<number | null>(null);
   const [latestReg, setLatestReg] = useState<RegistrationApi | null>(null);
-  const [docs, setDocs] = useState<DocSummary[]>([]);
+  const [docs, setDocs] = useState<Record<string, DocSummary[]>>({});
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
@@ -108,11 +108,13 @@ export default function Profile() {
             setFitToFlyCertificate(!!reg.fitToFlyCertificate);
             setTravelers((reg.travelers || []).map(t => ({
               id: t.id,
+              patientId: t.patientId,
               fullName: t.fullName || '',
               dateOfBirth: t.dateOfBirth || '',
             })));
-            const existingDocs = await listDocuments(reg.id);
-            setDocs(existingDocs || []);
+            const patientIds = [reg.primaryPatientId, ...(reg.travelers || []).map(t => t.patientId)].filter(Boolean) as string[];
+            const entries = await Promise.all(patientIds.map(async patientId => [patientId, await listDocuments(reg.id, patientId)] as const));
+            setDocs(Object.fromEntries(entries));
           }
         }
       } finally {
@@ -171,7 +173,9 @@ export default function Profile() {
         travelers: validTravelers,
       };
 
-      await updateRegistrationById(regId, registrationPayload);
+      const updated = await updateRegistrationById(regId, registrationPayload);
+      setTravelers((updated.travelers || []).map(t => ({ id: t.id, patientId: t.patientId, fullName: t.fullName, dateOfBirth: t.dateOfBirth })));
+      setLatestReg(updated);
     }
     setShowSuccessPopup(true);
 
@@ -190,27 +194,18 @@ export default function Profile() {
       travelStartDate,
       travelEndDate,
       packageDays: Number.isFinite(packageDays) ? packageDays : 0,
-      travelers: validTravelers,
+      travelers: prevReg.travelers,
     }) : prevReg);
   }
 
-  async function onUploadDocument(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onUploadDocument(patientId: string, type: DocumentType, e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f || !regId) return;
     setErr('');
-    await uploadDocument(regId, f);
-    const existingDocs = await listDocuments(regId);
-    setDocs(existingDocs || []);
-    setMsg('Travel document uploaded successfully.');
-  }
-
-  async function onDeleteDocument(docId: number) {
-    if (!regId) return;
-    setErr('');
-    await deleteDocument(regId, docId);
-    const existingDocs = await listDocuments(regId);
-    setDocs(existingDocs || []);
-    setMsg('Travel document deleted successfully.');
+    await uploadDocument(regId, patientId, type, f);
+    const existingDocs = await listDocuments(regId, patientId);
+    setDocs(prev => ({ ...prev, [patientId]: existingDocs }));
+    setMsg(`${type === 'PASSPORT' ? 'Passport' : 'Travel document'} uploaded successfully.`);
   }
 
   async function onDeleteAccount() {
@@ -339,18 +334,22 @@ export default function Profile() {
               </div>
 
               <div className="field profile-documents">
-                <label>Travel Document</label>
-                <input type="file" onChange={onUploadDocument} />
-                {docs.length > 0 && (
-                  <ul className="profile-doc-list">
-                    {docs.map((d) => (
-                      <li key={d.id} className="profile-doc-item">
-                        <span className="profile-doc-name">{d.fileName}</span>
-                        <button type="button" className="btn secondary profile-doc-remove" onClick={() => onDeleteDocument(d.id)}>Remove</button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <label className="h3">Traveller Documents</label>
+                {latestReg?.primaryPatientId && [{ name: `${firstName} ${lastName}`.trim() || 'Primary traveller', patientId: latestReg.primaryPatientId },
+                  ...travelers.filter(t => t.patientId).map(t => ({ name: t.fullName, patientId: t.patientId! }))].map(person => (
+                  <div className="card profile-passenger-card" key={person.patientId}>
+                    <strong>{person.name}</strong>
+                    {(['PASSPORT', 'TRAVEL_DOCUMENT'] as DocumentType[]).map(type => {
+                      const current = (docs[person.patientId] || []).find(doc => doc.type === type)
+                      return <div className="field" key={type}>
+                        <label>{type === 'PASSPORT' ? 'Passport' : 'Travel Document'}</label>
+                        {current && <div className="help">Current: {current.fileName}</div>}
+                        <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={e => onUploadDocument(person.patientId, type, e)} />
+                        <div className="help">{current ? 'Choose a file to replace this document.' : 'Choose a file to upload.'}</div>
+                      </div>
+                    })}
+                  </div>
+                ))}
               </div>
             </>
           )}

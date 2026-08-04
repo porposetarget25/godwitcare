@@ -171,17 +171,24 @@ public class RegistrationController {
 
     /* ---------------- Documents ---------------- */
 
-    @PostMapping(value = "/registrations/{id}/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/registrations/{id}/patients/{patientId}/documents/{type}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
     public ResponseEntity<Map<String, Object>> upload(
             @PathVariable("id") Long id,
+            @PathVariable String patientId,
+            @PathVariable RegistrationDocument.DocumentType type,
             @RequestParam("file") MultipartFile file
     ) throws Exception {
         Registration r = repo.findById(id).orElse(null);
         if (r == null) return ResponseEntity.notFound().build();
-        if (file.isEmpty()) return ResponseEntity.badRequest().build();
+        if (!belongsTo(r, patientId)) return ResponseEntity.status(403).build();
+        if (file.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "A document file is required."));
 
-        RegistrationDocument d = new RegistrationDocument();
+        RegistrationDocument d = docs.findByRegistrationIdAndPatientIdAndDocumentType(id, patientId, type)
+                .orElseGet(RegistrationDocument::new);
         d.setRegistration(r);
+        d.setPatientId(patientId);
+        d.setDocumentType(type);
         d.setOriginalFileName(Optional.ofNullable(file.getOriginalFilename()).orElse("upload.bin"));
         d.setContentType(Optional.ofNullable(file.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE));
         d.setSizeBytes(file.getSize());
@@ -192,21 +199,49 @@ public class RegistrationController {
         body.put("id", d.getId());
         body.put("fileName", d.getOriginalFileName());
         body.put("sizeBytes", d.getSizeBytes());
+        body.put("patientId", d.getPatientId());
+        body.put("type", d.getDocumentType());
         return ResponseEntity.ok(body);
     }
 
-    @GetMapping("/registrations/{id}/documents")
-    public ResponseEntity<List<Map<String, Object>>> listDocs(@PathVariable("id") Long id) {
-        if (!repo.existsById(id)) return ResponseEntity.notFound().build();
-        List<Map<String, Object>> list = docs.findByRegistrationIdOrderByCreatedAtDesc(id).stream().map(d -> {
+    @PostMapping("/registrations/{id}/documents/complete")
+    @Transactional
+    public ResponseEntity<?> completeDocuments(@PathVariable Long id) {
+        Registration registration = repo.findById(id).orElse(null);
+        if (registration == null) return ResponseEntity.notFound().build();
+        List<String> patients = new ArrayList<>();
+        patients.add(registration.getPrimaryPatientId());
+        registration.getTravelers().forEach(t -> patients.add(t.getPatientId()));
+        boolean complete = patients.stream().allMatch(patientId ->
+                docs.existsByRegistrationIdAndPatientIdAndDocumentType(id, patientId, RegistrationDocument.DocumentType.PASSPORT)
+                && docs.existsByRegistrationIdAndPatientIdAndDocumentType(id, patientId, RegistrationDocument.DocumentType.TRAVEL_DOCUMENT));
+        if (!complete) return ResponseEntity.badRequest().body(Map.of("message", "Passport and travel document are required for every traveller."));
+        registration.setDocumentsComplete(true);
+        repo.save(registration);
+        return ResponseEntity.ok(Map.of("documentsComplete", true));
+    }
+
+    @GetMapping("/registrations/{id}/patients/{patientId}/documents")
+    public ResponseEntity<List<Map<String, Object>>> listDocs(@PathVariable Long id, @PathVariable String patientId) {
+        Registration registration = repo.findById(id).orElse(null);
+        if (registration == null) return ResponseEntity.notFound().build();
+        if (!belongsTo(registration, patientId)) return ResponseEntity.status(403).build();
+        List<Map<String, Object>> list = docs.findByRegistrationIdAndPatientIdOrderByCreatedAtDesc(id, patientId).stream().map(d -> {
             Map<String, Object> m = new HashMap<>();
             m.put("id", d.getId());
             m.put("fileName", d.getOriginalFileName());
             m.put("sizeBytes", d.getSizeBytes());
             m.put("createdAt", d.getCreatedAt());
+            m.put("patientId", d.getPatientId());
+            m.put("type", d.getDocumentType());
             return m;
         }).toList();
         return ResponseEntity.ok(list);
+    }
+
+    private boolean belongsTo(Registration registration, String patientId) {
+        return Objects.equals(registration.getPrimaryPatientId(), patientId)
+                || registration.getTravelers().stream().anyMatch(t -> Objects.equals(t.getPatientId(), patientId));
     }
 
     @DeleteMapping("/registrations/{regId}/documents/{docId}")
@@ -224,13 +259,13 @@ public class RegistrationController {
     }
 
     /** Legacy: forces download (Content-Disposition: attachment). */
-    @GetMapping(value = "/registrations/{regId}/documents/{docId}")
+    @GetMapping(value = "/registrations/{regId}/patients/{patientId}/documents/{docId}")
     public ResponseEntity<byte[]> downloadLegacy(
             @PathVariable("regId") Long regId,
-            @PathVariable("docId") Long docId
+            @PathVariable String patientId, @PathVariable("docId") Long docId
     ) {
         return docs.findById(docId)
-                .filter(d -> Objects.equals(d.getRegistration().getId(), regId))
+                .filter(d -> Objects.equals(d.getRegistration().getId(), regId) && Objects.equals(d.getPatientId(), patientId))
                 .map(d -> ResponseEntity.ok()
                         .contentType(MediaType.parseMediaType(d.getContentType()))
                         .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -240,13 +275,13 @@ public class RegistrationController {
     }
 
     /** New: VIEW inline for iframe preview (no Content-Disposition). */
-    @GetMapping("/registrations/{regId}/documents/{docId}/view")
+    @GetMapping("/registrations/{regId}/patients/{patientId}/documents/{docId}/view")
     public ResponseEntity<byte[]> viewDoc(
             @PathVariable Long regId,
-            @PathVariable Long docId
+            @PathVariable String patientId, @PathVariable Long docId
     ) {
         return docs.findById(docId)
-                .filter(d -> Objects.equals(d.getRegistration().getId(), regId))
+                .filter(d -> Objects.equals(d.getRegistration().getId(), regId) && Objects.equals(d.getPatientId(), patientId))
                 .map(d -> ResponseEntity.ok()
                         .contentType(MediaType.parseMediaType(d.getContentType()))
                         .body(d.getData()))
@@ -254,13 +289,13 @@ public class RegistrationController {
     }
 
     /** New: explicit download alias (same behavior as legacy). */
-    @GetMapping("/registrations/{regId}/documents/{docId}/download")
+    @GetMapping("/registrations/{regId}/patients/{patientId}/documents/{docId}/download")
     public ResponseEntity<byte[]> downloadDoc(
             @PathVariable Long regId,
-            @PathVariable Long docId
+            @PathVariable String patientId, @PathVariable Long docId
     ) {
         return docs.findById(docId)
-                .filter(d -> Objects.equals(d.getRegistration().getId(), regId))
+                .filter(d -> Objects.equals(d.getRegistration().getId(), regId) && Objects.equals(d.getPatientId(), patientId))
                 .map(d -> ResponseEntity.ok()
                         .contentType(MediaType.parseMediaType(d.getContentType()))
                         .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -307,6 +342,7 @@ public class RegistrationController {
                         }
                     }
                     body.put("travelers", travellers);
+                    body.put("primaryPatientId", reg.getPrimaryPatientId());
 
                     return ResponseEntity.ok(body);
                 })

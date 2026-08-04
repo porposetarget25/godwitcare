@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 public class Registration {
@@ -36,6 +37,12 @@ public class Registration {
     private LocalDate travelEndDate;
     private Integer packageDays;
     private String documentFileName;
+
+    @Column(name = "primary_patient_id", nullable = false, unique = true, updatable = false)
+    private String primaryPatientId = UUID.randomUUID().toString();
+
+    @Column(name = "documents_complete", nullable = false)
+    private boolean documentsComplete;
 
     @OneToMany(mappedBy = "registration", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -196,6 +203,11 @@ public class Registration {
     public java.util.List<Traveler> getTravelers() {
         return travelers;
     }
+
+    public String getPrimaryPatientId() { return primaryPatientId; }
+    public void setPrimaryPatientId(String primaryPatientId) { this.primaryPatientId = primaryPatientId; }
+    public boolean isDocumentsComplete() { return documentsComplete; }
+    public void setDocumentsComplete(boolean documentsComplete) { this.documentsComplete = documentsComplete; }
 
     public void setTravelers(java.util.List<Traveler> travelers) {
         this.travelers = travelers;

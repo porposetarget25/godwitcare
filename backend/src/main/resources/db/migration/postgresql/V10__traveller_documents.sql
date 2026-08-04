@@ -1,0 +1,21 @@
+ALTER TABLE registration ADD COLUMN IF NOT EXISTS primary_patient_id VARCHAR(36);
+UPDATE registration SET primary_patient_id = 'legacy-registration-' || id WHERE primary_patient_id IS NULL;
+ALTER TABLE registration ALTER COLUMN primary_patient_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_registration_primary_patient_id ON registration(primary_patient_id);
+ALTER TABLE registration ADD COLUMN IF NOT EXISTS documents_complete BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE travelers ADD COLUMN IF NOT EXISTS patient_id VARCHAR(36);
+UPDATE travelers SET patient_id = 'legacy-traveler-' || id WHERE patient_id IS NULL;
+ALTER TABLE travelers ALTER COLUMN patient_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_travelers_patient_id ON travelers(patient_id);
+
+ALTER TABLE registration_documents ADD COLUMN IF NOT EXISTS patient_id VARCHAR(36);
+UPDATE registration_documents d SET patient_id = r.primary_patient_id FROM registration r
+WHERE d.registration_id = r.id AND d.patient_id IS NULL;
+ALTER TABLE registration_documents ALTER COLUMN patient_id SET NOT NULL;
+ALTER TABLE registration_documents ADD COLUMN IF NOT EXISTS document_type VARCHAR(32);
+UPDATE registration_documents SET document_type = 'TRAVEL_DOCUMENT' WHERE document_type IS NULL;
+ALTER TABLE registration_documents ALTER COLUMN document_type SET NOT NULL;
+DELETE FROM registration_documents WHERE id NOT IN (SELECT MAX(id) FROM registration_documents GROUP BY registration_id, patient_id, document_type);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_patient_document_type
+  ON registration_documents(registration_id, patient_id, document_type);
