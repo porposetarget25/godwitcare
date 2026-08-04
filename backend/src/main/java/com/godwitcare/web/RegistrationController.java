@@ -41,18 +41,19 @@ public class RegistrationController {
     /* ---------------- Registrations ---------------- */
 
     @PostMapping("/registrations")
-    public ResponseEntity<Registration> create(@Valid @RequestBody Registration r) {
+    public ResponseEntity<?> create(@Valid @RequestBody Registration r) {
         if (r.getTravelers() == null) r.setTravelers(new java.util.ArrayList<>());
 
         // Drop empty rows to avoid @NotBlank/@NotNull violations
         r.getTravelers().removeIf(t ->
                 t.getFullName() == null || t.getFullName().isBlank() || t.getDateOfBirth() == null);
 
-        // Safety cap (adjust if you want a different limit)
-        if (r.getTravelers().size() > 6) return ResponseEntity.badRequest().build();
-
-        // IMPORTANT: set parent on each child so JPA writes the FK
-        r.getTravelers().forEach(t -> t.setRegistration(r));
+        // Co-travellers must use the atomic multipart endpoint, which cannot create
+        // a traveller unless both documents are present and successfully stored.
+        if (!r.getTravelers().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message",
+                    "Co-travellers must be added with both required documents."));
+        }
 
         Registration saved = repo.save(r);
         return ResponseEntity.ok(saved);
@@ -67,6 +68,14 @@ public class RegistrationController {
                 .map(existing -> {
                     List<Traveler> normalizedTravelers = normalizeTravelers(r.getTravelers());
                     if (normalizedTravelers.size() > 6) return ResponseEntity.badRequest().build();
+                    Set<Long> existingIds = existing.getTravelers().stream()
+                            .map(Traveler::getId).filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+                    boolean containsNewTraveler = normalizedTravelers.stream()
+                            .anyMatch(t -> t.getId() == null || !existingIds.contains(t.getId()));
+                    if (containsNewTraveler) {
+                        return ResponseEntity.badRequest().body(Map.of("message",
+                                "New co-travellers must be added with both required documents."));
+                    }
 
                     copyRegistrationDetails(existing, r);
                     syncTravelers(existing, normalizedTravelers);
@@ -171,6 +180,49 @@ public class RegistrationController {
 
     /* ---------------- Documents ---------------- */
 
+    @PostMapping(value = "/registrations/{id}/travelers", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<?> addTravelerWithDocuments(
+            @PathVariable Long id,
+            @RequestParam String fullName,
+            @RequestParam String dateOfBirth,
+            @RequestParam("passport") MultipartFile passport,
+            @RequestParam("travelDocument") MultipartFile travelDocument) {
+        Registration registration = repo.findById(id).orElse(null);
+        if (registration == null) return ResponseEntity.notFound().build();
+        if (fullName == null || fullName.isBlank() || dateOfBirth == null || dateOfBirth.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Full name and date of birth are required."));
+        }
+        if (passport == null || passport.isEmpty() || travelDocument == null || travelDocument.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Passport and travel document are required."));
+        }
+        if (registration.getTravelers().size() >= 6) {
+            return ResponseEntity.badRequest().body(Map.of("message", "A maximum of six co-travellers is allowed."));
+        }
+
+        final java.time.LocalDate dob;
+        try {
+            dob = java.time.LocalDate.parse(dateOfBirth);
+        } catch (java.time.format.DateTimeParseException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", "A valid date of birth is required."));
+        }
+
+        try {
+            Traveler traveler = new Traveler();
+            traveler.setRegistration(registration);
+            traveler.setFullName(fullName.trim());
+            traveler.setDateOfBirth(dob);
+            registration.getTravelers().add(traveler);
+            repo.saveAndFlush(registration);
+
+            saveDocument(registration, traveler.getPatientId(), RegistrationDocument.DocumentType.PASSPORT, passport);
+            saveDocument(registration, traveler.getPatientId(), RegistrationDocument.DocumentType.TRAVEL_DOCUMENT, travelDocument);
+            return ResponseEntity.ok(traveler);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to store co-traveller documents.", ex);
+        }
+    }
+
     @PostMapping(value = "/registrations/{id}/patients/{patientId}/documents/{type}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Transactional
     public ResponseEntity<Map<String, Object>> upload(
@@ -184,16 +236,7 @@ public class RegistrationController {
         if (!belongsTo(r, patientId)) return ResponseEntity.status(403).build();
         if (file.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "A document file is required."));
 
-        RegistrationDocument d = docs.findByRegistrationIdAndPatientIdAndDocumentType(id, patientId, type)
-                .orElseGet(RegistrationDocument::new);
-        d.setRegistration(r);
-        d.setPatientId(patientId);
-        d.setDocumentType(type);
-        d.setOriginalFileName(Optional.ofNullable(file.getOriginalFilename()).orElse("upload.bin"));
-        d.setContentType(Optional.ofNullable(file.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE));
-        d.setSizeBytes(file.getSize());
-        d.setData(file.getBytes());
-        d = docs.save(d);
+        RegistrationDocument d = saveDocument(r, patientId, type, file);
 
         Map<String, Object> body = new HashMap<>();
         body.put("id", d.getId());
@@ -202,6 +245,20 @@ public class RegistrationController {
         body.put("patientId", d.getPatientId());
         body.put("type", d.getDocumentType());
         return ResponseEntity.ok(body);
+    }
+
+    private RegistrationDocument saveDocument(Registration registration, String patientId,
+                                               RegistrationDocument.DocumentType type, MultipartFile file) throws Exception {
+        RegistrationDocument d = docs.findByRegistrationIdAndPatientIdAndDocumentType(registration.getId(), patientId, type)
+                .orElseGet(RegistrationDocument::new);
+        d.setRegistration(registration);
+        d.setPatientId(patientId);
+        d.setDocumentType(type);
+        d.setOriginalFileName(Optional.ofNullable(file.getOriginalFilename()).orElse("upload.bin"));
+        d.setContentType(Optional.ofNullable(file.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE));
+        d.setSizeBytes(file.getSize());
+        d.setData(file.getBytes());
+        return docs.save(d);
     }
 
     @PostMapping("/registrations/{id}/documents/complete")
