@@ -15,6 +15,14 @@ type AvailabilityResponse = { days?: AvailabilityDay[]; timeZone?: string }
 
 type BookingPeriod = 'morning' | 'afternoon'
 
+function localAppointmentRange(startTime: string, endTime: string) {
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  const date = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(start)
+  const time = (value: Date) => new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).format(value)
+  return `${date}, ${time(start)} – ${time(end)}`
+}
+
 const BOOKING_PERIODS: Array<{ id: BookingPeriod; label: string; range: string; startHour: number; endHour: number }> = [
   { id: 'morning', label: 'Morning', range: '9:00 AM – 12:00 PM', startHour: 9, endHour: 12 },
   { id: 'afternoon', label: 'Afternoon', range: '12:00 PM – 5:00 PM', startHour: 12, endHour: 17 },
@@ -41,15 +49,17 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [bookedAppointment, setBookedAppointment] = useState<any>(null)
+  const [rescheduling, setRescheduling] = useState(false)
+  const [changing, setChanging] = useState(false)
 
   useEffect(() => {
     let alive = true
     authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' })
       .then(async res => res.ok ? res.json() : [])
-      .then(items => { if (alive) setBookedAppointment((Array.isArray(items) ? items : []).find(item => item.consultationId === consultationId) ?? null) })
+      .then(items => { if (alive) setBookedAppointment((Array.isArray(items) ? items : []).find(item => item.consultationId === consultationId && item.consultationPatientId === patientId && item.status === 'SCHEDULED') ?? null) })
       .catch(() => undefined)
     return () => { alive = false }
-  }, [consultationId])
+  }, [consultationId, patientId])
 
   const loadAvailability = React.useCallback(async () => {
     setLoading(true)
@@ -117,14 +127,15 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
     setError(null)
     setMessage(null)
     try {
-      const res = await authFetch(`${API_BASE_URL}/appointments`, {
-        method: 'POST',
+      const res = await authFetch(rescheduling ? `${API_BASE_URL}/appointments/${bookedAppointment.id}/reschedule` : `${API_BASE_URL}/appointments`, {
+        method: rescheduling ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ consultationId, startTime: selectedSlot, patientId }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
       setBookedAppointment(data)
+      setRescheduling(false)
       setSlotsModalOpen(false)
       setSelectedSlot('')
       setMessage(`Appointment booked for ${clinicDateTime(data.startTime)}.`)
@@ -137,14 +148,48 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
     }
   }
 
+  async function cancelAppointment() {
+    if (!bookedAppointment || !window.confirm('Are you sure you want to cancel this appointment?')) return
+    setChanging(true)
+    setError(null)
+    try {
+      const res = await authFetch(`${API_BASE_URL}/appointments/${bookedAppointment.id}/cancel`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Unable to cancel this appointment.')
+      setBookedAppointment(null)
+      setRescheduling(false)
+      setMessage('Appointment cancelled. The reserved slot is available again.')
+      onBooked(data)
+      await loadAvailability()
+    } catch (e: any) {
+      setError(e?.message || 'Unable to cancel this appointment.')
+    } finally {
+      setChanging(false)
+    }
+  }
+
+  const canChangeAppointment = !!bookedAppointment && bookedAppointment.status === 'SCHEDULED'
+    && consultationActive && new Date(bookedAppointment.startTime).getTime() > Date.now()
+  const showBookingFlow = !bookedAppointment || rescheduling
+
   return (
     <div className="appointment-booking">
-      {bookedAppointment ? (
-        <div className="booking-selection-summary" role="status">
-          <span>Appointment status: {bookedAppointment.status ?? 'SCHEDULED'}</span>
-          <strong>{clinicDateTime(bookedAppointment.startTime)}</strong>
+      {bookedAppointment && !rescheduling ? (
+        <div className="upcoming-appointment-card" role="status">
+          <span>✓</span>
+          <div><strong>Upcoming Appointment</strong><p>{localAppointmentRange(bookedAppointment.startTime, bookedAppointment.endTime)}</p></div>
         </div>
       ) : null}
+      {bookedAppointment && !rescheduling && canChangeAppointment && (
+        <div className="appointment-change-actions">
+          <button type="button" className="btn secondary" onClick={() => { setRescheduling(true); setMessage(null); void loadAvailability() }} disabled={changing}>↻ Reschedule Appointment</button>
+          <button type="button" className="btn appointment-cancel-btn" onClick={cancelAppointment} disabled={changing}>× {changing ? 'Cancelling…' : 'Cancel Appointment'}</button>
+        </div>
+      )}
+      {rescheduling && <div className="booking-reschedule-heading"><strong>Choose a replacement appointment</strong><button type="button" className="btn secondary" onClick={() => { setRescheduling(false); setSelectedSlot(''); setSlotsModalOpen(false) }}>Keep Original Appointment</button></div>}
+      {showBookingFlow && <>
       <div className="appointment-booking-header">
         <span className="muted small">10-minute appointment slots</span>
       </div>
@@ -206,8 +251,8 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
           <strong>{new Intl.DateTimeFormat('en-GB', { timeZone: availabilityTimeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(selectedSlotDetails.startTime))} {clinicTime(selectedSlotDetails.startTime)}</strong>
         </div>
       )}
-      <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking || !!bookedAppointment || !consultationActive} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking || bookedAppointment || !consultationActive ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>
-        {bookedAppointment ? 'Appointment Booked' : !consultationActive ? 'Consultation expired' : booking ? 'Booking…' : 'Confirm Appointment'}
+      <button type="button" className="btn consultation-action-main" disabled={!selectedSlot || booking || (!rescheduling && !!bookedAppointment) || !consultationActive} onClick={confirmBooking} style={{ marginTop: 14, ...(!selectedSlot || booking || (!rescheduling && bookedAppointment) || !consultationActive ? { opacity: .55, cursor: 'not-allowed' } : {}) }}>
+        {!consultationActive ? 'Consultation expired' : booking ? (rescheduling ? 'Rescheduling…' : 'Booking…') : rescheduling ? 'Confirm Reschedule' : 'Confirm Appointment'}
       </button>
 
       {slotsModalOpen && selectedPeriod && (
@@ -233,6 +278,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
           </div>
         </div>
       )}
+      </>}
     </div>
   )
 }
