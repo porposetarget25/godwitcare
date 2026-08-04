@@ -1822,6 +1822,32 @@ html { scroll-behavior: smooth; }
   min-width: 0;
 }
 
+.upcoming-appointment-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  color: #08783f;
+  background: #eaf8ef;
+  border: 1px solid #86d7a4;
+  border-radius: 12px;
+}
+
+.upcoming-appointment-card > span { font-size: 20px; line-height: 1.2; }
+.upcoming-appointment-card strong { display: block; font-size: 18px; }
+.upcoming-appointment-card p { margin: 5px 0 0; font-size: 17px; font-weight: 600; }
+
+.appointment-change-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.appointment-cancel-btn { color: #c83224; background: #fff2f0; border-color: #efaca5; }
+.appointment-cancel-btn:hover { background: #ffe7e3; }
+.booking-reschedule-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 14px 0; }
+
+@media (max-width: 640px) {
+  .booking-reschedule-heading { align-items: stretch; flex-direction: column; }
+  .appointment-change-actions .btn { width: 100%; }
+}
+
 .appointment-booking-header {
   display: flex;
   gap: 10px;
