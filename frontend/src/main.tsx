@@ -70,15 +70,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     navigate('/dashboard');
   }
 
-  async function handleTopNavClick(hash: '#top' | '#how' | '#features' | '#testimonials') {
+  function handleTopNavClick(hash: '#top' | '#how' | '#features' | '#testimonials') {
     setMobileMenuOpen(false);
-    if (user) {
-      await logout();
-      await refresh();
-      setMenuOpen(false);
-      navigate('/login');
-      return;
-    }
     navigate(`/dashboard${hash}`);
   }
 
@@ -91,12 +84,14 @@ function Shell({ children }: { children: React.ReactNode }) {
             <span className="envBadge">Test Environment</span>
           </div>
 
-          <nav className="navlinks">
-            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#top')}>Home</button>
-            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#how')}>How It Works</button>
-            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#features')}>Features</button>
-            <button type="button" className="nav-link-btn" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
-          </nav>
+          {!user ? (
+            <nav className="navlinks">
+              <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#top')}>Home</button>
+              <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#how')}>How It Works</button>
+              <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#features')}>Features</button>
+              <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#testimonials')}>Testimonials</button>
+            </nav>
+          ) : null}
 
           <div className="nav-right">
             {user ? (
@@ -144,21 +139,23 @@ function Shell({ children }: { children: React.ReactNode }) {
             {!user ? (
               <Link to="/login" className="nav-mobile-login-btn" onClick={() => setMobileMenuOpen(false)}>Log in</Link>
             ) : null}
-            <button
-              type="button"
-              className="mobile-menu-toggle"
-              aria-label="Open menu"
-              onClick={() => setMobileMenuOpen(true)}
-            >
-              <span className="hamburger-icon">
-                <span /><span /><span />
-              </span>
-            </button>
+            {!user ? (
+              <button
+                type="button"
+                className="mobile-menu-toggle"
+                aria-label="Open menu"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <span className="hamburger-icon">
+                  <span /><span /><span />
+                </span>
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
 
-      {mobileMenuOpen ? (
+      {!user && mobileMenuOpen ? (
         <div className="mobile-menu-overlay">
           <div className="mobile-menu-topbar">
             <img className="mobile-menu-logo" src={logoColorSrc} alt="GodwitCare" />
@@ -178,10 +175,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="mobile-menu-list">
-            <button type="button" onClick={() => void handleTopNavClick('#top')}>Home</button>
-            <button type="button" onClick={() => void handleTopNavClick('#how')}>How It Works</button>
-            <button type="button" onClick={() => void handleTopNavClick('#features')}>Features</button>
-            <button type="button" onClick={() => void handleTopNavClick('#testimonials')}>Testimonials</button>
+            <button type="button" onClick={() => handleTopNavClick('#top')}>Home</button>
+            <button type="button" onClick={() => handleTopNavClick('#how')}>How It Works</button>
+            <button type="button" onClick={() => handleTopNavClick('#features')}>Features</button>
+            <button type="button" onClick={() => handleTopNavClick('#testimonials')}>Testimonials</button>
           </nav>
 
           <div className="mobile-menu-cta">
