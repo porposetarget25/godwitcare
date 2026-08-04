@@ -60,6 +60,7 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
 // ---------- Types ----------
 export type Traveler = {
   id?: number
+  patientId?: string
   fullName: string
   dateOfBirth: string
 }
@@ -75,6 +76,9 @@ export type Registration = {
   'Carer/Secondary WhatsApp Number': string
   'Email Address': string
   'Account Password'?: string
+  'Username'?: string
+  primaryDial?: string
+  secondaryDial?: string
 
   'Are you on any long-term/regular medication that we should be aware of?': boolean
   'Do you have any health condition that can affect your trip?': boolean
@@ -149,7 +153,10 @@ export type DocSummary = {
   fileName: string
   sizeBytes: number
   createdAt: string
+  patientId: string
+  type: DocumentType
 }
+export type DocumentType = 'PASSPORT' | 'TRAVEL_DOCUMENT'
 
 export type RegistrationApi = {
   id: number
@@ -172,6 +179,8 @@ export type RegistrationApi = {
   packageDays?: number
   documentFileName?: string
   travelers?: Traveler[]
+  primaryPatientId?: string
+  documentsComplete?: boolean
 }
 
 // --- Consultations (shared types) ---
@@ -285,6 +294,7 @@ function toBackend(r: Registration | any) {
         .filter(t => t && t.fullName && t.dateOfBirth)
         .map(t => ({
           id: t.id,
+          patientId: (t as any).patientId,
           fullName: String(t.fullName).trim(),
           dateOfBirth: String(t.dateOfBirth), // yyyy-MM-dd
         }))
@@ -381,17 +391,21 @@ export async function saveRegistration(r: Registration) {
   })
 }
 
-export async function uploadDocument(id: number, file: File) {
+export async function uploadDocument(id: number, patientId: string, type: DocumentType, file: File) {
   const fd = new FormData()
   fd.append('file', file) // must be "file" (controller expects it)
-  return request(`/registrations/${id}/document`, { method: 'POST', body: fd })
+  return request(`/registrations/${id}/patients/${encodeURIComponent(patientId)}/documents/${type}`, { method: 'POST', body: fd })
 }
 
 // Optional helpers if you want to show/download stored docs later
-export async function listDocuments(registrationId: number): Promise<DocSummary[]> {
-  return request<DocSummary[]>(`/registrations/${registrationId}/documents`, {
+export async function listDocuments(registrationId: number, patientId: string): Promise<DocSummary[]> {
+  return request<DocSummary[]>(`/registrations/${registrationId}/patients/${encodeURIComponent(patientId)}/documents`, {
     method: 'GET',
   })
+}
+
+export async function completeRegistrationDocuments(registrationId: number): Promise<void> {
+  await request(`/registrations/${registrationId}/documents/complete`, { method: 'POST' })
 }
 
 export async function deleteDocument(registrationId: number, docId: number): Promise<void> {

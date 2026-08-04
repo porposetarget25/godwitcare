@@ -136,24 +136,26 @@ public class ConsultationController {
     }
 
     private String buildTravelerPatientId(User user, Long travelerId) {
-        String base = "PV-" + String.format("%09d", user.getId() == null ? 0L : user.getId());
-        if (travelerId == null) return base;
-
-        // Preserve the identifier already attached to this exact traveller's
-        // records. Older versions derived this suffix from collection position,
-        // which allowed reordered co-travellers to inherit each other's context.
-        String existingPatientId = consultations
-                .findByUserEmailAndTravelerIdOrderByIdDesc(user.getEmail(), travelerId)
-                .stream()
+        // A consultation's patient ID was historically the public, stable ID for
+        // this patient. Keep returning it when records already exist so adding
+        // registration-document IDs cannot split the patient's care history.
+        List<Consultation> existingConsultations = travelerId == null
+                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(user.getEmail())
+                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(user.getEmail(), travelerId);
+        String existingPatientId = existingConsultations.stream()
                 .map(Consultation::getPatientId)
                 .filter(id -> id != null && !id.isBlank())
                 .findFirst()
                 .orElse(null);
         if (existingPatientId != null) return existingPatientId;
 
-        // New co-travellers are keyed by their immutable database identifier,
-        // never by their position or object order in a registration payload.
-        return base + "-T" + travelerId;
+        Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
+        if (latest != null) {
+            if (travelerId == null) return latest.getPrimaryPatientId();
+            return latest.getTravelers().stream().filter(t -> Objects.equals(t.getId(), travelerId))
+                    .map(Traveler::getPatientId).findFirst().orElse("");
+        }
+        return "PV-" + String.format("%09d", user.getId() == null ? 0L : user.getId());
     }
 
     private Traveler resolveOwnedTraveler(User user, Long travelerId) {

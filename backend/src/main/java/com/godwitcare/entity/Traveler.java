@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "travelers")
@@ -28,6 +29,9 @@ public class Traveler {
     @JsonBackReference
     private Registration registration;
 
+    @Column(name = "patient_id", nullable = false, unique = true, updatable = false)
+    private String patientId = UUID.randomUUID().toString();
+
     // getters/setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -40,4 +44,6 @@ public class Traveler {
 
     public Registration getRegistration() { return registration; }
     public void setRegistration(Registration registration) { this.registration = registration; }
+    public String getPatientId() { return patientId; }
+    public void setPatientId(String patientId) { this.patientId = patientId; }
 }

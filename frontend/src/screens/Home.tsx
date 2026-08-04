@@ -32,6 +32,8 @@ type DocInfo = {
   fileName: string
   sizeBytes: number
   createdAt?: string
+  patientId: string
+  type: 'PASSPORT' | 'TRAVEL_DOCUMENT'
 }
 
 
@@ -194,22 +196,7 @@ export default function Home() {
           setReg(normalized)
           setLoadingReg(false)
 
-          if (normalized?.id) {
-            setLoadingDocs(true)
-            const dres = await authFetch(
-              `${API_BASE_URL}/registrations/${normalized.id}/documents`,
-              {}
-            )
-            if (dres.status === 200) {
-              const arr = (await dres.json()) as DocInfo[]
-              setDocs(Array.isArray(arr) ? arr : [])
-            } else if (dres.status !== 204) {
-              console.warn('GET /documents unexpected status:', dres.status)
-            }
-            setLoadingDocs(false)
-          } else {
-            setDocs([])
-          }
+          setDocs([])
         } finally {
           if (alive) setChecking(false)
         }
@@ -406,6 +393,18 @@ export default function Home() {
   // Keep one primitive snapshot of the active patient's identifiers. This avoids
   // links and requests retaining a URLSearchParams object from a previous tab.
   const selectedTravelerQuery = queryString;
+
+  useEffect(() => {
+    if (!reg?.id || !selectedPatientId) { setDocs([]); return }
+    let cancelled = false
+    setLoadingDocs(true)
+    authFetch(`${API_BASE_URL}/registrations/${reg.id}/patients/${encodeURIComponent(selectedPatientId)}/documents`, {})
+      .then(async response => response.ok ? response.json() : Promise.reject(new Error('Unable to load documents')))
+      .then(items => { if (!cancelled) setDocs(Array.isArray(items) ? items : []) })
+      .catch(() => { if (!cancelled) setDocs([]) })
+      .finally(() => { if (!cancelled) setLoadingDocs(false) })
+    return () => { cancelled = true }
+  }, [reg?.id, selectedPatientId])
 
   // Latest prescription URL (if exists)
   const [rxUrl, setRxUrl] = React.useState<string | null>(null);
@@ -693,17 +692,17 @@ export default function Home() {
       {reg && docs.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <h2 className="h2" style={{ textAlign: 'left' }}>
-            Your Travel Document
+            {selectedTraveler?.name}&apos;s Documents
           </h2>
           {docs.map((d) => {
-            const viewUrl = `${API_BASE_URL}/registrations/${reg.id}/documents/${d.id}/view`
-            const dlUrl = `${API_BASE_URL}/registrations/${reg.id}/documents/${d.id}/download`
+            const viewUrl = `${API_BASE_URL}/registrations/${reg.id}/patients/${encodeURIComponent(selectedPatientId)}/documents/${d.id}/view`
+            const dlUrl = `${API_BASE_URL}/registrations/${reg.id}/patients/${encodeURIComponent(selectedPatientId)}/documents/${d.id}/download`
             const isPreviewable = /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.fileName || '')
             return (
               <div key={d.id} className="card" style={{ marginTop: 12 }}>
                 <div className="doc-head">
                   <div>
-                    <div className="strong">{d.fileName}</div>
+                    <div className="strong">{d.type === 'PASSPORT' ? 'Passport' : 'Travel Document'} · {d.fileName}</div>
                     <div className="muted small">
                       {(d.sizeBytes / 1024).toFixed(1)} KB
                       {d.createdAt ? ` • ${new Date(d.createdAt).toLocaleString()}` : ''}
