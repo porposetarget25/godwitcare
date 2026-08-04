@@ -10,12 +10,21 @@ import java.time.Instant;
 @Table(name = "registration_documents")
 public class RegistrationDocument {
 
+    public enum DocumentType { PASSPORT, TRAVEL_DOCUMENT }
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "registration_id")
     private Registration registration;
+
+    @Column(name = "patient_id", nullable = false)
+    private String patientId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false)
+    private DocumentType documentType;
 
     @Column(nullable = false)
     private String originalFileName;
@@ -38,6 +47,10 @@ public class RegistrationDocument {
     public void setId(Long id) { this.id = id; }
     public Registration getRegistration() { return registration; }
     public void setRegistration(Registration registration) { this.registration = registration; }
+    public String getPatientId() { return patientId; }
+    public void setPatientId(String patientId) { this.patientId = patientId; }
+    public DocumentType getDocumentType() { return documentType; }
+    public void setDocumentType(DocumentType documentType) { this.documentType = documentType; }
     public String getOriginalFileName() { return originalFileName; }
     public void setOriginalFileName(String originalFileName) { this.originalFileName = originalFileName; }
     public String getContentType() { return contentType; }

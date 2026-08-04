@@ -82,12 +82,16 @@ public class SecurityConfig {
 
                         // Registration creation + document upload (public)
                         .requestMatchers(HttpMethod.POST, "/api/registrations").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/registrations/*/document").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/registrations/*/patients/*/documents/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/registrations/*/documents/complete").permitAll()
 
                         // Read-only document access (list + view + download) — public
                         // Use single-segment wildcards to avoid Mvc pattern parser errors.
                         .requestMatchers(HttpMethod.GET,  "/api/registrations/*/documents").permitAll()
                         .requestMatchers(HttpMethod.GET,  "/api/registrations/*/documents/*").permitAll()
+                        .requestMatchers(HttpMethod.GET,  "/api/registrations/*/patients/*/documents").permitAll()
+                        .requestMatchers(HttpMethod.GET,  "/api/registrations/*/patients/*/documents/*").permitAll()
+                        .requestMatchers(HttpMethod.GET,  "/api/registrations/*/patients/*/documents/*/*").permitAll()
 
                         /* ---------- Patients (must be logged in) ---------- */
                         .requestMatchers("/api/consultations/**").authenticated()

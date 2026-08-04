@@ -5,16 +5,17 @@ import { useReg } from '../state/registration'
 import {
   saveRegistration,
   uploadDocument,
+  completeRegistrationDocuments,
   registerAuthUser,
   login,
 } from '../api'
 
 type Errors = Partial<Record<
-  'from' | 'to' | 'start' | 'end' | 'dates' | 'package' | 'travelers',
+  'from' | 'to' | 'start' | 'end' | 'dates' | 'package' | 'travelers' | 'documents',
   string
 >>
 
-type Person = { fullName: string; dateOfBirth: string }
+type Person = { fullName: string; dateOfBirth: string; passport: File | null; travelDocument: File | null }
 
 // ---- Date helpers ----
 const ymd = (d: Date) => {
@@ -38,7 +39,6 @@ const cutoff18YMD = ymd(cutoff18)
 const MIN_DOB_YMD = '1900-01-01'
 
 const MAX_DOC_BYTES = 20 * 1024 * 1024; // 20MB (match backend)
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 
 // Validators
@@ -117,7 +117,8 @@ export default function Step3() {
   const { draft, setDraft } = useReg()
   const nav = useNavigate()
 
-  const [file, setFile] = useState<File | null>(null)
+  const [primaryPassport, setPrimaryPassport] = useState<File | null>(null)
+  const [primaryTravelDocument, setPrimaryTravelDocument] = useState<File | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -153,7 +154,7 @@ export default function Step3() {
 
   function addAdult() {
     if (totalTravelers >= MAX_TRAVELERS) return
-    setAdults(a => [...a, { fullName: '', dateOfBirth: '' }])
+    setAdults(a => [...a, { fullName: '', dateOfBirth: '', passport: null, travelDocument: null }])
   }
   function removeAdult(idx: number) {
     setAdults(a => a.filter((_, i) => i !== idx))
@@ -166,7 +167,7 @@ export default function Step3() {
 
   function addChild() {
     if (totalTravelers >= MAX_TRAVELERS) return
-    setChildren(c => [...c, { fullName: '', dateOfBirth: '' }])
+    setChildren(c => [...c, { fullName: '', dateOfBirth: '', passport: null, travelDocument: null }])
   }
   function removeChild(idx: number) {
     setChildren(c => c.filter((_, i) => i !== idx))
@@ -197,10 +198,12 @@ export default function Step3() {
     }
 
     if (!pkg) next.package = 'Please select a package'
+    if (!primaryPassport || !primaryTravelDocument) next.documents = 'Upload both required documents for every traveller.'
 
     // Travelers: per-row DOB checks; blank rows allowed (dropped on submit)
     const merged = [...adults, ...children]
     const cleaned = merged.filter(t => t.fullName.trim() && t.dateOfBirth)
+    if (cleaned.some(t => !t.passport || !t.travelDocument)) next.documents = 'Upload both required documents for every traveller.'
     if (cleaned.length > MAX_TRAVELERS) next.travelers = `Maximum ${MAX_TRAVELERS} travelers allowed.`
 
     // Adults DOB checks
@@ -244,27 +247,22 @@ export default function Step3() {
       // Put travelers onto the draft so api.ts->toBackend can map them
       const payload = { ...draft, travelers } as any
 
-      // 2) Save registration (+doc upload)
+      // 2) Save the people, then upload each document against its immutable patient ID.
       const created = await saveRegistration(payload)
-
-      // ---- optional document upload (robust) ----
-      try {
-        if (file) {
-          // front-end size guard (avoid server reset for big files)
-          if (file.size > MAX_DOC_BYTES) {
-            alert('File too large. Max allowed is 10MB.');
-          } else {
-            // tiny delay so the new registration is visible even if tx commit is lagging
-            await sleep(200);
-
-            // try once
-            await uploadDocument(created.id!, file);
-          }
-        }
-      } catch (e) {
-        console.warn('Document upload failed:', e);
-        // don’t block the rest of the flow if upload fails
+      const filePairs = [{ patientId: created.primaryPatientId, passport: primaryPassport!, travelDocument: primaryTravelDocument! },
+        ...(created.travelers || []).map((traveler: any, index: number) => ({
+          patientId: traveler.patientId,
+          passport: [...adults, ...children].filter(t => t.fullName.trim() && t.dateOfBirth)[index].passport!,
+          travelDocument: [...adults, ...children].filter(t => t.fullName.trim() && t.dateOfBirth)[index].travelDocument!,
+        }))]
+      if (filePairs.some(pair => !pair.patientId || pair.passport.size > MAX_DOC_BYTES || pair.travelDocument.size > MAX_DOC_BYTES)) {
+        throw new Error('Each document must be 20MB or smaller.')
       }
+      for (const pair of filePairs) {
+        await uploadDocument(created.id!, pair.patientId, 'PASSPORT', pair.passport)
+        await uploadDocument(created.id!, pair.patientId, 'TRAVEL_DOCUMENT', pair.travelDocument)
+      }
+      await completeRegistrationDocuments(created.id!)
 
       // 3) Create user account (email optional, username required = primary WhatsApp)
       const firstName = draft['First Name'] || ''
@@ -421,6 +419,10 @@ export default function Step3() {
                     )}
                   </div>
                 </div>
+                <div className="grid two" style={{ marginTop: 10 }}>
+                  <label>Passport *<input type="file" accept=".jpg,.jpeg,.png,.pdf" required onChange={e => setAdults(list => list.map((row, idx) => idx === i ? { ...row, passport: e.target.files?.[0] || null } : row))} /></label>
+                  <label>Travel Document *<input type="file" accept=".jpg,.jpeg,.png,.pdf" required onChange={e => setAdults(list => list.map((row, idx) => idx === i ? { ...row, travelDocument: e.target.files?.[0] || null } : row))} /></label>
+                </div>
                 <button type="button" className="btn secondary" onClick={() => removeAdult(i)}>Remove</button>
               </div>
             ))}
@@ -475,6 +477,10 @@ export default function Step3() {
                     )}
                   </div>
                 </div>
+                <div className="grid two" style={{ marginTop: 10 }}>
+                  <label>Passport *<input type="file" accept=".jpg,.jpeg,.png,.pdf" required onChange={e => setChildren(list => list.map((row, idx) => idx === i ? { ...row, passport: e.target.files?.[0] || null } : row))} /></label>
+                  <label>Travel Document *<input type="file" accept=".jpg,.jpeg,.png,.pdf" required onChange={e => setChildren(list => list.map((row, idx) => idx === i ? { ...row, travelDocument: e.target.files?.[0] || null } : row))} /></label>
+                </div>
                 <button type="button" className="btn secondary" onClick={() => removeChild(i)}>Remove</button>
               </div>
             ))}
@@ -485,15 +491,19 @@ export default function Step3() {
           </div>
           {errors.travelers && <div className="help" style={{ color: '#e11d48' }}>{errors.travelers}</div>}
 
-          {/* Optional document */}
           <div className="field" style={{ marginTop: 16 }}>
-            <label>Boarding Pass / E-Ticket (optional)</label>
-            <input
-              type="file"
-              accept=".jpg,.jpeg,.png,.pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-            <div className="help">JPG, PNG, PDF formats supported</div>
+            <label className="h3">Primary traveller documents</label>
+            <div className="grid two">
+              <label>Passport <span style={{ color: '#e11d48' }}>*</span><input type="file" accept=".jpg,.jpeg,.png,.pdf" required onChange={e => setPrimaryPassport(e.target.files?.[0] || null)} /></label>
+              <label>Travel Document <span style={{ color: '#e11d48' }}>*</span><input type="file" accept=".jpg,.jpeg,.png,.pdf" required onChange={e => setPrimaryTravelDocument(e.target.files?.[0] || null)} /></label>
+            </div>
+            <div className="help">PDF, JPG or PNG · maximum 20MB each</div>
+            {errors.documents && <div className="help" style={{ color: '#e11d48' }}>{errors.documents}</div>}
+          </div>
+
+          {/* Required documents */}
+          <div className="field" style={{ marginTop: 16 }}>
+            <div className="help">Passport and travel document uploads are required in each co-traveller card above.</div>
           </div>
 
           {/* Package selection */}
