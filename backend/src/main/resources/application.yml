@@ -14,9 +14,16 @@ spring:
       ddl-auto: update
     show-sql: true
   flyway:
-    enabled: false
-    locations: classpath:db/migration/h2
+    # Run data-safe PostgreSQL migrations before Hibernate attempts to validate
+    # or update entity mappings. In particular, V10 adds the new patient IDs as
+    # nullable columns, backfills legacy rows, and only then makes them required.
+    enabled: true
+    locations: classpath:db/migration/postgresql
     baseline-on-migrate: true
+    # Local databases created before Flyway was enabled already contain the
+    # schema through V9. Baseline those databases there so V10 is applied rather
+    # than asking Hibernate to add NOT NULL columns to populated tables.
+    baseline-version: 9
     validate-on-migrate: false
   logging:
     level:
