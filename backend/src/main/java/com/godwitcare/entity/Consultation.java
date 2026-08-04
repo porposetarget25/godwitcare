@@ -63,8 +63,8 @@ public class Consultation {
 
         public enum Status { PENDING, IN_PROGRESS, COMPLETED }
 
-    // Patient ID (e.g., PV-123456789)
-    @Column(length = 20)
+    // Patient ID (legacy PV-* values and the 36-character registration UUIDs)
+    @Column(length = 36)
     private String patientId;
 
     private LocalDate dob;

@@ -136,6 +136,19 @@ public class ConsultationController {
     }
 
     private String buildTravelerPatientId(User user, Long travelerId) {
+        // A consultation's patient ID was historically the public, stable ID for
+        // this patient. Keep returning it when records already exist so adding
+        // registration-document IDs cannot split the patient's care history.
+        List<Consultation> existingConsultations = travelerId == null
+                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(user.getEmail())
+                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(user.getEmail(), travelerId);
+        String existingPatientId = existingConsultations.stream()
+                .map(Consultation::getPatientId)
+                .filter(id -> id != null && !id.isBlank())
+                .findFirst()
+                .orElse(null);
+        if (existingPatientId != null) return existingPatientId;
+
         Registration latest = registrations.findTopByEmailAddressOrderByIdDesc(user.getEmail()).orElse(null);
         if (latest != null) {
             if (travelerId == null) return latest.getPrimaryPatientId();
