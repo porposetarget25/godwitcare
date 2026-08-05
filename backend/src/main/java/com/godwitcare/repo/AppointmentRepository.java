@@ -15,6 +15,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByDoctorIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(Long doctorId, Instant from);
     List<Appointment> findByPatientIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(Long patientId, Instant from);
     boolean existsByConsultationIdAndStatusNot(Long consultationId, Appointment.Status status);
+    void deleteByConsultationUserId(Long userId);
+    void deleteByPatientId(Long patientId);
+    void deleteByDoctorId(Long doctorId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from Appointment a where a.id = :id")
     Optional<Appointment> findLockedById(@Param("id") Long id);

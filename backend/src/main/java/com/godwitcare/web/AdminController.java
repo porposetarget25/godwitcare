@@ -19,6 +19,7 @@ public class AdminController {
 
     private final UserRepository users;
     private final ConsultationRepository consultations;
+    private final AppointmentRepository appointments;
     private final PrescriptionRepository prescriptions;
     private final ReferralLetterRepo referrals;
     private final PaymentRepository payments;
@@ -27,6 +28,7 @@ public class AdminController {
 
     public AdminController(UserRepository users,
                            ConsultationRepository consultations,
+                           AppointmentRepository appointments,
                            PrescriptionRepository prescriptions,
                            ReferralLetterRepo referrals,
                            PaymentRepository payments,
@@ -34,6 +36,7 @@ public class AdminController {
                            PasswordEncoder encoder) {
         this.users = users;
         this.consultations = consultations;
+        this.appointments = appointments;
         this.prescriptions = prescriptions;
         this.referrals = referrals;
         this.payments = payments;
@@ -235,10 +238,16 @@ public class AdminController {
         if (existing == null || existing.getRole() != role) return ResponseEntity.notFound().build();
 
         // Delete dependent rows first to satisfy FK constraints.
-        referrals.deleteByConsultationUserId(id);
-        prescriptions.deleteByConsultationUserId(id);
-        consultations.deleteByUserId(id);
-        payments.deleteByUserId(id);
+        if (role == Role.USER) {
+            appointments.deleteByConsultationUserId(id);
+            appointments.deleteByPatientId(id);
+            referrals.deleteByConsultationUserId(id);
+            prescriptions.deleteByConsultationUserId(id);
+            consultations.deleteByUserId(id);
+            payments.deleteByUserId(id);
+        } else if (role == Role.DOCTOR) {
+            appointments.deleteByDoctorId(id);
+        }
         users.delete(existing);
         return ResponseEntity.ok(Map.of("deleted", true));
     }

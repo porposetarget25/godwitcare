@@ -37,6 +37,11 @@ public class StripePaymentService {
 
     @Transactional
     public PaymentIntentSession createPaymentIntent(User user, PaymentMethod method, BigDecimal amount, String currency) throws StripeException {
+        return createPaymentIntent(user, method, amount, currency, null, null, null);
+    }
+
+    @Transactional
+    public PaymentIntentSession createPaymentIntent(User user, PaymentMethod method, BigDecimal amount, String currency, String packageLabel, BigDecimal registrationFee, BigDecimal tripCoverageFee) throws StripeException {
         ensureStripeConfigured();
 
         String normalizedCurrency = normalizeCurrency(currency);
@@ -46,6 +51,9 @@ public class StripePaymentService {
         payment.setUser(user);
         payment.setMethod(method);
         payment.setAmount(normalizedAmount);
+        payment.setPackageLabel(packageLabel);
+        payment.setRegistrationFee(registrationFee);
+        payment.setTripCoverageFee(tripCoverageFee);
         payment.setCurrency(normalizedCurrency);
         payment.setStatus("CREATED");
         payment = payments.saveAndFlush(payment);
