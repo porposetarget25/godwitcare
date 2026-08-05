@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePatient } from '../state/patient'
-import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
+import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getPaymentHistory, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -147,6 +147,7 @@ export default function Home() {
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
   const [paymentComplete, setPaymentComplete] = useState(false)
   const [latestPayment, setLatestPayment] = useState<PaymentHistoryResponse | null>(null)
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryResponse[]>([])
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false)
   const [paymentHistoryError, setPaymentHistoryError] = useState<string | null>(null)
   const stripeRef = useRef<StripeInstance | null>(null)
@@ -207,7 +208,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (location.hash.startsWith('#payments') && isTravelerUser) {
+    if ((location.hash.startsWith('#payments') || location.pathname.endsWith('/payment-history')) && isTravelerUser) {
       setShowPaymentsModal(true)
     }
   }, [location.hash, isTravelerUser])
@@ -219,8 +220,8 @@ export default function Home() {
     setPaymentHistoryError(null)
     ;(async () => {
       try {
-        const payment = await getLatestPayment()
-        if (alive) setLatestPayment(payment)
+        const [payment, history] = await Promise.all([getLatestPayment(), getPaymentHistory()])
+        if (alive) { setLatestPayment(payment); setPaymentHistory(history) }
       } catch (err: any) {
         if (alive) setPaymentHistoryError(err?.message || 'Unable to load payment history.')
       } finally {
@@ -255,7 +256,7 @@ export default function Home() {
     setPaymentError(null)
     setShowPaymentsModal(false)
     if (location.hash.startsWith('#payments')) {
-      navigate('/home', { replace: true })
+      navigate(location.pathname.endsWith('/payment-history') ? '/home' : '/home', { replace: true })
     }
   }
 
@@ -997,13 +998,13 @@ export default function Home() {
         <div className="payment-modal-backdrop" onClick={closePaymentsModal}>
           <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
             <div className="payment-modal-header">
-              <h3>Complete Payment</h3>
+              <h3>{location.pathname.endsWith('/payment-history') ? 'Payment History' : 'Complete Payment'}</h3>
               <button className="payment-close-btn" onClick={closePaymentsModal} aria-label="Close payments">
                 ✕
               </button>
             </div>
 
-            <p className="payment-subtitle">Select a payment method and proceed securely.</p>
+            <p className="payment-subtitle">{location.pathname.endsWith('/payment-history') ? 'Read-only audit history for your account payments.' : 'Select a payment method and proceed securely.'}</p>
 
             <div className="payment-history-summary">
               {paymentHistoryLoading ? (
@@ -1020,7 +1021,15 @@ export default function Home() {
               )}
             </div>
 
-            {!paymentComplete && (
+            {location.pathname.endsWith('/payment-history') ? (
+              <div className="payment-history-table">
+                {paymentHistory.length === 0 ? <p>No payment transactions available.</p> : paymentHistory.map(p => (
+                  <div className="payment-history-row" key={p.id}>
+                    <strong>{formatPaymentAmount(p)}</strong><span>{paymentStatusCopy(p.status)}</span><span>{formatPaymentDate(p.updatedAt || p.createdAt)}</span><span>{p.packageLabel || 'Package not recorded'}</span><span>Registration: {p.registrationFee != null ? `£${Number(p.registrationFee).toFixed(2)}` : '—'}</span><span>Trip: {p.tripCoverageFee != null ? `£${Number(p.tripCoverageFee).toFixed(2)}` : '—'}</span><span>{p.method}</span><span>{p.stripePaymentIntentId || p.stripeChargeId || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            ) : !paymentComplete && (
               <>
             <div className="payment-methods">
               {[
@@ -1086,7 +1095,7 @@ export default function Home() {
             {paymentError && <div className="payment-error">{paymentError}</div>}
             {paymentSuccess && <div className="payment-success">{paymentSuccess}</div>}
 
-            {!paymentComplete && (
+            {!location.pathname.endsWith('/payment-history') && !paymentComplete && (
               <button className="btn block payment-submit-btn" onClick={submitPayment} disabled={paymentLoading}>
                 {paymentLoading ? 'Processing…' : clientSecret ? 'Pay securely with Stripe' : 'Continue to secure checkout'}
               </button>

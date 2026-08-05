@@ -47,6 +47,11 @@ public class User {
 
     private java.time.Instant otpVerifiedAt;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean activated = true;
+
+    private java.time.Instant activatedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.USER; // default
@@ -105,6 +110,12 @@ public class User {
 
     public java.time.Instant getOtpVerifiedAt() { return otpVerifiedAt; }
     public void setOtpVerifiedAt(java.time.Instant otpVerifiedAt) { this.otpVerifiedAt = otpVerifiedAt; }
+
+    public boolean isActivated() { return activated; }
+    public void setActivated(boolean activated) { this.activated = activated; }
+
+    public java.time.Instant getActivatedAt() { return activatedAt; }
+    public void setActivatedAt(java.time.Instant activatedAt) { this.activatedAt = activatedAt; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }

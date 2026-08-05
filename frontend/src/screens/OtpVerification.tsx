@@ -34,7 +34,7 @@ export default function OtpVerification() {
     try {
       await verifyOtp(otp.trim());
       await refresh();
-      nav('/home');
+      nav('/activate');
     } catch (e: any) {
       setError(e?.message || 'Invalid or expired OTP.');
     } finally {
