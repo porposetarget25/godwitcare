@@ -67,7 +67,7 @@ public class AuthController {
                           String email,
                           String username,
                           List<String> roles,
-                          boolean otpVerified) {}
+                          boolean otpVerified, boolean activated) {}
     public record AuthResponse(UserDto user, String token, long expiresInSeconds) {}
     public record AvailabilityDto(boolean emailRegistered, boolean whatsAppRegistered) {}
 
@@ -79,7 +79,8 @@ public class AuthController {
                 u.getEmail(),
                 u.getUsername(),
                 List.of(u.getRole().name()),
-                u.isOtpVerified()
+                u.isOtpVerified(),
+                u.isActivated()
         );
     }
 
@@ -122,6 +123,8 @@ public class AuthController {
         u.setPassword(encoder.encode(req.password()));
         u.setRole(Role.USER);
         u.setOtpVerified(false);
+        u.setActivated(false);
+        u.setActivatedAt(null);
         users.save(u);
 
         return ResponseEntity.ok(toDto(u));
@@ -238,6 +241,8 @@ public class AuthController {
         u.setPassword(encoder.encode(dto.password()));
         u.setRole(Role.DOCTOR);
         u.setOtpVerified(true);
+        u.setActivated(true);
+        u.setActivatedAt(java.time.Instant.now());
         users.save(u);
 
         return ResponseEntity.ok(toDto(u));

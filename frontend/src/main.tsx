@@ -28,6 +28,7 @@ import ResetPassword from './screens/ResetPassword';
 import ChangePassword from './screens/ChangePassword';
 import AdminDashboard from './screens/AdminDashboard';
 import OtpVerification from './screens/OtpVerification';
+import ActivationPayment from './screens/ActivationPayment';
 
 // NEW: shared auth context
 import { AuthProvider, useAuth } from './state/auth';
@@ -124,7 +125,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="menu-dropdown-divider" />
                     <Link to="/profile" onClick={() => setMenuOpen(false)}>Update Profile</Link>
-                    <button type="button" className="dropdown-action-btn" onClick={() => { setMenuOpen(false); navigate(`/home?openPayments=${Date.now()}#payments`); }}>Payments</button>
+                    <button type="button" className="dropdown-action-btn" onClick={() => { setMenuOpen(false); navigate('/payment-history'); }}>Payment History</button>
                     <Link to="/change-password" onClick={() => setMenuOpen(false)}>Change Password</Link>
                     <button type="button" className="dropdown-action-btn" onClick={handleLogout}>Logout</button>
                   </div>
@@ -294,6 +295,8 @@ function AppRoutes() {
         }
       />
       <Route path="/profile" element={<Shell><Profile /></Shell>} />
+      <Route path="/payment-history" element={<Shell><Home /></Shell>} />
+      <Route path="/activate" element={<Shell>{user ? <ActivationPayment /> : <Navigate to="/login" replace />}</Shell>} />
       <Route path="/forgot-password" element={<Shell><ForgotPassword /></Shell>} />
       <Route path="/reset-password" element={<Shell><ResetPassword /></Shell>} />
       <Route path="/change-password" element={<Shell>{user ? <ChangePassword /> : <Navigate to="/login" replace />}</Shell>} />
@@ -322,7 +325,7 @@ function AppRoutes() {
         path="/home"
         element={
           <Shell>
-            {user && !user.otpVerified ? <Navigate to="/verify-otp" replace /> : <Home />}
+            {user && !user.otpVerified ? <Navigate to="/verify-otp" replace /> : user && !user.activated ? <Navigate to="/activate" replace /> : <Home />}
           </Shell>
         }
       />

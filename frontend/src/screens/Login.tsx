@@ -25,7 +25,7 @@ export default function Login() {
       if (!isAdmin && !u?.otpVerified) {
         navigate('/verify-otp');
       } else {
-        navigate(isAdmin ? '/admin/dashboard' : '/home');
+        navigate(isAdmin ? '/admin/dashboard' : (u?.activated === false ? '/activate' : '/home'));
       }
     } catch (err: any) {
       setError(err?.message || 'Login failed');

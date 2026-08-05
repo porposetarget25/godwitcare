@@ -105,6 +105,7 @@ export type UserDto = {
   photoUrl?: string
   roles?: string[]
   otpVerified?: boolean
+  activated?: boolean
 }
 
 export type AdminListItem = {
@@ -252,7 +253,21 @@ export type PaymentTransactionResponse = Omit<PaymentIntentResponse, 'clientSecr
   cardBrand?: string
 }
 
-export type PaymentHistoryResponse = PaymentTransactionResponse
+export type PaymentHistoryResponse = PaymentTransactionResponse & {
+  packageLabel?: string
+  registrationFee?: number
+  tripCoverageFee?: number
+}
+
+export type ActivationPaymentSummary = {
+  activated: boolean
+  packageDays: number
+  packageLabel: string
+  registrationFee: number
+  tripCoverageFee: number
+  totalAmount: number
+  currency: string
+}
 
 // ---------- Model -> Backend payload mapper ----------
 function toBackend(r: Registration | any) {
@@ -797,6 +812,18 @@ export async function getStripePaymentConfig(): Promise<StripePaymentConfig> {
   return request('/payments/config', { method: 'GET' })
 }
 
+export async function getActivationPaymentSummary(): Promise<ActivationPaymentSummary> {
+  return request('/payments/activation-summary', { method: 'GET' })
+}
+
+export async function createActivationPaymentIntent(payload: Pick<CreatePaymentIntentPayload, 'method' | 'currency'>): Promise<PaymentIntentResponse & ActivationPaymentSummary> {
+  return request('/payments/activation-intents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function createPaymentIntent(payload: CreatePaymentIntentPayload): Promise<PaymentIntentResponse> {
   return request('/payments/payment-intents', {
     method: 'POST',
@@ -835,4 +862,9 @@ export async function getLatestPayment(): Promise<PaymentHistoryResponse | null>
   }
 
   return parseJsonResponse<PaymentHistoryResponse>(text, contentType, res.status)
+}
+
+
+export async function getPaymentHistory(): Promise<PaymentHistoryResponse[]> {
+  return request('/payments/history', { method: 'GET' })
 }

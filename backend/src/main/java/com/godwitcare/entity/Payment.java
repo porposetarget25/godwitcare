@@ -24,6 +24,15 @@ public class Payment {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(length = 64)
+    private String packageLabel;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal registrationFee;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal tripCoverageFee;
+
     @Column(length = 8)
     private String currency;
 
@@ -94,6 +103,18 @@ public class Payment {
     public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
+
+    public String getPackageLabel() { return packageLabel; }
+
+    public void setPackageLabel(String packageLabel) { this.packageLabel = packageLabel; }
+
+    public BigDecimal getRegistrationFee() { return registrationFee; }
+
+    public void setRegistrationFee(BigDecimal registrationFee) { this.registrationFee = registrationFee; }
+
+    public BigDecimal getTripCoverageFee() { return tripCoverageFee; }
+
+    public void setTripCoverageFee(BigDecimal tripCoverageFee) { this.tripCoverageFee = tripCoverageFee; }
 
     public String getCurrency() {
         return currency;
