@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePatient } from '../state/patient'
-import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getPaymentHistory, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
+import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getPaymentHistory, getStoredToken, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
 import { API_BASE_URL, resolveApiUrl } from '../api'
 
 type Traveler = {
@@ -150,6 +150,7 @@ export default function Home() {
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryResponse[]>([])
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false)
   const [paymentHistoryError, setPaymentHistoryError] = useState<string | null>(null)
+  const [paymentHistoryLoaded, setPaymentHistoryLoaded] = useState(false)
   const stripeRef = useRef<StripeInstance | null>(null)
   const elementsRef = useRef<StripeElementsInstance | null>(null)
   const paymentElementRef = useRef<{ unmount: () => void; destroy?: () => void } | null>(null)
@@ -215,21 +216,50 @@ export default function Home() {
 
   useEffect(() => {
     if (!showPaymentsModal) return
+
+    if (!user?.id) {
+      if (!checking) {
+        setPaymentHistory([])
+        setLatestPayment(null)
+        setPaymentHistoryLoaded(true)
+        setPaymentHistoryError('Please sign in before viewing payment history.')
+      }
+      return
+    }
+
+    if (!getStoredToken()) {
+      setPaymentHistory([])
+      setLatestPayment(null)
+      setPaymentHistoryLoaded(true)
+      setPaymentHistoryError('Your session has expired. Please sign in again to view payment history.')
+      return
+    }
+
     let alive = true
     setPaymentHistoryLoading(true)
+    setPaymentHistoryLoaded(false)
     setPaymentHistoryError(null)
     ;(async () => {
       try {
         const [payment, history] = await Promise.all([getLatestPayment(), getPaymentHistory()])
-        if (alive) { setLatestPayment(payment); setPaymentHistory(history) }
+        if (alive) {
+          setLatestPayment(payment)
+          setPaymentHistory(Array.isArray(history) ? history : [])
+          setPaymentHistoryLoaded(true)
+        }
       } catch (err: any) {
-        if (alive) setPaymentHistoryError(err?.message || 'Unable to load payment history.')
+        if (alive) {
+          setLatestPayment(null)
+          setPaymentHistory([])
+          setPaymentHistoryLoaded(true)
+          setPaymentHistoryError(err?.message || 'Unable to load payment history.')
+        }
       } finally {
         if (alive) setPaymentHistoryLoading(false)
       }
     })()
     return () => { alive = false }
-  }, [showPaymentsModal])
+  }, [checking, location.hash, location.pathname, showPaymentsModal, user?.id])
 
   useEffect(() => {
     if (!showPaymentsModal || !paymentComplete) return
@@ -1016,14 +1046,20 @@ export default function Home() {
                   Previous payment of {formatPaymentAmount(latestPayment)} was {paymentStatusCopy(latestPayment.status)}
                   {formatPaymentDate(latestPayment.updatedAt || latestPayment.createdAt) ? ` on ${formatPaymentDate(latestPayment.updatedAt || latestPayment.createdAt)}` : ''}.
                 </span>
-              ) : (
+              ) : paymentHistoryLoaded ? (
                 <span>No payment history available.</span>
-              )}
+              ) : null}
             </div>
 
             {location.pathname.endsWith('/payment-history') ? (
               <div className="payment-history-table">
-                {paymentHistory.length === 0 ? <p>No payment transactions available.</p> : paymentHistory.map(p => (
+                {paymentHistoryLoading ? (
+                  <p>Loading payment transactions…</p>
+                ) : paymentHistoryError ? (
+                  <p className="payment-history-error">{paymentHistoryError}</p>
+                ) : paymentHistoryLoaded && paymentHistory.length === 0 ? (
+                  <p>No payment transactions available.</p>
+                ) : paymentHistory.map(p => (
                   <div className="payment-history-row" key={p.id}>
                     <strong>{formatPaymentAmount(p)}</strong><span>{paymentStatusCopy(p.status)}</span><span>{formatPaymentDate(p.updatedAt || p.createdAt)}</span><span>{p.packageLabel || 'Package not recorded'}</span><span>Registration: {p.registrationFee != null ? `£${Number(p.registrationFee).toFixed(2)}` : '—'}</span><span>Trip: {p.tripCoverageFee != null ? `£${Number(p.tripCoverageFee).toFixed(2)}` : '—'}</span><span>{p.method}</span><span>{p.stripePaymentIntentId || p.stripeChargeId || '—'}</span>
                   </div>
