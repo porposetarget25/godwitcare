@@ -1,0 +1,3 @@
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS package_label VARCHAR(64);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS registration_fee NUMERIC(12, 2);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS trip_coverage_fee NUMERIC(12, 2);
