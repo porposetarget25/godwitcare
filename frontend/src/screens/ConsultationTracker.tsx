@@ -12,6 +12,7 @@ type CountryCode = { code: string; country: string; label: string }
 type Slot = { startTime: string; endTime: string; label: string; available: boolean }
 type AvailabilityDay = { date: string; slots: Slot[] }
 type AvailabilityResponse = { days?: AvailabilityDay[]; timeZone?: string }
+type Appointment = { id: number; consultationId: number; consultationPatientId?: string; status?: string; startTime: string; endTime: string }
 
 type BookingPeriod = 'morning' | 'afternoon'
 
@@ -37,7 +38,7 @@ function slotHour(slot: Slot, timeZone: string) {
   return Number(hourPart ?? Number.NaN)
 }
 
-function AppointmentBooking({ consultationId, consultationActive, patientId, onBooked }: { consultationId: number; consultationActive: boolean; patientId: string; onBooked: (appointment: any) => void }) {
+function AppointmentBooking({ consultationId, consultationActive, patientId }: { consultationId: number; consultationActive: boolean; patientId: string }) {
   const [days, setDays] = useState<AvailabilityDay[]>([])
   const [availabilityTimeZone, setAvailabilityTimeZone] = useState('Europe/London')
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -48,18 +49,32 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
   const [booking, setBooking] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [bookedAppointment, setBookedAppointment] = useState<any>(null)
+  const [bookedAppointment, setBookedAppointment] = useState<Appointment | null>(null)
   const [rescheduling, setRescheduling] = useState(false)
   const [changing, setChanging] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' })
-      .then(async res => res.ok ? res.json() : [])
-      .then(items => { if (alive) setBookedAppointment((Array.isArray(items) ? items : []).find(item => item.consultationId === consultationId && item.consultationPatientId === patientId && item.status === 'SCHEDULED') ?? null) })
-      .catch(() => undefined)
-    return () => { alive = false }
+  const findScheduledAppointment = React.useCallback((items: unknown): Appointment | null => {
+    return (Array.isArray(items) ? items : []).find(item => {
+      const appointment = item as Partial<Appointment>
+      return appointment.consultationId === consultationId
+        && appointment.consultationPatientId === patientId
+        && appointment.status === 'SCHEDULED'
+    }) as Appointment | undefined ?? null
   }, [consultationId, patientId])
+
+  const loadBookedAppointment = React.useCallback(async (signal?: AbortSignal) => {
+    const res = await authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store', signal })
+    const items = res.ok ? await res.json().catch(() => []) : []
+    const nextAppointment = findScheduledAppointment(items)
+    setBookedAppointment(nextAppointment)
+    return nextAppointment
+  }, [findScheduledAppointment])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    loadBookedAppointment(controller.signal).catch(() => undefined)
+    return () => { controller.abort() }
+  }, [loadBookedAppointment])
 
   const loadAvailability = React.useCallback(async () => {
     setLoading(true)
@@ -134,12 +149,12 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.')
-      setBookedAppointment(data)
+      const confirmedAppointment = await loadBookedAppointment().catch(() => data as Appointment)
+      setBookedAppointment(confirmedAppointment)
       setRescheduling(false)
       setSlotsModalOpen(false)
       setSelectedSlot('')
       setMessage(`Appointment booked for ${clinicDateTime(data.startTime)}.`)
-      onBooked(data)
       await loadAvailability()
     } catch (e: any) {
       setError(e?.message || 'Unable to book that slot.')
@@ -161,7 +176,6 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
       setBookedAppointment(null)
       setRescheduling(false)
       setMessage('Appointment cancelled. The reserved slot is available again.')
-      onBooked(data)
       await loadAvailability()
     } catch (e: any) {
       setError(e?.message || 'Unable to cancel this appointment.')
@@ -520,7 +534,6 @@ export default function ConsultationTracker() {
   const [latestStatus, setLatestStatus] =
     useState<'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null>(null)
   const [latestActive, setLatestActive] = useState(false)
-  const [appointmentStatus, setAppointmentStatus] = useState<string | null>(null)
 
   // Patient info for WhatsApp draft message
   const [patientName, setPatientName] = useState<string>('N/A')
@@ -1022,8 +1035,7 @@ export default function ConsultationTracker() {
               Choose a future 10-minute appointment slot with an available doctor. Booked slots are disabled to prevent double-booking.
             </div>
           </div>
-          {appointmentStatus && <div className="muted small" role="status">Current appointment: {appointmentStatus}</div>}
-          {latestCid ? <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} patientId={patientId || ''} onBooked={appointment => setAppointmentStatus(appointment.status ?? 'SCHEDULED')} /> : (
+          {latestCid ? <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} patientId={patientId || ''} /> : (
             <button type="button" className="btn secondary consultation-action-btn consultation-action-main" style={disabledButtonStyle} disabled aria-disabled="true">
               Complete Step 1 first
             </button>
