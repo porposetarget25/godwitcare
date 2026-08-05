@@ -212,7 +212,7 @@ export default function Home() {
     if ((location.hash.startsWith('#payments') || location.pathname.endsWith('/payment-history')) && isTravelerUser) {
       setShowPaymentsModal(true)
     }
-  }, [location.hash, isTravelerUser])
+  }, [location.hash, location.pathname, isTravelerUser])
 
   useEffect(() => {
     if (!showPaymentsModal) return
