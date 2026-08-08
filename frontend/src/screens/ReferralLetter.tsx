@@ -1,7 +1,7 @@
 // src/screens/DoctorReferral.tsx
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { authFetch, API_BASE_URL } from '../api';
+import { authFetch, API_BASE_URL, openAuthenticatedFile } from '../api';
 
 // Prevent double `/api` (e.g., API_BASE_URL already has /api and server returns /api/..)
 function normalizeApiUrl(base: string, path: string | null | undefined): string | null {
@@ -45,6 +45,8 @@ export default function DoctorReferral() {
 
   // Editable paragraph
   const [body, setBody] = React.useState<string>('');
+  const [generating, setGenerating] = React.useState(false);
+  const [genErr, setGenErr] = React.useState<string | null>(null);
 
   // Hardcoded doctor details (per your note)
   const doctorName  = 'Dr. Dimitris–Christos Zachariades';
@@ -130,6 +132,8 @@ Referring Practitioner`
 
   async function onGeneratePdf() {
     if (!c?.id) return;
+    setGenerating(true);
+    setGenErr(null);
     try {
       // Create referral for this consultation
       const createRes = await authFetch(
@@ -146,41 +150,19 @@ Referring Practitioner`
         throw new Error(t || `Failed (${createRes.status})`);
       }
 
-      const ct = createRes.headers.get('content-type') || '';
-
-      // If backend streams PDF directly
-      if (ct.includes('application/pdf')) {
-        const blob = await createRes.blob();
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        return;
-      }
-
-      // Otherwise expect a JSON meta with id or pdfUrl
       const meta = await createRes.json().catch(() => ({} as any));
+      const pdfUrl = meta?.id
+        ? `${API_BASE_URL}/doctor/referrals/${meta.id}/pdf`
+        : (meta?.pdfUrl ? normalizeApiUrl(API_BASE_URL, meta.pdfUrl) : null);
+      if (!pdfUrl) throw new Error('Referral created but no PDF URL/ID returned.');
 
-      if (meta?.pdfUrl) {
-        const url = normalizeApiUrl(API_BASE_URL, meta.pdfUrl);
-        if (!url) throw new Error('Invalid pdfUrl returned.');
-        window.open(url, '_blank');
-        return;
-      }
-
-      if (meta?.id) {
-        const pdfRes = await authFetch(
-          `${API_BASE_URL}/doctor/referrals/${meta.id}/pdf`,
-          {}
-        );
-        if (!pdfRes.ok) throw new Error('Failed to download referral PDF.');
-        const blob = await pdfRes.blob();
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        return;
-      }
-
-      throw new Error('Referral created but no PDF URL/ID returned.');
+      // Open the generated PDF for review, then return to the consultation.
+      await openAuthenticatedFile(pdfUrl);
+      nav(`/doctor/consultations/${c.id}`);
     } catch (e: any) {
-      alert(e?.message || 'Failed to generate PDF');
+      setGenErr(e?.message || 'Failed to generate PDF');
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -189,80 +171,55 @@ Referring Practitioner`
   const patientDob  = c?.patient?.dob ? new Date(c.patient.dob).toLocaleDateString() : '—';
 
   return (
-    <section className="section">
-      <div className="page-head" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <h1 className="page-title">Referral Letter</h1>
-        <Link to="/doctor/consultations" className="btn secondary">Back</Link>
+    <>
+      <div className="page-head">
+        <div className="page-title">Referral Letter</div>
+        <Link to="/doctor/consultations" className="bs">‹ Consultations</Link>
       </div>
 
       {loading && <div className="card">Loading…</div>}
-      {err && <div className="card" style={{ color:'#b91c1c' }}>{err}</div>}
+      {err && <div className="notice n-warn"><i className="ti ti-alert-triangle" aria-hidden="true" />{err}</div>}
 
       {!loading && !err && (
         <>
-          {/* Patient Information */}
-          <div className="card" style={{ marginTop: 12 }}>
-            <div className="strong" style={{ marginBottom: 8 }}>Patient Information</div>
-            <div className="grid three" style={{ rowGap: 8 }}>
+          <div className="card">
+            <div className="ct">Patient Information</div>
+            <div className="g3">
+              <div><div className="fi-hint">Patient Name</div><div style={{ fontSize: 13, fontWeight: 600 }}>{patientName}</div></div>
+              <div><div className="fi-hint">Patient ID</div><div style={{ fontSize: 13, fontWeight: 600 }}>{patientId}</div></div>
+              <div><div className="fi-hint">Date of Birth</div><div style={{ fontSize: 13, fontWeight: 600 }}>{patientDob}</div></div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="ct">Referral From</div>
+            <div className="g2">
               <div>
-                <div className="muted small">Patient Name</div>
-                <div className="strong">{patientName}</div>
+                <div className="dr"><div className="dk">GP Name</div><div className="dv">{doctorName}</div></div>
+                <div className="dr"><div className="dk">GMS Number</div><div className="dv">{doctorReg}</div></div>
               </div>
               <div>
-                <div className="muted small">Patient ID</div>
-                <div className="strong">{patientId}</div>
-              </div>
-              <div>
-                <div className="muted small">Date of Birth</div>
-                <div className="strong">{patientDob}</div>
+                <div className="dr"><div className="dk">Address</div><div className="dv">{doctorAddr}</div></div>
+                <div className="dr"><div className="dk">Email</div><div className="dv">{doctorEmail}</div></div>
+                <div className="dr"><div className="dk">Contact Number</div><div className="dv">{doctorPhone}</div></div>
               </div>
             </div>
           </div>
 
-          {/* Referral From */}
-          <div className="card" style={{ marginTop: 12 }}>
-            <div className="strong" style={{ marginBottom: 8 }}>Referral From</div>
-            <div className="grid two" style={{ rowGap: 8 }}>
-              <div>
-                <div className="muted small">GP Name</div>
-                <div className="strong">{doctorName}</div>
-                <div className="muted small" style={{ marginTop: 8 }}>GMS Number</div>
-                <div className="strong">{doctorReg}</div>
-              </div>
-              <div>
-                <div className="muted small">Address</div>
-                <div className="strong">{doctorAddr}</div>
-                <div className="muted small" style={{ marginTop: 8 }}>Email</div>
-                <div className="strong">{doctorEmail}</div>
-                <div className="muted small" style={{ marginTop: 8 }}>Contact Number</div>
-                <div className="strong">{doctorPhone}</div>
-              </div>
-            </div>
+          <div className="card">
+            <div className="ct">Letter Body</div>
+            <textarea rows={12} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type the referral text here…" />
           </div>
 
-          {/* Editable Paragraph */}
-          <div className="card" style={{ marginTop: 12 }}>
-            <div className="strong" style={{ marginBottom: 8 }}>Letter Body</div>
-            <textarea
-              rows={12}
-              style={{ width: '100%' }}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Type the referral text here…"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="actions" style={{ marginTop: 12, display:'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" className="btn secondary" onClick={onPreview} disabled={!c?.id}>
-              Preview
-            </button>
-            <button type="button" className="btn" onClick={onGeneratePdf} disabled={!c?.id}>
-              Generate PDF
+          {genErr && <div className="notice n-warn"><i className="ti ti-alert-triangle" aria-hidden="true" />{genErr}</div>}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="bs" onClick={onPreview} disabled={!c?.id}>Preview</button>
+            <button type="button" className="bp" onClick={onGeneratePdf} disabled={!c?.id || generating}>
+              <i className="ti ti-file-download" aria-hidden="true" /> {generating ? 'Generating…' : 'Generate PDF'}
             </button>
           </div>
         </>
       )}
-    </section>
+    </>
   );
 }

@@ -2,66 +2,34 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { authFetch, API_BASE_URL } from '../api'
-import { QUESTIONNAIRE_SECTIONS } from '../questionnaire'
+import { QUESTIONNAIRE_SECTIONS, type QuestionnaireSection } from '../questionnaire'
 import { usePatient } from '../state/patient'
+import Modal from '../components/portal/Modal'
 
 type YesNo = 'Yes' | 'No'
 type Ans = YesNo | undefined
-
-function sanitizeAscii(input: string): string {
-  if (!input) return input
-
-  // Normalize accents (ā → a) and remove remaining non-ASCII chars
-  return input
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // strip accents
-    .replace(/[^\x20-\x7E]/g, '')    // remove non-printable / non-ASCII
-}
-
 
 function Toggle({
   label,
   value,
   onChange,
-  critical = false,
+  disabled,
 }: {
   label: string
   value: Ans
   onChange: (v: YesNo) => void
-  /** when true, render the label bold + red; when false, bold + green */
-  critical?: boolean
+  disabled?: boolean
 }) {
-  const isUnset = value === undefined
   return (
-    <div className="field" style={{ marginBottom: 12 }}>
-      <label
-        className="strong"
-        style={critical ? { color: '#991b1b', fontWeight: 700 } : { color: '#166534', fontWeight: 700 }}
-      >
-        {label}
-      </label>
-      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-        <button
-          type="button"
-          className={'btn btn-no ' + (value === 'No' ? '' : 'secondary')}
-          onClick={() => onChange('No')}
-          aria-pressed={value === 'No'}
-        >
-          No
+    <div className="q-row">
+      <span>{label}</span>
+      <div className="yn">
+        <button type="button" className={`yn-btn no${value === 'No' ? ' on' : ''}`} onClick={() => onChange('No')} aria-pressed={value === 'No'} disabled={disabled}>
+          <i className="ti ti-circle-check" aria-hidden="true" /> No
         </button>
-        <button
-          type="button"
-          className={'btn btn-yes ' + (value === 'Yes' ? '' : 'secondary')}
-          onClick={() => onChange('Yes')}
-          aria-pressed={value === 'Yes'}
-        >
-          Yes
+        <button type="button" className={`yn-btn yes${value === 'Yes' ? ' on' : ''}`} onClick={() => onChange('Yes')} aria-pressed={value === 'Yes'} disabled={disabled}>
+          <i className="ti ti-alert-triangle" aria-hidden="true" /> Yes
         </button>
-        {isUnset && (
-          <span className="muted small" style={{ alignSelf: 'center' }}>
-            ← please choose
-          </span>
-        )}
       </div>
     </div>
   )
@@ -148,6 +116,7 @@ export default function PreConsultation() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const cid = params.get('cid') // if present => edit mode
+  const locked = params.get('locked') === '1'
   const { activePatient, loading: patientContextLoading, queryString: activePatientQuery } = usePatient()
   const travelerId = activePatient?.id === 'PRIMARY' ? null : activePatient?.id || null
   const patientId = activePatient?.patientId || null
@@ -163,7 +132,6 @@ export default function PreConsultation() {
   }, [patientId])
 
   // Contact fields
-  const [location, setLocation] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactAddress, setContactAddress] = useState('')
@@ -177,31 +145,19 @@ export default function PreConsultation() {
   const [patientOptions, setPatientOptions] = useState<PatientOpt[]>([])
   const [selectedPatientKey, setSelectedPatientKey] = useState<string>('')
 
-  // Answers, details
+  // Answers, details — questions start unselected; `touched` tracks which ones the patient
+  // has actually answered, driving the "reviewed" progress and section auto-advance.
   const defaultAnswers = useMemo(() => {
     const all: Record<string, Ans> = {}
     for (const s of FORM) for (const q of s.questions) all[q.id] = undefined
     return all
   }, [])
   const [answers, setAnswers] = useState<Record<string, Ans>>(defaultAnswers)
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [detailsByQ, setDetailsByQ] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
-
-  // Sticky banner offset below header
-  const [stickyTop, setStickyTop] = React.useState(64)
-  React.useEffect(() => {
-    const calc = () => {
-      const header =
-        (document.querySelector('header') ||
-          document.querySelector('.site-header') ||
-          document.querySelector('.topnav')) as HTMLElement | null
-      const h = header?.offsetHeight ?? 56
-      setStickyTop(h - 1)
-    }
-    calc()
-    window.addEventListener('resize', calc)
-    return () => window.removeEventListener('resize', calc)
-  }, [])
+  // Sections are walked through one at a time; only this index is expanded.
+  const [openSectionIndex, setOpenSectionIndex] = useState(0)
 
   /* ---------- Prefill (NEW mode): Registration → Latest Consultation → /auth/me ---------- */
   useEffect(() => {
@@ -237,7 +193,7 @@ export default function PreConsultation() {
         }
       } catch { /* ignore */ }
 
-      // 2) Latest consultation details (address/location; fallback dob)
+      // 2) Latest consultation details (address; fallback dob)
       try {
         const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest${travelerQueryString ? `?${travelerQueryString}` : ''}`, {})
         if (!ignore && r0.ok) {
@@ -246,7 +202,6 @@ export default function PreConsultation() {
             const r1 = await authFetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, {})
             if (!ignore && r1.ok) {
               const j = await r1.json()
-              if (!location && j?.currentLocation) setLocation(j.currentLocation)
               if (!contactAddress && j?.contactAddress) setContactAddress(j.contactAddress)
               const ymd = toYMD(j?.dob || j?.patient?.dob)
               if (!dob && ymd) setDob(ymd)
@@ -278,7 +233,6 @@ export default function PreConsultation() {
         const r = await authFetch(`${API_BASE_URL}/consultations/${cid}/mine`, {})
         if (!ignore && r.ok) {
           const j = await r.json()
-          setLocation(j.currentLocation || '')
           setContactName(j.contactName || '')
           setContactPhone(j.contactPhone || '')
           setContactAddress(j.contactAddress || '')
@@ -311,6 +265,10 @@ export default function PreConsultation() {
             if (v === 'Yes' || v === 'No') merged[k] = v
           })
           setAnswers(merged)
+          // A previously-submitted checklist means every question was already reviewed.
+          const allTouched: Record<string, boolean> = {}
+          for (const s of FORM) for (const q of s.questions) allTouched[q.id] = true
+          setTouched(allTouched)
           setDetailsByQ(j.detailsByQuestion || {})
         }
       } catch { /* ignore */ }
@@ -337,16 +295,13 @@ export default function PreConsultation() {
     setDob(opt.dob || '')
   }, [selectedPatientKey, patientOptions])
 
-  function setAnswer(id: string, v: YesNo) {
-    setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
-  }
   function setDetail(id: string, v: string) {
     setDetailsByQ(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (submitting) return
+    if (submitting || locked || hasEmergencyAnswer) return
 
     const unanswered = Object.entries(answers).filter(([, v]) => v === undefined)
     if (unanswered.length > 0) {
@@ -370,7 +325,7 @@ export default function PreConsultation() {
         : null
 
       const payload = {
-        currentLocation: sanitizeAscii(location),
+        currentLocation: null,
         contactName,
         contactPhone,
         contactAddress,
@@ -397,53 +352,13 @@ export default function PreConsultation() {
         throw new Error(`Failed to save consultation: ${res.status} ${t}`)
       }
 
-      nav(travelerQueryString ? `/consultation/tracker?logged=1&${travelerQueryString}` : '/consultation/tracker?logged=1')
+      nav(travelerQueryString ? `/consultation?${travelerQueryString}` : '/consultation')
     } catch (err) {
       console.error(err)
       alert('Sorry, we could not save your details. Please try again.')
     } finally {
       setSubmitting(false)
     }
-  }
-
-  // Geolocation helpers
-  const [coords, setCoords] = React.useState<{ lat: number; lon: number } | null>(null)
-  const [locLoading, setLocLoading] = React.useState(false)
-  const [locErr, setLocErr] = React.useState<string | null>(null)
-
-  async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`
-      const res = await authFetch(url, { headers: { 'Accept-Language': 'en' } })
-      if (!res.ok) return null
-      const j = await res.json()
-      return j?.display_name || null
-    } catch {
-      return null
-    }
-  }
-
-  async function useMyLocation() {
-    setLocErr(null)
-    if (!('geolocation' in navigator)) {
-      setLocErr('Geolocation is not available in this browser.')
-      return
-    }
-    setLocLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords
-        setCoords({ lat: latitude, lon: longitude })
-        const addr = await reverseGeocode(latitude, longitude)
-        setLocation(addr ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
-        setLocLoading(false)
-      },
-      (err) => {
-        setLocLoading(false)
-        setLocErr(err.message || 'Unable to fetch location.')
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
   }
 
   /** Critical sections that should be red-bordered (and labels red/bold). */
@@ -458,186 +373,189 @@ export default function PreConsultation() {
     []
   )
 
-    /** Show 999 banner ONLY if ANY "Yes" is answered inside critical (red) sections. */
-  const showEmergencyBanner = useMemo(() => {
+    /** Lock the whole checklist and show the 999 warning if ANY "Yes" is answered inside a critical (red) section. */
+  const hasEmergencyAnswer = useMemo(() => {
     return FORM
       .filter(s => CRITICAL_SECTION_TITLES.has(s.title))
       .some(s => s.questions.some(q => answers[q.id] === 'Yes'))
   }, [answers, CRITICAL_SECTION_TITLES])
 
+  const [emergencyModalDismissed, setEmergencyModalDismissed] = useState(false)
+  useEffect(() => {
+    if (!hasEmergencyAnswer) setEmergencyModalDismissed(false)
+  }, [hasEmergencyAnswer])
+
+
+  const totalQuestions = useMemo(() => FORM.reduce((n, s) => n + s.questions.length, 0), [])
+  const reviewedCount = useMemo(() => Object.values(touched).filter(Boolean).length, [touched])
+
+  function isSectionComplete(section: QuestionnaireSection, snapshot: Record<string, boolean>) {
+    return section.questions.every(q => snapshot[q.id])
+  }
+
+  /** Mark a question reviewed, and if that was the section's last unreviewed one, fold it and expand the next. */
+  function answerQuestion(sectionIndex: number, id: string, v: YesNo) {
+    setAnswers(prev => (prev[id] === v ? prev : { ...prev, [id]: v }))
+    setTouched(prev => {
+      if (prev[id]) return prev
+      const next = { ...prev, [id]: true }
+      const section = FORM[sectionIndex]
+      // A "Yes" reveals a details textbox the patient may want to fill in — don't fold the
+      // section out from under them mid-typing. Only auto-advance on a completing "No".
+      if (v === 'No' && section && isSectionComplete(section, next) && sectionIndex < FORM.length - 1) {
+        window.setTimeout(() => {
+          setOpenSectionIndex(current => (current === sectionIndex ? sectionIndex + 1 : current))
+        }, 350)
+      }
+      return next
+    })
+  }
+
+  function openSection(index: number) {
+    setOpenSectionIndex(index)
+  }
 
   return (
-    <section className="section">
-      <div className="page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 className="page-title">Pre-Consultation Checklist</h1>
-        <Link to={travelerQueryString ? `/consultation/tracker?${travelerQueryString}` : '/consultation/tracker'} className="btn secondary">Back</Link>
+    <>
+      <div className="page-head">
+        <div className="page-title">Pre-Consultation Checklist</div>
+        <Link to={travelerQueryString ? `/consultation?${travelerQueryString}` : '/consultation'} className="bs">Back</Link>
       </div>
 
-      <form className="form" onSubmit={submit}>
-        {/* Current location */}
-        <div className="field">
-          <label>Current Location</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={location}
-              onChange={(e) => setLocation(sanitizeAscii(e.target.value))}
-              placeholder="123 Main St, Anytown"
-              style={{ flex: 1 }}
-            />
-            <button type="button" className="btn" onClick={useMyLocation} disabled={locLoading}>
-              {locLoading ? 'Getting…' : 'Use my location'}
-            </button>
-          </div>
-          {coords && (
-            <div className="muted small" style={{ marginTop: 6 }}>
-              ({coords.lat.toFixed(5)}, {coords.lon.toFixed(5)})
-            </div>
-          )}
-          {locErr && (
-            <div className="muted small" style={{ marginTop: 6, color: '#b91c1c' }}>
-              {locErr}
-            </div>
-          )}
+      {locked && (
+        <div className="notice n-info">
+          <i className="ti ti-lock" aria-hidden="true" />
+          <div>This checklist is locked while your appointment is booked. Cancel the appointment to make changes.</div>
         </div>
+      )}
 
-        {/* Patient Contact & Address */}
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="strong" style={{ marginBottom: 8 }}>Patient Contact &amp; Address</div>
+      <div className="progress-wrap">
+        <div className="progress-label"><span>Progress</span><span>{reviewedCount} of {totalQuestions} answered</span></div>
+        <div className="progress-bar-track"><div className="progress-bar-fill" style={{ width: `${totalQuestions ? (reviewedCount / totalQuestions) * 100 : 0}%` }} /></div>
+      </div>
 
-          {/* Patient context is chosen on the portal tabs and cannot be changed here. */}
-          <div className="field">
-            <label>Consultation for</label>
+      <form onSubmit={submit}>
+        <div className="card">
+          <div className="ct">Patient Contact &amp; Address</div>
+
+          <div className="fi">
+            <label className="fl2">Consultation for</label>
             {patientOptions.length > 0 ? (
-              <div className="selected-patient-summary">
-                <span className="patient-tab-avatar" aria-hidden="true">{contactName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}</span>
-                <strong>{contactName}</strong>
-                <span className="muted small">Selected from Patient Portal</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="ava" style={{ width: 26, height: 26, fontSize: 10 }}>{contactName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}</div>
+                <strong style={{ fontSize: 13 }}>{contactName}</strong>
               </div>
             ) : (
-              <input
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                placeholder="Full name"
-              />
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Full name" disabled={locked || hasEmergencyAnswer} />
             )}
-            <div className="muted small" style={{ marginTop: 4 }}>
-              WhatsApp (shared)
+          </div>
+
+          <div className="g2">
+            <div className="fi">
+              <label className="fl2">Phone / WhatsApp</label>
+              <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} disabled />
+            </div>
+            <div className="fi">
+              <label className="fl2">Date of Birth</label>
+              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} disabled />
             </div>
           </div>
 
-          {/* Phone + DOB in two columns */}
-          <div className="grid two">
-            <div className="field">
-              <label>Phone / WhatsApp</label>
-              <input
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="+44 7xxx xxx xxx"
-              />
-            </div>
-            <div className="field">
-              <label>Date of Birth</label>
-              <input
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                placeholder="yyyy-mm-dd"
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Address</label>
-            <textarea
-              value={contactAddress}
-              onChange={(e) => setContactAddress(e.target.value)}
-              placeholder="Street, City, Postal Code, Country"
-              rows={3}
-            />
+          <div className="fi">
+            <label className="fl2">Address</label>
+            <textarea value={contactAddress} onChange={(e) => setContactAddress(e.target.value)} placeholder="Street, City, Postal Code, Country" rows={3} disabled={locked || hasEmergencyAnswer} />
           </div>
         </div>
 
-        {/* Emergency banner (now shows if ANY Yes) */}
-        {showEmergencyBanner && (
-          <div
-            className="card"
-            role="note"
-            aria-live="polite"
-            style={{
-              position: 'sticky',
-              top: stickyTop,
-              zIndex: 50,
-              background: '#B94A48',
-              color: 'white',
-              borderColor: 'transparent',
-              marginTop: 0,
-              borderRadius: 12,
-              padding: 16,
-              boxShadow: '0 8px 20px rgba(185,74,72,.25)',
-            }}
-          >
-            <div className="strong" style={{ marginBottom: 0 }}>
-              If you answer “Yes” to any of these questions, please dial 999 immediately.
+        {hasEmergencyAnswer && (
+          <div className="notice n-danger" role="alert" aria-live="assertive" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+            <i className="ti ti-alert-triangle" aria-hidden="true" />
+            <div>
+              <strong>You are experiencing emergency symptoms. Please dial 999 immediately.</strong>
+              <div style={{ marginTop: 8 }}>
+                <a href="tel:999" className="bd" style={{ background: '#fff' }}><i className="ti ti-phone" aria-hidden="true" /> Call 999 Now</a>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Sections */}
-        {FORM.map((section) => {
+        <div className="ct" style={{ margin: '14px 0 8px' }}>Health Questionnaire</div>
+        {FORM.map((section, index) => {
           const isCritical = CRITICAL_SECTION_TITLES.has(section.title)
+          const reviewedInSection = section.questions.filter(q => touched[q.id]).length
+          const complete = reviewedInSection === section.questions.length
+          const isOpen = openSectionIndex === index
+          const isFirstGeneral = !isCritical && FORM[index - 1] && CRITICAL_SECTION_TITLES.has(FORM[index - 1].title)
           return (
-            <div
-              key={section.title}
-              className="card"
-              style={{
-                marginTop: 12,
-                border: isCritical ? '3px solid #dc2626' : '3px solid #16a34a',
-                borderRadius: 12,
-              }}
-            >
-              <div
-                className="strong"
-                style={{
-                  marginBottom: 8,
-                  color: isCritical ? '#991b1b' : '#166534',
-                }}
-              >
-                {section.title}
-              </div>
-
-              {section.questions.map((q) => {
-                const val = answers[q.id]
-                return (
-                  <div key={q.id} style={{ marginBottom: 10 }}>
-                    <Toggle
-                      label={q.label}
-                      value={val}
-                      onChange={(v) => setAnswer(q.id, v)}
-                      critical={isCritical}
-                    />
-                    {val === 'Yes' && (
-                      <div className="field" style={{ marginTop: 6 }}>
-                        <label className="small">Add details (optional)</label>
-                        <input
-                          value={detailsByQ[q.id] || ''}
-                          onChange={(e) => setDetail(q.id, e.target.value)}
-                          placeholder="Describe briefly (optional)"
-                        />
-                      </div>
+            <React.Fragment key={section.title}>
+              {index === 0 && <div className="fi-hint" style={{ margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Emergency Symptom Check</div>}
+              {isFirstGeneral && <div className="fi-hint" style={{ margin: '14px 0 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>General Health Questions</div>}
+              <div className={`accordion-item${isOpen ? ' open' : ''}${isCritical ? ' critical' : ''}${complete ? ' complete' : ''}`}>
+                <div className="accordion-header" onClick={() => openSection(index)}>
+                  <div className="accordion-header-left">
+                    {isCritical && <i className="ti ti-alert-triangle" aria-hidden="true" style={{ color: 'var(--text-danger)' }} />}
+                    <span className="accordion-title">{section.title}</span>
+                    {complete ? (
+                      <i className="ti ti-circle-check" aria-hidden="true" style={{ color: 'var(--text-success)' }} />
+                    ) : (
+                      <span className="accordion-count">{reviewedInSection}/{section.questions.length}</span>
                     )}
                   </div>
-                )
-              })}
-            </div>
+                  <i className="ti ti-chevron-down accordion-chevron" aria-hidden="true" />
+                </div>
+                <div className="accordion-body">
+                  <div className="accordion-body-inner">
+                    {section.questions.map(q => {
+                      const val = answers[q.id]
+                      // Keep the question(s) that actually triggered the emergency lock editable,
+                      // so the patient can correct a misclick — everything else stays blocked.
+                      const questionDisabled = locked || (hasEmergencyAnswer && val !== 'Yes')
+                      return (
+                        <div key={q.id}>
+                          <Toggle label={q.label} value={val} onChange={(v) => answerQuestion(index, q.id, v)} disabled={questionDisabled} />
+                          {val === 'Yes' && (
+                            <div className="fi" style={{ marginTop: -4, marginBottom: 10 }}>
+                              <input value={detailsByQ[q.id] || ''} onChange={(e) => setDetail(q.id, e.target.value)} placeholder="Add details (optional)" disabled={questionDisabled} />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </React.Fragment>
           )
         })}
 
-        <div className="actions" style={{ marginTop: 16 }}>
-          <button className="btn" disabled={submitting}>
+        {hasEmergencyAnswer ? (
+          <div className="notice n-danger" style={{ marginTop: 16 }}>
+            <i className="ti ti-alert-triangle" aria-hidden="true" />
+            This checklist can&apos;t be submitted while an emergency symptom is reported. Please dial 999.
+          </div>
+        ) : !locked && (
+          <button className="bp btn-block" style={{ marginTop: 16 }} disabled={submitting}>
             {submitting ? (isEdit ? 'Updating…' : 'Submitting…') : (isEdit ? 'Update & Continue' : 'Submit & Continue')}
           </button>
-        </div>
+        )}
       </form>
-    </section>
+
+      {hasEmergencyAnswer && !emergencyModalDismissed && (
+        <Modal
+          title="Medical Emergency"
+          onClose={() => setEmergencyModalDismissed(true)}
+          footer={(
+            <>
+              <button type="button" className="bs" onClick={() => setEmergencyModalDismissed(true)}>Close</button>
+              <a className="bd" href="tel:999">Call 999 Now</a>
+            </>
+          )}
+        >
+          <p style={{ fontSize: 13 }}>
+            You are experiencing emergency symptoms. Please dial 999 immediately.
+          </p>
+        </Modal>
+      )}
+    </>
   )
 }

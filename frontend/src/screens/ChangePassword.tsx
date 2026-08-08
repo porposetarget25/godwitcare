@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { forgotPassword, resetPassword, verifyForgotPasswordOtp } from '../api';
 import { useAuth } from '../state/auth';
 
@@ -48,28 +48,39 @@ export default function ChangePassword() {
   }
 
   return (
-    <section className="section auth">
-      <div className="auth-card">
-        <h1 className="auth-title">Change Password</h1>
-        <p className="help">We will send an OTP to your registered WhatsApp number.</p>
-        <button type="button" className="btn block" onClick={sendOtp}>Send OTP to WhatsApp</button>
-
-        <form className="auth-form" onSubmit={verifyOtp}>
-          <div className="field">
-            <label>Enter OTP</label>
-            <input value={otp} onChange={e => setOtp(e.target.value)} required />
-          </div>
-          <button className="btn block" type="submit">Verify OTP</button>
-        </form>
-
-        <form className="auth-form" onSubmit={submitPassword}>
-          <div className="field"><label>New Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required /></div>
-          <div className="field"><label>Confirm Password</label><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required /></div>
-          <button className="btn block" type="submit">Update Password</button>
-        </form>
-        {!!msg && <p className="help">{msg}</p>}
-        {!!error && <p className="help" style={{ color: '#b91c1c' }}>{error}</p>}
+    <>
+      <div className="page-head">
+        <div className="page-title">Change Password</div>
+        <Link to="/profile" className="bs">‹ Profile</Link>
       </div>
-    </section>
+
+      {!!msg && <div className="notice n-info"><i className="ti ti-circle-check" aria-hidden="true" />{msg}</div>}
+      {!!error && <div className="notice n-warn"><i className="ti ti-alert-triangle" aria-hidden="true" />{error}</div>}
+
+      <div className="card">
+        <div className="ct">Step 1 — Verify it&apos;s you</div>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>We will send an OTP to your registered WhatsApp number.</p>
+        <button type="button" className="bp" onClick={sendOtp}>Send OTP to WhatsApp</button>
+
+        <form onSubmit={verifyOtp} style={{ marginTop: 14 }}>
+          <div className="fi">
+            <label className="fl2">Enter OTP</label>
+            <input className="otp-input" value={otp} onChange={e => setOtp(e.target.value)} required />
+          </div>
+          <button className="bs" type="submit">Verify OTP</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="ct">Step 2 — Set a new password</div>
+        <form onSubmit={submitPassword}>
+          <div className="g2">
+            <div className="fi"><label className="fl2">New Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required /></div>
+            <div className="fi"><label className="fl2">Confirm Password</label><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required /></div>
+          </div>
+          <button className="bp btn-block" type="submit">Update Password</button>
+        </form>
+      </div>
+    </>
   );
 }

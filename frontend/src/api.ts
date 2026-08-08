@@ -214,6 +214,20 @@ export type ConsultationSummary = {
 }
 
 export type ConsultationDetails = ConsultationSummary & {
+  patientId?: string
+  patient?: { email?: string; firstName?: string; dob?: string }
+  currentLocation?: string
+  contactName?: string
+  contactPhone?: string
+  contactAddress?: string
+  historyOfPresentingComplaint?: string
+  diagnosis?: string
+  recommendations?: string
+  prescriptionRequired?: boolean
+  answers?: Record<string, 'Yes' | 'No'>
+  detailsByQuestion?: Record<string, string>
+  appointmentStatus?: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+  appointmentNoShowNote?: string | null
   patientContact?: PatientContact
   questionnaire?: Record<string, 'Yes' | 'No'>
   notes?: string
@@ -466,9 +480,10 @@ export async function updateRegistrationById(id: number, payload: RegistrationAp
 
 export async function downloadDocumentBlob(
   registrationId: number,
+  patientId: string,
   docId: number
 ): Promise<Blob> {
-  const url = `${API_BASE}/registrations/${registrationId}/documents/${docId}`
+  const url = `${API_BASE}/registrations/${registrationId}/patients/${encodeURIComponent(patientId)}/documents/${docId}/download`
   const res = await authFetch(url, { method: 'GET' })
   if (!res.ok) throw new Error('Failed to download document')
   return res.blob()
@@ -683,6 +698,17 @@ export function resolveApiUrl(base: string, path: string) {
       : cleanPath;
 
   return `${cleanBase}/${effectivePath}`;
+}
+
+// Prescription (and other protected file) endpoints require the Authorization: Bearer
+// header, which a plain <a href> navigation never sends. Fetch it authenticated and
+// open the resulting blob instead.
+export async function openAuthenticatedFile(url: string): Promise<void> {
+  const r = await authFetch(url, {});
+  if (!r.ok) throw new Error(`Unable to open file (HTTP ${r.status}).`);
+  const blob = await r.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, '_blank', 'noopener,noreferrer');
 }
 
 // api.ts
