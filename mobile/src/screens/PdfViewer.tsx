@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams } from 'expo-router';
 import { PageHeader } from '../components/PageHeader';
 import { colors, typography, spacing } from '../theme';
+import { authFetch } from '../api';
 
 function ShareIcon() {
   return (
@@ -47,8 +48,8 @@ export default function PdfViewer() {
   async function fetchAndSave(remoteUrl: string): Promise<string> {
     const localPath = getLocalPath();
 
-    // Fetch with session credentials — this is critical for authenticated PDFs
-    const res = await fetch(remoteUrl, { credentials: 'include' });
+    // Fetch with the Bearer auth token — this is critical for authenticated PDFs
+    const res = await authFetch(remoteUrl);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
 
     // Convert response to base64 via FileReader

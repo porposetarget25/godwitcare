@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL, authFetch } from '../api';
 import { Btn, Card, Muted, Strong, LoadingView } from '../components/UI';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
@@ -28,7 +28,7 @@ export default function DoctorConsultations() {
     setLoading(true);
     try {
       const q = which === 'ALL' ? '' : `?status=${which}`;
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations${q}`, { credentials: 'include' });
+      const res = await authFetch(`${API_BASE_URL}/doctor/consultations${q}`);
       const j = await res.json();
       setItems(Array.isArray(j) ? j : []);
     } catch {

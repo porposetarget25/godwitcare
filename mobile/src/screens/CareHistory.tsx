@@ -6,7 +6,7 @@ import {
   Modal, FlatList,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL, authFetch } from '../api';
 import { useAuth } from '../state/auth';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
@@ -22,6 +22,8 @@ type Item = {
   diagnosis?: string;
   medicines?: string;
   recommendations?: string;
+  pdfUrl?: string;          // this item's own prescription
+  referralPdfUrl?: string;  // this item's own referral letter
 };
 type Payload = {
   patient: {
@@ -145,6 +147,23 @@ function ConsultCard({ item, index }: { item: Item; index: number }) {
               ))}
             </View>
           )}
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {item.pdfUrl && (
+                <TouchableOpacity style={s.itemActionBtn} onPress={() => openPdf(item.pdfUrl!, 'Prescription')} activeOpacity={0.75}>
+                  <Text style={s.itemActionBtnText}>View Prescription</Text>
+                </TouchableOpacity>
+              )}
+              {item.referralPdfUrl ? (
+                <TouchableOpacity style={s.itemActionBtn} onPress={() => openPdf(item.referralPdfUrl!, 'Referral Letter')} activeOpacity={0.75}>
+                  <Text style={s.itemActionBtnText}>View Referral Letter</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[s.itemActionBtn, { opacity: 0.5 }]}>
+                  <Text style={s.itemActionBtnText}>Referral Letter Not Generated</Text>
+                </View>
+              )}
+          </View>
         </View>
       )}
     </View>
@@ -211,11 +230,12 @@ export default function CareHistory() {
   const [showSheet, setShowSheet] = useState(false);
 
   useEffect(() => {
-    if (!user?.email) return;
+    const email = user?.email;
+    if (!email) return;
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(user.email)}`, { credentials: 'include' });
+        const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(email)}`);
         if (!alive) return;
         if (res.ok) {
           const json = await res.json();
@@ -268,14 +288,14 @@ export default function CareHistory() {
         if (patientId)  qp.set('patientId',  patientId);
         const qs = qp.toString() ? `?${qp.toString()}` : '';
 
-        const r = await fetch(`${API_BASE_URL}/care-history/mine${qs}`, { credentials: 'include' });
+        const r = await authFetch(`${API_BASE_URL}/care-history/mine${qs}`);
         if (!ignore) {
           if      (r.status === 204) setData(null);
           else if (r.ok)             setData(await r.json());
           else                       setErr(`Failed to load (HTTP ${r.status})`);
         }
 
-        const r2 = await fetch(`${API_BASE_URL}/prescriptions/latest${qs}`, { credentials: 'include' });
+        const r2 = await authFetch(`${API_BASE_URL}/prescriptions/latest${qs}`);
         if (!ignore && r2.ok && r2.status !== 204) {
           const j = await r2.json().catch(() => null);
           setRxUrl(j?.pdfUrl ?? null);
@@ -431,4 +451,7 @@ const s = StyleSheet.create({
   sectionValue: { fontSize: typography.base, color: colors.text, lineHeight: 22 },
   medRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: 2 },
   medDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand, marginTop: 7 },
+
+  itemActionBtn:     { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  itemActionBtnText: { color: colors.text, fontWeight: '600', fontSize: typography.xs },
 });

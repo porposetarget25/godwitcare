@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput, Linking, Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { API_BASE_URL, resolveApiUrl } from '../api';
+import { API_BASE_URL, resolveApiUrl, authFetch } from '../api';
 import { Btn, Card, Muted, Strong, LoadingView, ErrorBanner } from '../components/UI';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
@@ -31,7 +31,7 @@ export default function ReferralLetter() {
       setLoading(true);
       setErr(null);
       try {
-        const res = await fetch(`${API_BASE_URL}/doctor/consultations/${Number(id)}`, { credentials: 'include' });
+        const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${Number(id)}`);
         if (!res.ok) throw new Error(`Failed (${res.status}).`);
         const data = await res.json();
         if (ignore) return;
@@ -70,10 +70,9 @@ Referring Practitioner`
   async function onGeneratePdf() {
     if (!c?.id) return;
     try {
-      const createRes = await fetch(`${API_BASE_URL}/doctor/consultations/${c.id}/referrals`, {
+      const createRes = await authFetch(`${API_BASE_URL}/doctor/consultations/${c.id}/referrals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ paragraph: body }),
       });
       if (!createRes.ok) throw new Error(`Failed (${createRes.status})`);

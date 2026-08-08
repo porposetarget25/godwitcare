@@ -7,7 +7,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../state/auth';
-import { updateMe, uploadProfilePhoto, deleteProfilePhoto, API_BASE_URL } from '../api';
+import { updateMe, uploadProfilePhoto, deleteProfilePhoto, API_BASE_URL, authFetch } from '../api';
 import { PageHeader } from '../components/PageHeader';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -106,7 +106,7 @@ export default function Account() {
   async function loadPhoto() {
     setPhotoLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/users/me/photo`, { credentials: 'include' });
+      const res = await authFetch(`${API_BASE_URL}/users/me/photo`);
       if (!res.ok) { setPhotoB64(null); return; }
       const blob = await res.blob();
       const reader = new FileReader();
