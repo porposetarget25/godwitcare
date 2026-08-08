@@ -14,6 +14,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByDoctorIdAndStartTimeBetweenOrderByStartTimeAsc(Long doctorId, Instant from, Instant to);
     List<Appointment> findByDoctorIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(Long doctorId, Instant from);
     List<Appointment> findByPatientIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(Long patientId, Instant from);
+    Optional<Appointment> findTopByConsultationIdOrderByIdDesc(Long consultationId);
     boolean existsByConsultationIdAndStatusNot(Long consultationId, Appointment.Status status);
     void deleteByConsultationUserId(Long userId);
     void deleteByPatientId(Long patientId);

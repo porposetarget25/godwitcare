@@ -1,0 +1,1 @@
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;

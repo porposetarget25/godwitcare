@@ -120,6 +120,7 @@ public class SecurityConfig {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:5173",                      // local dev
+                "http://localhost:5174",                      // local dev (fallback port when 5173 is busy)
                 "https://porposetarget25.github.io",          // GitHub Pages root
                 "https://porposetarget25.github.io/godwitcare"// project subpath (safe to keep)
         ));

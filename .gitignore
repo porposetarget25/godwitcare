@@ -29,3 +29,6 @@ out/
 npm-debug.log*
 yarn-error.log*
 pnpm-lock.yaml
+
+# Runtime-uploaded files
+backend/uploads/
