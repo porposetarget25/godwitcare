@@ -21,7 +21,7 @@ const PatientCtx = createContext<PatientState>({
   patients: [], activePatient: null, loading: true, selectPatient: () => {}, queryString: '',
 })
 
-const PATIENT_ROUTES = ['/home', '/care-history', '/consultation']
+const PATIENT_ROUTES = ['/home', '/care-history', '/consultation', '/documents', '/prescription', '/referral']
 
 export function usePatient() {
   return useContext(PatientCtx)
@@ -98,7 +98,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     next.set('patientId', activePatient.patientId)
     if (activePatient.id !== 'PRIMARY') next.set('travelerId', activePatient.id)
     if (next.toString() !== current.toString()) {
-      navigate({ pathname: location.pathname, search: `?${next}`, hash: location.hash }, { replace: true })
+      navigate({ pathname: location.pathname, search: `?${next}`, hash: location.hash }, { replace: true, state: location.state })
     }
   }, [activePatient, location.hash, location.pathname, location.search, navigate, patientRoute, storageKey])
 

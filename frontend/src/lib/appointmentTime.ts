@@ -31,6 +31,18 @@ export function clinicDateTime(value: string | Date) {
   }).format(typeof value === 'string' ? new Date(value) : value)
 }
 
+export function clinicDateTime12(value: string | Date) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: CLINIC_TIME_ZONE,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(typeof value === 'string' ? new Date(value) : value)
+}
+
 export function clinicTodayLabel(value: Date = new Date()) {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: CLINIC_TIME_ZONE,

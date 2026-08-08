@@ -1,326 +1,603 @@
-// src/screens/ConsultationTracker.tsx — widget-style flow
-import React, { useEffect, useMemo, useState } from 'react';
+// src/screens/ConsultationTracker.tsx
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Linking, TextInput, Modal,
+  Linking, Modal, ActivityIndicator,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { API_BASE_URL, getMe } from '../api';
+import { API_BASE_URL, authFetch } from '../api';
+import { clinicDateTime, clinicTime } from '../lib/appointmentTime';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { openPdf } from '../utils/openPdf';
 
-const WA_NUMBER = '447783579014';
+type Slot = { startTime: string; endTime: string; label: string; available: boolean };
+type AvailabilityDay = { date: string; slots: Slot[] };
+type Appointment = { id: number; consultationId: number; status?: string; startTime: string; endTime: string };
 
-// ── Step status types ─────────────────────────────────────────────────────────
-type StepStatus = 'done' | 'active' | 'upcoming';
+function dayShort(dateKey: string) {
+  const d = new Date(`${dateKey}T00:00:00`);
+  return {
+    dow: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+    dnum: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+  };
+}
 
-const STEPS = [
-  { id: 1, icon: '📋', label: 'Pre-Consultation',     sub: 'Complete health checklist' },
-  { id: 2, icon: '📲', label: 'Notify Clinician',     sub: 'Alert via WhatsApp'        },
-  { id: 3, icon: '📞', label: 'Clinician Call',       sub: 'Receive WhatsApp call'     },
-  { id: 4, icon: '💊', label: 'Prescription',         sub: 'Digital prescription'      },
-  { id: 5, icon: '🗺️', label: 'Locate Pharmacy',     sub: 'Find nearby pharmacy'      },
-];
-
-// ── Contact-preference modal ──────────────────────────────────────────────────
-function ContactModal({ visible, onClose, onConfirm }: {
-  visible: boolean;
-  onClose: () => void;
-  onConfirm: (choice: 'SAME' | 'DIFFERENT', alt: string) => void;
+// ── Simple centered confirm/info modal ─────────────────────────────────────────
+function ConfirmModal({ visible, title, body, onClose, danger, confirmLabel, onConfirm, confirming }: {
+  visible: boolean; title: string; body: string; onClose: () => void;
+  danger?: boolean; confirmLabel?: string; onConfirm?: () => void; confirming?: boolean;
 }) {
-  const [choice, setChoice] = useState<'SAME' | 'DIFFERENT'>('SAME');
-  const [alt,    setAlt   ] = useState('');
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={cm.overlay} activeOpacity={1} onPress={onClose} />
-      <View style={cm.sheet}>
-        <View style={cm.handle} />
-        <Text style={cm.title}>Contact Preference</Text>
-        <Text style={cm.sub}>How should the clinician reach you?</Text>
-
-        {(['SAME', 'DIFFERENT'] as const).map(opt => (
-          <TouchableOpacity
-            key={opt}
-            style={[cm.option, choice === opt && cm.optionActive]}
-            onPress={() => setChoice(opt)}
-            activeOpacity={0.75}
-          >
-            <View style={[cm.radio, choice === opt && cm.radioActive]}>
-              {choice === opt && <View style={cm.radioDot} />}
-            </View>
-            <Text style={[cm.optLabel, choice === opt && cm.optLabelActive]}>
-              {opt === 'SAME' ? 'Same WhatsApp number' : 'Different number'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-
-        {choice === 'DIFFERENT' && (
-          <View style={cm.altWrap}>
-            <TextInput
-              style={cm.altInput}
-              value={alt}
-              onChangeText={setAlt}
-              placeholder="+44 7xxx xxxxxx"
-              placeholderTextColor={colors.mutedLight}
-              keyboardType="phone-pad"
-            />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={cx.overlay} activeOpacity={1} onPress={onClose} />
+      <View style={cx.centerWrap} pointerEvents="box-none">
+        <View style={cx.box}>
+          <Text style={cx.title}>{title}</Text>
+          <Text style={cx.body}>{body}</Text>
+          <View style={cx.actions}>
+            <TouchableOpacity style={cx.closeBtn} onPress={onClose} activeOpacity={0.75}>
+              <Text style={cx.closeBtnText}>{onConfirm ? 'Keep Appointment' : 'Close'}</Text>
+            </TouchableOpacity>
+            {onConfirm && (
+              <TouchableOpacity
+                style={[cx.confirmBtn, danger && cx.confirmBtnDanger]}
+                onPress={onConfirm}
+                disabled={confirming}
+                activeOpacity={0.85}
+              >
+                {confirming
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={cx.confirmBtnText}>{confirmLabel || 'Confirm'}</Text>
+                }
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-
-        <View style={cm.btnRow}>
-          <TouchableOpacity style={cm.cancelBtn} onPress={onClose} activeOpacity={0.75}>
-            <Text style={cm.cancelTxt}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[cm.confirmBtn, choice === 'DIFFERENT' && !alt.trim() && cm.confirmDisabled]}
-            onPress={() => {
-              if (choice === 'DIFFERENT' && !alt.trim()) return;
-              onConfirm(choice, alt);
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={cm.confirmTxt}>Open WhatsApp</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-export default function ConsultationTracker() {
-  const router   = useRouter();
-  const params   = useLocalSearchParams<{ travelerId?: string; logged?: string }>();
-  const travelerId = params.travelerId || null;
+// ── Appointment booking widget (Step 2) ─────────────────────────────────────────
+function AppointmentBooking({ consultationId, consultationActive, patientId, onBookingChange }: {
+  consultationId: number; consultationActive: boolean; patientId: string;
+  onBookingChange: (a: Appointment | null) => void;
+}) {
+  const [days, setDays] = useState<AvailabilityDay[]>([]);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [bookedAppointment, setBookedAppointment] = useState<Appointment | null>(null);
+  const [historicalAppointment, setHistoricalAppointment] = useState<Appointment | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState<{ startTime: string; endTime: string } | null>(null);
 
-  const [latestCid,    setLatestCid   ] = useState<number | null>(null);
-  const [latestStatus, setLatestStatus] = useState<string | null>(null);
-  const [patientName,  setPatientName ] = useState('N/A');
-  const [dob,          setDob         ] = useState('N/A');
-  const [mobile,       setMobile      ] = useState('N/A');
-  const [address,      setAddress     ] = useState('N/A');
-  const [rxUrl,        setRxUrl       ] = useState<string | null>(null);
-  const [showContact,  setShowContact ] = useState(false);
-  const [findingPharm, setFindingPharm] = useState(false);
+  const loadBookedAppointment = useCallback(async () => {
+    const res = await authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' });
+    const items: unknown[] = res.ok ? await res.json().catch(() => []) : [];
+    const mine = (Array.isArray(items) ? items : []).filter(
+      (a: any) => a.consultationId === consultationId
+    ) as Appointment[];
+    const next = mine.find(a => a.status === 'SCHEDULED') ?? null;
+    setBookedAppointment(next);
+    setHistoricalAppointment(mine.sort((a, b) => b.id - a.id)[0] ?? null);
+    onBookingChange(next);
+    return next;
+  }, [consultationId, onBookingChange]);
+
+  useEffect(() => { loadBookedAppointment().catch(() => undefined); }, [loadBookedAppointment]);
+
+  const loadAvailability = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await authFetch(`${API_BASE_URL}/appointments/availability`, { cache: 'no-store' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.');
+      const nextDays: AvailabilityDay[] = Array.isArray(data?.days) ? data.days : [];
+      setDays(nextDays);
+      const firstWithSlots = nextDays.find(d => d.slots.some(s => s.available));
+      setSelectedDate((firstWithSlots ?? nextDays[0])?.date ?? '');
+      setSelectedSlot('');
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load appointment slots.');
+      setDays([]); setSelectedDate(''); setSelectedSlot('');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (consultationActive) loadAvailability(); }, [loadAvailability, consultationActive]);
+
+  const selectedDay = useMemo(() => days.find(d => d.date === selectedDate) ?? null, [days, selectedDate]);
+  // `label` is already clinic-local (Europe/London) time — deriving the hour from
+  // `startTime` via Date.getHours() would use the *device's* local timezone instead.
+  const morningSlots = useMemo(() => selectedDay?.slots.filter(s => Number(s.label.split(':')[0]) < 12) ?? [], [selectedDay]);
+  const afternoonSlots = useMemo(() => selectedDay?.slots.filter(s => Number(s.label.split(':')[0]) >= 12) ?? [], [selectedDay]);
+
+  async function confirmBooking() {
+    if (!selectedSlot) return;
+    setBooking(true); setError(null); setMessage(null);
+    try {
+      const res = await authFetch(
+        rescheduling ? `${API_BASE_URL}/appointments/${bookedAppointment!.id}/reschedule` : `${API_BASE_URL}/appointments`,
+        {
+          method: rescheduling ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ consultationId, startTime: selectedSlot, patientId }),
+        }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || 'Unable to book that slot.');
+      await loadBookedAppointment().catch(() => undefined);
+      setRescheduling(false);
+      setSelectedSlot('');
+      setConfirmedBooking({ startTime: data.startTime, endTime: data.endTime });
+      await loadAvailability();
+    } catch (e: any) {
+      setError(e?.message || 'Unable to book that slot.');
+    } finally {
+      setBooking(false);
+    }
+  }
+
+  async function cancelAppointment() {
+    if (!bookedAppointment) return;
+    setChanging(true); setError(null);
+    try {
+      const res = await authFetch(`${API_BASE_URL}/appointments/${bookedAppointment.id}/cancel`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || 'Unable to cancel this appointment.');
+      setBookedAppointment(null);
+      onBookingChange(null);
+      setRescheduling(false);
+      setShowCancelModal(false);
+      setMessage('Appointment cancelled. The reserved slot is available again.');
+      await loadAvailability();
+    } catch (e: any) {
+      setError(e?.message || 'Unable to cancel this appointment.');
+    } finally {
+      setChanging(false);
+    }
+  }
+
+  const canChangeAppointment = !!bookedAppointment && bookedAppointment.status === 'SCHEDULED'
+    && consultationActive && new Date(bookedAppointment.startTime).getTime() > Date.now();
+  const showBookingFlow = consultationActive && (!bookedAppointment || rescheduling);
+
+  const historicalStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'COMPLETED': return 'Completed';
+      case 'CANCELLED': return 'Cancelled';
+      case 'NO_SHOW':   return 'No-show';
+      case 'SCHEDULED': return 'Scheduled';
+      default:          return status || 'Recorded';
+    }
+  };
+
+  return (
+    <View style={{ gap: spacing.md }}>
+      {bookedAppointment && !rescheduling && (
+        <View style={ab.infoNotice}>
+          <Text style={ab.infoNoticeTitle}>Upcoming Appointment</Text>
+          <Text style={ab.infoNoticeBody}>{clinicDateTime(bookedAppointment.startTime)} – {clinicTime(bookedAppointment.endTime)}</Text>
+          <Text style={ab.infoNoticeHint}>We'll remind you over WhatsApp before your appointment.</Text>
+        </View>
+      )}
+
+      {bookedAppointment && !rescheduling && canChangeAppointment && (
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <TouchableOpacity
+            style={ab.secondaryBtn}
+            onPress={() => { setRescheduling(true); setMessage(null); loadAvailability(); }}
+            disabled={changing}
+            activeOpacity={0.75}
+          >
+            <Text style={ab.secondaryBtnText}>↻ Reschedule</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={ab.dangerBtn}
+            onPress={() => setShowCancelModal(true)}
+            disabled={changing}
+            activeOpacity={0.75}
+          >
+            <Text style={ab.dangerBtnText}>✕ Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {rescheduling && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontWeight: '700', fontSize: typography.sm, color: colors.text }}>Choose a replacement appointment</Text>
+          <TouchableOpacity onPress={() => { setRescheduling(false); setSelectedSlot(''); }}>
+            <Text style={{ color: colors.brand, fontWeight: '600', fontSize: typography.sm }}>Keep Original</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {showBookingFlow && (
+        <>
+          {loading && <Text style={ab.hint}>Loading available slots…</Text>}
+          {error && <View style={ab.warnNotice}><Text style={ab.warnNoticeText}>{error}</Text></View>}
+          {message && <View style={ab.infoNoticeSm}><Text style={ab.infoNoticeSmText}>{message}</Text></View>}
+
+          <Text style={ab.hint}>Choose a future appointment slot. You'll be connected with the next available doctor.</Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+            {days.map(day => {
+              const { dow, dnum } = dayShort(day.date);
+              const availableCount = day.slots.filter(s => s.available).length;
+              const active = selectedDate === day.date;
+              return (
+                <TouchableOpacity
+                  key={day.date}
+                  style={[ab.datePill, active && ab.datePillActive]}
+                  onPress={() => { setSelectedDate(day.date); setSelectedSlot(''); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[ab.datePillDow, active && ab.datePillTextActive]}>{dow}</Text>
+                  <Text style={[ab.datePillNum, active && ab.datePillTextActive]}>{dnum}</Text>
+                  <Text style={[ab.datePillCount, active && ab.datePillTextActive]}>{availableCount > 0 ? `${availableCount} slots` : 'Full'}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {selectedDay && selectedDay.slots.length === 0 && (
+            <View style={ab.warnNotice}><Text style={ab.warnNoticeText}>No doctors are available on this date.</Text></View>
+          )}
+
+          {selectedDay && selectedDay.slots.length > 0 && (
+            <>
+              {morningSlots.length > 0 && (
+                <>
+                  <Text style={ab.sessionLabel}>Morning</Text>
+                  <View style={ab.slotGrid}>
+                    {morningSlots.map(slot => (
+                      <TouchableOpacity
+                        key={slot.startTime}
+                        disabled={!slot.available}
+                        style={[ab.slotChip, !slot.available && ab.slotChipDisabled, selectedSlot === slot.startTime && ab.slotChipActive]}
+                        onPress={() => setSelectedSlot(slot.startTime)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[ab.slotChipText, !slot.available && ab.slotChipTextDisabled, selectedSlot === slot.startTime && ab.slotChipTextActive]}>{slot.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+              {afternoonSlots.length > 0 && (
+                <>
+                  <Text style={ab.sessionLabel}>Afternoon</Text>
+                  <View style={ab.slotGrid}>
+                    {afternoonSlots.map(slot => (
+                      <TouchableOpacity
+                        key={slot.startTime}
+                        disabled={!slot.available}
+                        style={[ab.slotChip, !slot.available && ab.slotChipDisabled, selectedSlot === slot.startTime && ab.slotChipActive]}
+                        onPress={() => setSelectedSlot(slot.startTime)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[ab.slotChipText, !slot.available && ab.slotChipTextDisabled, selectedSlot === slot.startTime && ab.slotChipTextActive]}>{slot.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+            </>
+          )}
+
+          <TouchableOpacity
+            style={[ab.confirmBtn, (!selectedSlot || booking || !consultationActive) && { opacity: 0.5 }]}
+            disabled={!selectedSlot || booking || !consultationActive}
+            onPress={confirmBooking}
+            activeOpacity={0.85}
+          >
+            {booking
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={ab.confirmBtnText}>
+                  {!consultationActive ? 'Consultation expired' : rescheduling ? 'Confirm Reschedule' : 'Confirm Appointment'}
+                </Text>
+            }
+          </TouchableOpacity>
+        </>
+      )}
+
+      {!consultationActive && !bookedAppointment && (
+        historicalAppointment ? (
+          <View style={historicalAppointment.status === 'CANCELLED' || historicalAppointment.status === 'NO_SHOW' ? ab.warnNotice : ab.infoNoticeSm}>
+            <Text style={historicalAppointment.status === 'CANCELLED' || historicalAppointment.status === 'NO_SHOW' ? ab.warnNoticeText : ab.infoNoticeSmText}>
+              Appointment {historicalStatusLabel(historicalAppointment.status)} — {clinicDateTime(historicalAppointment.startTime)}
+            </Text>
+          </View>
+        ) : (
+          <Text style={ab.hint}>No appointment was booked for this consultation.</Text>
+        )
+      )}
+
+      <ConfirmModal
+        visible={showCancelModal && !!bookedAppointment}
+        title="Cancel Appointment"
+        body={bookedAppointment ? `Are you sure you want to cancel your appointment on ${clinicDateTime(bookedAppointment.startTime)}? This slot will be released back to other patients.` : ''}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={cancelAppointment}
+        confirming={changing}
+        confirmLabel="Cancel Appointment"
+        danger
+      />
+
+      <ConfirmModal
+        visible={!!confirmedBooking}
+        title="Appointment Confirmed"
+        body={confirmedBooking ? `Your appointment is booked for ${clinicDateTime(confirmedBooking.startTime)} – ${clinicTime(confirmedBooking.endTime)}. We'll remind you over WhatsApp before your appointment.` : ''}
+        onClose={() => setConfirmedBooking(null)}
+      />
+    </View>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+export default function ConsultationTracker() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ travelerId?: string; cid?: string }>();
+  const travelerId = params.travelerId || null;
+  const viewCid = params.cid || null;
+
+  const [latestCid,     setLatestCid    ] = useState<number | null>(null);
+  const [latestStatus,  setLatestStatus ] = useState<string | null>(null);
+  const [latestActive,  setLatestActive ] = useState(false);
+  const [completedAt,   setCompletedAt  ] = useState<string | null>(null);
+  const [patientId,     setPatientId    ] = useState<string>('');
+  const [loading,       setLoading      ] = useState(true);
+  const [appointmentBooked, setAppointmentBooked] = useState(false);
+
+  const [summary, setSummary] = useState<{
+    presentingComplaint?: string; diagnosis?: string; recommendations?: string; medicines?: string;
+  } | null>(null);
+
+  const [rxUrl,          setRxUrl         ] = useState<string | null>(null);
+  const [findingPharm,   setFindingPharm  ] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     (async () => {
       try {
-        const me = await getMe().catch(() => null);
+        const qp = new URLSearchParams();
+        if (travelerId) qp.set('travelerId', travelerId);
+        if (viewCid) qp.set('cid', viewCid);
+        const res = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${qp.toString()}`, { cache: 'no-store' });
         if (!alive) return;
-        if (me) {
-          const n = [me.firstName, me.lastName].filter(Boolean).join(' ');
-          if (n) setPatientName(n);
+        if (res.status === 204 || !res.ok) {
+          setLatestCid(null); setLatestStatus(null); setLatestActive(false); setCompletedAt(null);
+          return;
         }
-        const travQs = travelerId ? `?travelerId=${travelerId}` : '';
-        const res = await fetch(`${API_BASE_URL}/consultations/mine/latest${travQs}`, { credentials: 'include', cache: 'no-store' });
-        if (!alive || res.status === 204 || !res.ok) return;
         const j = await res.json();
         setLatestCid(typeof j?.id === 'number' ? j.id : null);
         setLatestStatus(typeof j?.status === 'string' ? j.status : null);
-        if (j?.patientName)              setPatientName(j.patientName);
-        if (j?.contactPhone || j?.mobile) setMobile(j.contactPhone || j.mobile);
-        if (j?.contactAddress || j?.address) setAddress(j.contactAddress || j.address);
-        if (j?.dob)                       setDob(j.dob);
-      } catch {}
-    })();
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/prescriptions/latest${travelerId ? `?travelerId=${travelerId}` : ''}`, { credentials: 'include', cache: 'no-store' });
-        if (res.status === 204 || !res.ok) return;
-        const j = await res.json().catch(() => null);
-        if (j?.pdfUrl) setRxUrl(j.pdfUrl);
-      } catch {}
+        setLatestActive(j?.active === true);
+        setCompletedAt(typeof j?.completedAt === 'string' ? j.completedAt : null);
+        setPatientId(typeof j?.patientId === 'string' ? j.patientId : '');
+      } finally {
+        if (alive) setLoading(false);
+      }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [travelerId, viewCid]);
 
-  const isStep1Done        = !!latestCid;
-  const hasRxOrCompleted   = !!rxUrl || latestStatus === 'COMPLETED';
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const qp = new URLSearchParams();
+        if (travelerId) qp.set('travelerId', travelerId);
+        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${qp.toString()}`, { cache: 'no-store' });
+        if (ignore) return;
+        if (res.status === 204 || !res.ok) { setRxUrl(null); return; }
+        const j = await res.json().catch(() => null);
+        const matches = !viewCid || String(j?.consultationId) === viewCid;
+        setRxUrl(j?.pdfUrl && matches ? j.pdfUrl : null);
+      } catch { if (!ignore) setRxUrl(null); }
+    })();
+    return () => { ignore = true; };
+  }, [travelerId, viewCid]);
 
-  function getStatus(id: number): StepStatus {
-    if (id === 1) return isStep1Done ? 'done' : 'active';
-    if (id === 2) return isStep1Done ? 'active' : 'upcoming';
-    if (id === 3) return 'upcoming';
-    if (id === 4) return hasRxOrCompleted ? 'active' : 'upcoming';
-    if (id === 5) return hasRxOrCompleted ? 'active' : 'upcoming';
-    return 'upcoming';
+  useEffect(() => {
+    if (latestStatus !== 'COMPLETED' || !latestCid) { setSummary(null); return; }
+    let ignore = false;
+    (async () => {
+      try {
+        const qp = new URLSearchParams();
+        if (travelerId) qp.set('travelerId', travelerId);
+        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${qp.toString()}`, { cache: 'no-store' });
+        if (ignore) return;
+        if (res.status === 204 || !res.ok) { setSummary(null); return; }
+        const j = await res.json().catch(() => null);
+        const items: any[] = Array.isArray(j?.items) ? j.items : [];
+        const match = items.find(it => it.consultationId === latestCid);
+        setSummary(match ? {
+          presentingComplaint: match.presentingComplaint,
+          diagnosis: match.diagnosis,
+          recommendations: match.recommendations,
+          medicines: match.medicines,
+        } : null);
+      } catch { if (!ignore) setSummary(null); }
+    })();
+    return () => { ignore = true; };
+  }, [travelerId, latestStatus, latestCid]);
+
+  async function openPrescription() {
+    if (!rxUrl) return;
+    openPdf(rxUrl, 'Prescription');
   }
 
-  // Build WhatsApp URL
-  function buildWaHref(choice: 'SAME' | 'DIFFERENT', alt: string) {
-    const contactLine = choice === 'SAME'
-      ? 'Please contact me on the same number from which I am messaging.'
-      : `Please contact me on the number ${alt}.`;
-    const msg = `Hi, This is the patient ${patientName}, I have logged a consultation call with GodwitCare, ` +
-      `my details are Address: ${address}, DOB: ${dob}, Mobile: ${mobile}. ` +
-      `Consultation ID: ${latestCid ?? 'N/A'}. Please look into my case. ${contactLine}`;
-    return `https://api.whatsapp.com/send?phone=${WA_NUMBER}&text=${encodeURIComponent(msg)}`;
-  }
-
-  async function openPharmacy() {
+  async function openNearbyPharmacies() {
     setFindingPharm(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({});
-        Linking.openURL(`https://www.google.com/maps/search/pharmacy/@${loc.coords.latitude},${loc.coords.longitude},14z`);
-      } else {
-        Linking.openURL('https://www.google.com/maps/search/pharmacy');
-      }
-    } catch {
-      Linking.openURL('https://www.google.com/maps/search/pharmacy');
-    } finally {
-      setFindingPharm(false);
-    }
+    Linking.openURL('https://www.google.com/maps/search/pharmacy').finally(() => setFindingPharm(false));
   }
 
-  function stepAction(id: number) {
-    if (id === 1) {
-      if (isStep1Done) {
-        router.push(`/(app)/consultation/questionnaire?cid=${latestCid}${travelerId ? `&travelerId=${travelerId}` : ''}` as any);
-      } else {
-        router.push(`/(app)/consultation/questionnaire${travelerId ? `?travelerId=${travelerId}` : ''}` as any);
-      }
-    }
-    if (id === 2) setShowContact(true);
-    if (id === 4 && rxUrl) openPdf(rxUrl, 'Prescription');
-    if (id === 5) openPharmacy();
-  }
+  const hasLatestConsultation = !!latestCid;
+  const isLatestCompleted     = latestStatus === 'COMPLETED';
+  const canViewPrescription   = isLatestCompleted && !!rxUrl;
+  // Never got an appointment booked before the 48h consultation window closed.
+  const isExpiredPending = hasLatestConsultation && !latestActive && !isLatestCompleted && !appointmentBooked;
 
-  function stepActionLabel(id: number): string | null {
-    if (id === 1) return isStep1Done ? 'Edit Details' : 'Start Checklist';
-    if (id === 2) return 'Notify via WhatsApp';
-    if (id === 3) return null; // no action — passive
-    if (id === 4) return rxUrl ? 'View Prescription' : null;
-    if (id === 5) return hasRxOrCompleted ? (findingPharm ? 'Finding…' : 'Find Nearby Pharmacy') : null;
-    return null;
-  }
+  const checklistHref = () => {
+    const lockedQs = (appointmentBooked || isExpiredPending) ? '&locked=1' : '';
+    const travQs = travelerId ? `&travelerId=${travelerId}` : '';
+    return `/(app)/consultation/questionnaire?cid=${latestCid}${travQs}${lockedQs}`;
+  };
 
-  const activeStep = STEPS.find(s => getStatus(s.id) === 'active')?.id ?? 1;
-  const progressPct = ((activeStep - 1) / (STEPS.length - 1)) * 100;
+  const checklistViewHref = () => {
+    const travQs = travelerId ? `&travelerId=${travelerId}` : '';
+    return `/(app)/consultation/questionnaire?cid=${latestCid}${travQs}&locked=1`;
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1 }}>
+        <PageHeader title="Consultation" subtitle="Track your journey" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.brand} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
-      <PageHeader title="Consultation Tracker" subtitle="Track your journey" />
+      <PageHeader title="Consultation" subtitle="Track your journey" />
       <ScrollView contentContainerStyle={s.container} showsVerticalScrollIndicator={false}>
 
-        {/* ── Progress header card ── */}
-        <View style={s.progressCard}>
-          <View style={s.progressHeader}>
-            <View>
-              <Text style={s.progressTitle}>Step {activeStep} of {STEPS.length}</Text>
-              <Text style={s.progressSub}>{STEPS[activeStep - 1]?.label}</Text>
-            </View>
-            <View style={s.progressBadge}>
-              <Text style={s.progressBadgeText}>{Math.round(progressPct)}%</Text>
-            </View>
+        {!hasLatestConsultation ? (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>No active consultation</Text>
+            <Text style={s.cardBody}>Start a new consultation from the Home screen to begin the pre-consultation checklist.</Text>
+            <TouchableOpacity style={s.primaryBtn} onPress={() => router.replace('/(app)/home' as any)} activeOpacity={0.85}>
+              <Text style={s.primaryBtnText}>Go to Home</Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <>
+            {isExpiredPending && (
+              <View style={ab.warnNotice}>
+                <Text style={ab.warnNoticeText}>No appointment was booked within the consultation window, so it has expired. Start a new consultation from Home to continue.</Text>
+              </View>
+            )}
 
-          {/* Progress bar */}
-          <View style={s.progressBarBg}>
-            <View style={[s.progressBarFill, { width: `${progressPct}%` as any }]} />
-          </View>
-
-          {/* Step dots */}
-          <View style={s.dotRow}>
-            {STEPS.map((step, i) => {
-              const st = getStatus(step.id);
-              return (
-                <React.Fragment key={step.id}>
-                  <View style={[s.dot, st === 'done' && s.dotDone, st === 'active' && s.dotActive]}>
-                    {st === 'done'
-                      ? <Text style={s.dotCheck}>✓</Text>
-                      : <Text style={[s.dotNum, st === 'active' && s.dotNumActive]}>{step.id}</Text>
-                    }
-                  </View>
-                  {i < STEPS.length - 1 && (
-                    <View style={[s.dotConnector, getStatus(step.id) === 'done' && s.dotConnectorDone]} />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ── Step widgets ── */}
-        {STEPS.map(step => {
-          const st     = getStatus(step.id);
-          const action = stepActionLabel(step.id);
-          const isDone = st === 'done';
-          const isAct  = st === 'active';
-
-          return (
-            <View key={step.id} style={[s.stepCard, isAct && s.stepCardActive, isDone && s.stepCardDone]}>
-              <View style={s.stepRow}>
-                {/* Icon circle */}
-                <View style={[s.stepIconCircle, isAct && s.stepIconCircleActive, isDone && s.stepIconCircleDone]}>
-                  {isDone
-                    ? <Text style={s.stepCheckIcon}>✓</Text>
-                    : <Text style={s.stepEmoji}>{step.icon}</Text>
-                  }
+            {isLatestCompleted ? (
+              // Completed consultations collapse to a single summary card — booking is no longer relevant.
+              <View style={s.card}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={s.cardTitle}>Consultation #{latestCid}</Text>
+                  <View style={s.doneTag}><Text style={s.doneTagText}>Completed</Text></View>
                 </View>
+                <Text style={s.cardBody}>
+                  {completedAt ? `Completed on ${clinicDateTime(completedAt)}.` : 'This consultation is complete.'} View your checklist, prescription, and find a pharmacy below.
+                </Text>
 
-                {/* Text */}
-                <View style={{ flex: 1 }}>
-                  <View style={s.stepLabelRow}>
-                    <Text style={[s.stepLabel, isDone && s.stepLabelDone]}>{step.label}</Text>
-                    <View style={[s.statusPill, isDone && s.pillDone, isAct && s.pillActive]}>
-                      <Text style={[s.statusPillText, isDone && s.pillDoneText, isAct && s.pillActiveText]}>
-                        {isDone ? 'Done' : isAct ? 'In Progress' : 'Upcoming'}
-                      </Text>
-                    </View>
+                {summary && (summary.presentingComplaint || summary.diagnosis || summary.medicines || summary.recommendations) && (
+                  <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
+                    {summary.presentingComplaint && <View style={s.dr}><Text style={s.dk}>Presenting Complaint</Text><Text style={s.dv}>{summary.presentingComplaint}</Text></View>}
+                    {summary.diagnosis && <View style={s.dr}><Text style={s.dk}>Diagnosis</Text><Text style={s.dv}>{summary.diagnosis}</Text></View>}
+                    {summary.medicines && <View style={s.dr}><Text style={s.dk}>Medicines</Text><Text style={s.dv}>{summary.medicines.split(/\r?\n/).filter(Boolean).join(', ')}</Text></View>}
+                    {summary.recommendations && <View style={s.dr}><Text style={s.dk}>Recommendations</Text><Text style={s.dv}>{summary.recommendations}</Text></View>}
                   </View>
-                  <Text style={s.stepSub}>{step.sub}</Text>
+                )}
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+                  <TouchableOpacity style={s.secondaryBtn} onPress={() => router.push(checklistViewHref() as any)} activeOpacity={0.75}>
+                    <Text style={s.secondaryBtnText}>View Checklist</Text>
+                  </TouchableOpacity>
+                  {canViewPrescription ? (
+                    <TouchableOpacity style={s.primaryBtnSm} onPress={openPrescription} activeOpacity={0.85}>
+                      <Text style={s.primaryBtnSmText}>View Prescription</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[s.secondaryBtn, { opacity: 0.5 }]}><Text style={s.secondaryBtnText}>No Prescription</Text></View>
+                  )}
+                  <TouchableOpacity style={s.primaryBtnSm} onPress={openNearbyPharmacies} disabled={findingPharm} activeOpacity={0.85}>
+                    <Text style={s.primaryBtnSmText}>{findingPharm ? 'Finding…' : 'Find Nearby Pharmacies'}</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
+            ) : (
+              <>
+                {/* Step 1: Checklist */}
+                <View style={s.card}>
+                  <View style={s.stepRow}>
+                    <View style={[s.stepIcon, s.stepIconDone]}><Text style={s.stepIconCheck}>✓</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardTitle}>Pre-Consultation Checklist</Text>
+                      <Text style={s.cardBody}>Health questionnaire and consent forms completed before your session.</Text>
+                      <TouchableOpacity style={s.secondaryBtn} onPress={() => router.push(checklistHref() as any)} activeOpacity={0.75}>
+                        <Text style={s.secondaryBtnText}>{(appointmentBooked || isExpiredPending) ? 'View Checklist' : 'Edit Checklist'}</Text>
+                      </TouchableOpacity>
+                      {appointmentBooked && <Text style={s.stepHint}>Locked while your appointment is booked — cancel it to make changes.</Text>}
+                    </View>
+                  </View>
+                </View>
 
-              {/* Action button — only for active steps with an action */}
-              {isAct && action && (
-                <TouchableOpacity
-                  style={s.actionBtn}
-                  onPress={() => stepAction(step.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={s.actionBtnText}>{action}</Text>
-                </TouchableOpacity>
-              )}
+                {/* Step 2: Book an Appointment */}
+                <View style={s.card}>
+                  <View style={s.stepRow}>
+                    <View style={[s.stepIcon, appointmentBooked && s.stepIconDone]}>
+                      {appointmentBooked ? <Text style={s.stepIconCheck}>✓</Text> : <Text style={s.stepIconNum}>2</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardTitle}>Book an Appointment</Text>
+                      <Text style={s.cardBody}>Choose a future 10-minute appointment slot with an available doctor.</Text>
+                    </View>
+                  </View>
+                  {latestCid ? (
+                    <View style={{ marginTop: spacing.md }}>
+                      <AppointmentBooking
+                        consultationId={latestCid}
+                        consultationActive={latestActive}
+                        patientId={patientId}
+                        onBookingChange={a => setAppointmentBooked(!!a)}
+                      />
+                    </View>
+                  ) : null}
+                </View>
 
-              {/* Done state: secondary re-action (e.g. Edit for step 1) */}
-              {isDone && step.id === 1 && (
-                <TouchableOpacity
-                  style={s.secondaryBtn}
-                  onPress={() => router.push(`/(app)/consultation/questionnaire?cid=${latestCid}${travelerId ? `&travelerId=${travelerId}` : ''}` as any)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={s.secondaryBtnText}>Edit Details</Text>
-                </TouchableOpacity>
-              )}
-              {isDone && step.id === 4 && rxUrl && (
-                <TouchableOpacity
-                  style={s.secondaryBtn}
-                  onPress={() => openPdf(rxUrl, 'Prescription')}
-                  activeOpacity={0.75}
-                >
-                  <Text style={s.secondaryBtnText}>View Prescription</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })}
+                {/* Step 3: Prescription (upcoming) */}
+                <View style={s.card}>
+                  <View style={s.stepRow}>
+                    <View style={s.stepIcon}><Text style={s.stepIconNum}>3</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardTitle}>Prescription Issued</Text>
+                      <Text style={s.cardBody}>Your digital prescription with dosage instructions and medication details.</Text>
+                      <View style={[s.secondaryBtn, { opacity: 0.5, alignSelf: 'flex-start' }]}><Text style={s.secondaryBtnText}>Upcoming</Text></View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Step 4: Pharmacy (upcoming) */}
+                <View style={s.card}>
+                  <View style={s.stepRow}>
+                    <View style={s.stepIcon}><Text style={s.stepIconNum}>4</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cardTitle}>Locate Pharmacy</Text>
+                      <Text style={s.cardBody}>Find the nearest pharmacy to pick up your prescribed medication.</Text>
+                      <View style={[s.secondaryBtn, { opacity: 0.5, alignSelf: 'flex-start' }]}><Text style={s.secondaryBtnText}>Upcoming</Text></View>
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
-
-      <ContactModal
-        visible={showContact}
-        onClose={() => setShowContact(false)}
-        onConfirm={(choice, alt) => {
-          setShowContact(false);
-          Linking.openURL(buildWaHref(choice, alt));
-        }}
-      />
     </View>
   );
 }
@@ -329,86 +606,83 @@ export default function ConsultationTracker() {
 const s = StyleSheet.create({
   container: { padding: spacing.xl, paddingBottom: 60, backgroundColor: colors.bgGray, gap: spacing.md },
 
-  // Progress card
-  progressCard: {
-    backgroundColor: colors.brand, borderRadius: radius.xl, padding: spacing.xl,
-    gap: spacing.md, overflow: 'hidden', ...shadow.md,
-  },
-  progressHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  progressTitle:      { fontSize: typography.sm, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: 0.8 },
-  progressSub:        { fontSize: typography.lg, fontWeight: '800', color: '#fff', marginTop: 2 },
-  progressBadge:      { backgroundColor: colors.amber, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
-  progressBadgeText:  { fontSize: typography.sm, fontWeight: '800', color: colors.brandDark },
-  progressBarBg:      { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill:    { height: 6, backgroundColor: colors.amber, borderRadius: 3 },
+  card: { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.xs, ...shadow.sm },
+  cardTitle: { fontSize: typography.base, fontWeight: '700', color: colors.text },
+  cardBody:  { fontSize: typography.sm, color: colors.textSec, lineHeight: 19, marginBottom: spacing.xs },
 
-  // Dot row
-  dotRow:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dot:              { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
-  dotActive:        { backgroundColor: colors.amber, borderColor: colors.amber },
-  dotDone:          { backgroundColor: '#fff', borderColor: '#fff' },
-  dotNum:           { fontSize: typography.xs, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
-  dotNumActive:     { color: colors.brandDark },
-  dotCheck:         { fontSize: 13, fontWeight: '800', color: colors.brand },
-  dotConnector:     { flex: 1, height: 2, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 2 },
-  dotConnectorDone: { backgroundColor: 'rgba(255,255,255,0.7)' },
+  doneTag: { backgroundColor: colors.successBg, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  doneTagText: { color: colors.success, fontWeight: '700', fontSize: typography.xs },
 
-  // Step cards
-  stepCard: {
-    backgroundColor: colors.white, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.line,
-    padding: spacing.lg, gap: spacing.md, ...shadow.sm,
-  },
-  stepCardActive: { borderColor: colors.brand + '60', backgroundColor: colors.brandLight },
-  stepCardDone:   { backgroundColor: colors.bgGray, borderColor: colors.line },
+  dr: { gap: 2 },
+  dk: { fontSize: typography.xs, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  dv: { fontSize: typography.sm, color: colors.text, lineHeight: 19 },
 
-  stepRow:            { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  stepIconCircle:     { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-  stepIconCircleActive:{ backgroundColor: colors.brandLight, borderWidth: 2, borderColor: colors.brand + '40' },
-  stepIconCircleDone: { backgroundColor: colors.brand },
-  stepEmoji:          { fontSize: 22 },
-  stepCheckIcon:      { fontSize: 20, color: '#fff', fontWeight: '800' },
+  stepRow: { flexDirection: 'row', gap: spacing.md },
+  stepIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  stepIconDone: { backgroundColor: colors.brand },
+  stepIconNum: { fontWeight: '700', fontSize: typography.sm, color: colors.muted },
+  stepIconCheck: { fontWeight: '800', fontSize: typography.base, color: '#fff' },
+  stepHint: { fontSize: typography.xs, color: colors.muted, marginTop: 4 },
 
-  stepLabelRow:       { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  stepLabel:          { fontSize: typography.base, fontWeight: '700', color: colors.text },
-  stepLabelDone:      { color: colors.muted },
-  stepSub:            { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
+  primaryBtn: { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm, ...shadow.brand },
+  primaryBtnText: { fontWeight: '800', fontSize: typography.md, color: colors.brandDark },
 
-  // Status pills
-  statusPill:         { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.line },
-  pillActive:         { backgroundColor: colors.brand + '20' },
-  pillDone:           { backgroundColor: colors.successBg },
-  statusPillText:     { fontSize: typography.xxs, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  pillActiveText:     { color: colors.brand },
-  pillDoneText:       { color: colors.success },
+  primaryBtnSm: { backgroundColor: colors.brand, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 10 },
+  primaryBtnSmText: { color: '#fff', fontWeight: '700', fontSize: typography.sm },
 
-  // Action buttons
-  actionBtn:          { backgroundColor: colors.brand, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center', ...shadow.brand },
-  actionBtnText:      { color: '#fff', fontWeight: '700', fontSize: typography.base },
-  secondaryBtn:       { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingVertical: 10, alignItems: 'center' },
-  secondaryBtnText:   { color: colors.muted, fontWeight: '600', fontSize: typography.sm },
+  secondaryBtn: { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 10, alignSelf: 'flex-start', marginTop: spacing.xs },
+  secondaryBtnText: { color: colors.text, fontWeight: '600', fontSize: typography.sm },
 });
 
-// Contact modal styles
-const cm = StyleSheet.create({
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet:       { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 32 },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, alignSelf: 'center', marginTop: 12 },
-  title:       { fontSize: typography.lg, fontWeight: '700', color: colors.text, textAlign: 'center', paddingTop: spacing.lg, paddingHorizontal: spacing.xl },
-  sub:         { fontSize: typography.sm, color: colors.muted, textAlign: 'center', paddingHorizontal: spacing.xl, marginTop: 4, marginBottom: spacing.lg },
-  option:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 14, gap: spacing.md },
-  optionActive:{ backgroundColor: colors.brandLight },
-  radio:       { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.lineMid, alignItems: 'center', justifyContent: 'center' },
-  radioActive: { borderColor: colors.brand },
-  radioDot:    { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.brand },
-  optLabel:    { fontSize: typography.base, color: colors.text, fontWeight: '500' },
-  optLabelActive: { color: colors.brand, fontWeight: '700' },
-  altWrap:     { paddingHorizontal: spacing.xl, marginBottom: spacing.sm },
-  altInput:    { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 12, fontSize: typography.base, color: colors.text, backgroundColor: colors.bgGray },
-  btnRow:      { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
-  cancelBtn:   { flex: 1, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingVertical: 14, alignItems: 'center' },
-  cancelTxt:   { fontSize: typography.base, fontWeight: '600', color: colors.muted },
-  confirmBtn:  { flex: 2, backgroundColor: colors.brand, borderRadius: radius.full, paddingVertical: 14, alignItems: 'center' },
-  confirmDisabled: { backgroundColor: colors.lineMid },
-  confirmTxt:  { fontSize: typography.base, fontWeight: '700', color: '#fff' },
+const ab = StyleSheet.create({
+  hint: { fontSize: typography.xs, color: colors.muted },
+
+  infoNotice: { backgroundColor: colors.accentBg, borderWidth: 1, borderColor: colors.accentBorder, borderRadius: radius.lg, padding: spacing.md, gap: 2 },
+  infoNoticeTitle: { fontWeight: '700', fontSize: typography.sm, color: colors.accentText },
+  infoNoticeBody: { fontSize: typography.sm, color: colors.accentText },
+  infoNoticeHint: { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
+
+  infoNoticeSm: { backgroundColor: colors.accentBg, borderWidth: 1, borderColor: colors.accentBorder, borderRadius: radius.lg, padding: spacing.sm },
+  infoNoticeSmText: { fontSize: typography.xs, color: colors.accentText },
+
+  warnNotice: { backgroundColor: colors.warningBg, borderWidth: 1, borderColor: colors.warningBorder, borderRadius: radius.lg, padding: spacing.md },
+  warnNoticeText: { fontSize: typography.sm, color: colors.warning, lineHeight: 18 },
+
+  secondaryBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingVertical: 10, alignItems: 'center' },
+  secondaryBtnText: { color: colors.text, fontWeight: '600', fontSize: typography.sm },
+  dangerBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.errorBorder, backgroundColor: colors.errorBg, borderRadius: radius.full, paddingVertical: 10, alignItems: 'center' },
+  dangerBtnText: { color: colors.error, fontWeight: '600', fontSize: typography.sm },
+
+  datePill: { width: 76, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.lg, paddingVertical: spacing.sm, alignItems: 'center', gap: 2 },
+  datePillActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  datePillDow: { fontSize: typography.xs, fontWeight: '700', color: colors.muted },
+  datePillNum: { fontSize: typography.sm, fontWeight: '700', color: colors.text },
+  datePillCount: { fontSize: typography.xxs, color: colors.muted },
+  datePillTextActive: { color: '#fff' },
+
+  sessionLabel: { fontSize: typography.xs, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  slotChip: { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  slotChipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  slotChipDisabled: { opacity: 0.4 },
+  slotChipText: { fontSize: typography.sm, fontWeight: '600', color: colors.text },
+  slotChipTextActive: { color: '#fff' },
+  slotChipTextDisabled: { color: colors.muted },
+
+  confirmBtn: { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 14, alignItems: 'center', marginTop: spacing.xs, ...shadow.brand },
+  confirmBtnText: { fontWeight: '800', fontSize: typography.md, color: colors.brandDark },
+});
+
+const cx = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  centerWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  box:        { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.xl, gap: spacing.md, width: '100%', maxWidth: 380, ...shadow.md },
+  title:      { fontSize: typography.lg, fontWeight: '800', color: colors.text },
+  body:       { fontSize: typography.sm, color: colors.textSec, lineHeight: 20 },
+  actions:    { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  closeBtn:   { flex: 1, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
+  closeBtnText: { fontSize: typography.sm, fontWeight: '600', color: colors.muted },
+  confirmBtn: { flex: 1, backgroundColor: colors.brand, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
+  confirmBtnDanger: { backgroundColor: colors.error },
+  confirmBtnText: { fontSize: typography.sm, fontWeight: '700', color: '#fff' },
 });

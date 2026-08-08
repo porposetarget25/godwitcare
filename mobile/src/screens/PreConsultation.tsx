@@ -2,11 +2,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert, TextInput,
-  TouchableOpacity, Modal, FlatList, ActivityIndicator,
+  TouchableOpacity, Modal, FlatList, ActivityIndicator, Linking,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL, authFetch } from '../api';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 
@@ -78,10 +77,6 @@ function toYMD(raw?: string | null): string {
   } catch { return ''; }
 }
 
-function sanitize(s: string) {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '');
-}
-
 function buildPatientOptions(reg: any): PatientOpt[] {
   const opts: PatientOpt[] = [];
   const seen = new Set<string>();
@@ -99,6 +94,10 @@ function buildPatientOptions(reg: any): PatientOpt[] {
     });
   }
   return opts;
+}
+
+function isSectionComplete(section: { questions: { id: string }[] }, answers: Record<string, Ans>) {
+  return section.questions.every(q => answers[q.id] !== undefined);
 }
 
 // ── Patient picker sheet ──────────────────────────────────────────────────────
@@ -142,13 +141,36 @@ function PatientSheet({ visible, options, selected, onSelect, onClose }: {
   );
 }
 
+// ── Emergency blocking modal ──────────────────────────────────────────────────
+function EmergencyModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={em.overlay} activeOpacity={1} onPress={onClose} />
+      <View style={em.centerWrap} pointerEvents="box-none">
+        <View style={em.box}>
+          <Text style={em.title}>🚨 Medical Emergency</Text>
+          <Text style={em.body}>You are experiencing emergency symptoms. Please dial 999 immediately.</Text>
+          <View style={em.actions}>
+            <TouchableOpacity style={em.closeBtn} onPress={onClose} activeOpacity={0.75}>
+              <Text style={em.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={em.callBtn} onPress={() => Linking.openURL('tel:999')} activeOpacity={0.85}>
+              <Text style={em.callBtnText}>📞 Call 999 Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Yes/No toggle ─────────────────────────────────────────────────────────────
-function Toggle({ label, value, onChange, critical }: {
-  label: string; value: Ans; onChange: (v: YesNo) => void; critical: boolean;
+function Toggle({ label, value, onChange, critical, disabled }: {
+  label: string; value: Ans; onChange: (v: YesNo) => void; critical: boolean; disabled?: boolean;
 }) {
   const labelColor = critical ? colors.error : colors.success;
   return (
-    <View style={t.wrap}>
+    <View style={[t.wrap, disabled && { opacity: 0.5 }]}>
       <Text style={[t.label, { color: labelColor }]}>{label}</Text>
       {value === undefined && <Text style={t.hint}>← please choose</Text>}
       <View style={t.btnRow}>
@@ -156,6 +178,7 @@ function Toggle({ label, value, onChange, critical }: {
           style={[t.btn, value === 'No' ? t.btnNo : t.btnUnset]}
           onPress={() => onChange('No')}
           activeOpacity={0.75}
+          disabled={disabled}
         >
           <Text style={[t.btnTxt, value === 'No' && t.btnTxtActive]}>No</Text>
         </TouchableOpacity>
@@ -163,6 +186,7 @@ function Toggle({ label, value, onChange, critical }: {
           style={[t.btn, value === 'Yes' ? t.btnYes : t.btnUnset]}
           onPress={() => onChange('Yes')}
           activeOpacity={0.75}
+          disabled={disabled}
         >
           <Text style={[t.btnTxt, value === 'Yes' && t.btnTxtActive]}>Yes</Text>
         </TouchableOpacity>
@@ -174,21 +198,18 @@ function Toggle({ label, value, onChange, critical }: {
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function PreConsultation() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ cid?: string; travelerId?: string; patientId?: string }>();
+  const params = useLocalSearchParams<{ cid?: string; travelerId?: string; patientId?: string; locked?: string }>();
   const cid        = params.cid;
   const isEdit     = !!cid;
+  const isLocked   = params.locked === '1';
   const initTravId = params.travelerId;
   const initPatId  = params.patientId;
 
-  const [location,       setLocation      ] = useState('');
-  const [locationCity,   setLocationCity  ] = useState(''); // human-readable city name
   const [contactName,    setContactName   ] = useState('');
   const [contactPhone,   setContactPhone  ] = useState('');
   const [contactAddress, setContactAddress] = useState('');
   const [dob,            setDob           ] = useState('');
   const [submitting,     setSubmitting    ] = useState(false);
-  const [locLoading,     setLocLoading    ] = useState(false);
-  const [locError,       setLocError      ] = useState('');
 
   const [patientOptions,     setPatientOptions    ] = useState<PatientOpt[]>([]);
   const [selectedPatientKey, setSelectedPatientKey] = useState<string>('primary');
@@ -202,6 +223,9 @@ export default function PreConsultation() {
   const [answers,    setAnswers   ] = useState<Record<string, Ans>>(defaultAnswers);
   const [detailsByQ, setDetailsByQ] = useState<Record<string, string>>({});
 
+  // Sections are walked through one at a time; only this index is expanded.
+  const [openSectionIndex, setOpenSectionIndex] = useState(0);
+
   // ── Prefill (new mode) ──────────────────────────────────────────────────────
   useEffect(() => {
     if (isEdit) return;
@@ -209,7 +233,7 @@ export default function PreConsultation() {
     (async () => {
       // 1. Latest registration → build patient options
       try {
-        const r = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' });
+        const r = await authFetch(`${API_BASE_URL}/registrations/mine/latest`);
         if (!ignore && r.ok) {
           const reg = await r.json().catch(() => null);
           if (reg) {
@@ -233,16 +257,15 @@ export default function PreConsultation() {
         }
       } catch {}
 
-      // 2. Latest consultation → prefill location/address
+      // 2. Latest consultation → prefill address
       try {
-        const r0 = await fetch(`${API_BASE_URL}/consultations/mine/latest`, { credentials: 'include' });
+        const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest`);
         if (!ignore && r0.ok) {
           const latest = await r0.json().catch(() => null);
           if (latest?.id) {
-            const r1 = await fetch(`${API_BASE_URL}/consultations/${latest.id}/mine`, { credentials: 'include' });
+            const r1 = await authFetch(`${API_BASE_URL}/consultations/${latest.id}/mine`);
             if (!ignore && r1.ok) {
               const j = await r1.json();
-              if (!location && j?.currentLocation) setLocation(j.currentLocation);
               if (!contactAddress && j?.contactAddress) setContactAddress(j.contactAddress);
               if (!dob) { const y = toYMD(j?.dob || j?.patient?.dob); if (y) setDob(y); }
             }
@@ -252,7 +275,7 @@ export default function PreConsultation() {
 
       // 3. Fallback /auth/me
       try {
-        const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
+        const r = await authFetch(`${API_BASE_URL}/auth/me`);
         if (!ignore && r.ok) {
           const me = await r.json();
           if (!contactPhone && (me?.username || me?.phone)) setContactPhone(String(me.username || me.phone));
@@ -272,16 +295,15 @@ export default function PreConsultation() {
     let ignore = false;
     (async () => {
       try {
-        const r = await fetch(`${API_BASE_URL}/consultations/${cid}/mine`, { credentials: 'include' });
+        const r = await authFetch(`${API_BASE_URL}/consultations/${cid}/mine`);
         if (!ignore && r.ok) {
           const j = await r.json();
-          setLocation(j.currentLocation || '');
           setContactName(j.contactName || '');
           setContactPhone(j.contactPhone || '');
           setContactAddress(j.contactAddress || '');
           setDob(toYMD(j.dob || ''));
 
-          const r2 = await fetch(`${API_BASE_URL}/registrations/mine/latest`, { credentials: 'include' });
+          const r2 = await authFetch(`${API_BASE_URL}/registrations/mine/latest`);
           if (!ignore && r2.ok) {
             const reg = await r2.json().catch(() => null);
             if (reg) {
@@ -299,6 +321,9 @@ export default function PreConsultation() {
           });
           setAnswers(merged);
           setDetailsByQ(j.detailsByQuestion || {});
+          // A previously-submitted checklist means every section is already reviewed —
+          // land on the last section rather than forcing a walk-through.
+          setOpenSectionIndex(FORM.length - 1);
         }
       } catch {}
     })();
@@ -314,64 +339,40 @@ export default function PreConsultation() {
     if (opt.dob) setDob(opt.dob);
   }, [selectedPatientKey]);
 
-  // ── GPS with reverse geocode → friendly city name ──────────────────────────
-  async function useMyLocation() {
-    setLocLoading(true); setLocError('');
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') { setLocError('Location permission denied.'); return; }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const { latitude, longitude } = loc.coords;
-
-      // Try Nominatim reverse geocode for a human-readable address
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=16`,
-          { headers: { 'Accept-Language': 'en', 'User-Agent': 'GodwitCare/1.0' } }
-        );
-        if (res.ok) {
-          const j = await res.json();
-          const addr = j?.address;
-          // Build a concise friendly name: "Suburb, City, Country"
-          const parts = [
-            addr?.suburb || addr?.neighbourhood || addr?.village || addr?.hamlet,
-            addr?.city    || addr?.town || addr?.county,
-            addr?.country,
-          ].filter(Boolean);
-          const friendly = parts.length > 0 ? parts.join(', ') : j?.display_name;
-          if (friendly) {
-            setLocation(sanitize(friendly));
-            setLocationCity(sanitize(addr?.city || addr?.town || addr?.county || parts[0] || ''));
-          } else {
-            setLocation(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-          }
-        } else {
-          setLocation(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        }
-      } catch {
-        setLocation(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-      }
-    } catch {
-      setLocError('Unable to get location. Please enter it manually.');
-    } finally {
-      setLocLoading(false);
-    }
-  }
-
-  const showEmergencyBanner = useMemo(() =>
+  /** Lock the whole checklist and show the 999 warning if ANY "Yes" is answered inside a critical section. */
+  const hasEmergencyAnswer = useMemo(() =>
     FORM.filter(s => CRITICAL.has(s.title))
         .some(s => s.questions.some(q => answers[q.id] === 'Yes'))
   , [answers]);
 
-  function setAnswer(id: string, v: YesNo) {
-    setAnswers(prev => prev[id] === v ? prev : { ...prev, [id]: v });
+  const [emergencyModalDismissed, setEmergencyModalDismissed] = useState(false);
+  useEffect(() => {
+    if (!hasEmergencyAnswer) setEmergencyModalDismissed(false);
+  }, [hasEmergencyAnswer]);
+
+  /** Answer a question and, if that completes the section with a "No", auto-advance to the next one.
+   *  A "Yes" reveals a details textbox the patient may want to fill in, so it never auto-folds. */
+  function answerQuestion(sectionIndex: number, id: string, v: YesNo) {
+    setAnswers(prev => {
+      if (prev[id] === v) return prev;
+      const next = { ...prev, [id]: v };
+      const section = FORM[sectionIndex];
+      if (v === 'No' && section && isSectionComplete(section, next) && sectionIndex < FORM.length - 1) {
+        setTimeout(() => {
+          setOpenSectionIndex(current => (current === sectionIndex ? sectionIndex + 1 : current));
+        }, 350);
+      }
+      return next;
+    });
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   async function submit() {
+    if (submitting || isLocked || hasEmergencyAnswer) return;
+
     const unanswered = Object.entries(answers).filter(([, v]) => v === undefined);
     if (unanswered.length > 0) {
-      Alert.alert('Incomplete', `Please answer all ${unanswered.length} remaining question(s) before submitting.`);
+      Alert.alert('Incomplete', 'Please answer all questions (Yes/No) before submitting.');
       return;
     }
     setSubmitting(true);
@@ -394,7 +395,7 @@ export default function PreConsultation() {
         : null;
 
       const payload = {
-        currentLocation: sanitize(location),
+        currentLocation: null,
         contactName,
         contactPhone,
         contactAddress,
@@ -406,10 +407,9 @@ export default function PreConsultation() {
 
       const url    = isEdit ? `${API_BASE_URL}/consultations/${cid}` : `${API_BASE_URL}/consultations`;
       const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
@@ -427,9 +427,10 @@ export default function PreConsultation() {
     }
   }
 
-  const selectedPatient = patientOptions.find(o => o.key === selectedPatientKey);
-  const answeredCount   = Object.values(answers).filter(v => v !== undefined).length;
-  const totalCount      = Object.keys(answers).length;
+  const selectedPatient  = patientOptions.find(o => o.key === selectedPatientKey);
+  const answeredCount    = Object.values(answers).filter(v => v !== undefined).length;
+  const totalCount       = Object.keys(answers).length;
+  const initials         = contactName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgGray }}>
@@ -439,74 +440,60 @@ export default function PreConsultation() {
       />
       <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
+        {isLocked && (
+          <View style={s.lockNotice}>
+            <Text style={s.lockNoticeText}>🔒 This checklist is locked while your appointment is booked. Cancel the appointment to make changes.</Text>
+          </View>
+        )}
+
         {/* ── Progress pill ── */}
         <View style={s.progressPill}>
-          <View style={[s.progressBar, { width: `${(answeredCount / totalCount) * 100}%` as any }]} />
-          <Text style={s.progressText}>{answeredCount} / {totalCount} answered</Text>
-        </View>
-
-        {/* ── Current Location ── */}
-        <View style={s.card}>
-          <Text style={s.cardHeader}>📍  Current Location</Text>
-          <View style={s.locationRow}>
-            <View style={{ flex: 1 }}>
-              <TextInput
-                style={s.input}
-                value={location}
-                onChangeText={t => { setLocation(t); setLocError(''); }}
-                placeholder="e.g. Suburb, City, Country"
-                placeholderTextColor={colors.mutedLight}
-              />
-              {locationCity ? (
-                <Text style={s.locationCity}>📍 {locationCity}</Text>
-              ) : null}
-              {locError ? (
-                <Text style={s.locError}>{locError}</Text>
-              ) : null}
-            </View>
-            <TouchableOpacity style={s.gpsBtn} onPress={useMyLocation} disabled={locLoading} activeOpacity={0.75}>
-              {locLoading
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={s.gpsBtnText}>📡 GPS</Text>
-              }
-            </TouchableOpacity>
-          </View>
+          <View style={[s.progressBar, { width: `${totalCount ? (answeredCount / totalCount) * 100 : 0}%` as any }]} />
+          <Text style={s.progressText}>{answeredCount} of {totalCount} answered</Text>
         </View>
 
         {/* ── Patient Contact & Address ── */}
         <View style={s.card}>
           <Text style={s.cardHeader}>👤  Patient Contact & Address</Text>
 
-          {/* Patient selector */}
-          {patientOptions.length > 0 && (
+          {patientOptions.length > 0 ? (
             <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>Patient (Primary or Traveller)</Text>
-              <TouchableOpacity style={s.selector} onPress={() => setShowPatientSheet(true)} activeOpacity={0.75}>
+              <Text style={s.fieldLabel}>Consultation for</Text>
+              <TouchableOpacity
+                style={s.selector}
+                onPress={() => setShowPatientSheet(true)}
+                activeOpacity={0.75}
+                disabled={isLocked || hasEmergencyAnswer}
+              >
+                <View style={s.avatarBadge}><Text style={s.avatarBadgeText}>{initials}</Text></View>
                 <Text style={s.selectorText}>{selectedPatient?.label || 'Select patient'}</Text>
                 <Text style={s.selectorChevron}>›</Text>
               </TouchableOpacity>
-              {selectedPatient?.dob ? (
-                <Text style={s.selectorNote}>WhatsApp (shared)  ·  DOB: {selectedPatient.dob}</Text>
-              ) : (
-                <Text style={s.selectorNote}>WhatsApp (shared)</Text>
-              )}
+            </View>
+          ) : (
+            <View style={s.fieldWrap}>
+              <Text style={s.fieldLabel}>Full Name</Text>
+              <TextInput
+                style={s.input}
+                value={contactName}
+                onChangeText={setContactName}
+                placeholder="Full name"
+                placeholderTextColor={colors.mutedLight}
+                autoCapitalize="words"
+                editable={!isLocked && !hasEmergencyAnswer}
+              />
             </View>
           )}
 
           <View style={s.fieldRow}>
             <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Full Name</Text>
-              <TextInput style={s.input} value={contactName} onChangeText={setContactName} placeholder="Full name" placeholderTextColor={colors.mutedLight} autoCapitalize="words" />
+              <Text style={s.fieldLabel}>Phone / WhatsApp</Text>
+              <TextInput style={[s.input, s.inputDisabled]} value={contactPhone} editable={false} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.fieldLabel}>Date of Birth</Text>
-              <TextInput style={s.input} value={dob} onChangeText={setDob} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedLight} keyboardType="numbers-and-punctuation" />
+              <TextInput style={[s.input, s.inputDisabled]} value={dob} editable={false} />
             </View>
-          </View>
-
-          <View style={s.fieldWrap}>
-            <Text style={s.fieldLabel}>Phone / WhatsApp</Text>
-            <TextInput style={s.input} value={contactPhone} onChangeText={setContactPhone} placeholder="+44 7xxx xxx xxx" placeholderTextColor={colors.mutedLight} keyboardType="phone-pad" />
           </View>
 
           <View style={s.fieldWrap}>
@@ -520,69 +507,112 @@ export default function PreConsultation() {
               multiline
               numberOfLines={3}
               textAlignVertical="top"
+              editable={!isLocked && !hasEmergencyAnswer}
             />
           </View>
         </View>
 
         {/* ── Emergency banner ── */}
-        {showEmergencyBanner && (
+        {hasEmergencyAnswer && (
           <View style={s.emergencyBanner}>
-            <Text style={s.emergencyTitle}>🚨 Emergency Detected</Text>
-            <Text style={s.emergencyText}>
-              If you answered "Yes" to any of the critical questions, please dial 999 immediately.
-            </Text>
+            <Text style={s.emergencyTitle}>🚨 You are experiencing emergency symptoms</Text>
+            <Text style={s.emergencyText}>Please dial 999 immediately.</Text>
+            <TouchableOpacity style={s.emergencyCallBtn} onPress={() => Linking.openURL('tel:999')} activeOpacity={0.85}>
+              <Text style={s.emergencyCallBtnText}>📞 Call 999 Now</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* ── Question sections ── */}
-        {FORM.map(section => {
-          const isCritical = CRITICAL.has(section.title);
-          const borderColor = isCritical ? colors.error : colors.success;
-          const titleColor  = isCritical ? colors.error : colors.success;
+        {/* ── Question sections (sequential accordion) ── */}
+        {FORM.map((section, index) => {
+          const isCritical  = CRITICAL.has(section.title);
+          const answeredIn  = section.questions.filter(q => answers[q.id] !== undefined).length;
+          const complete    = answeredIn === section.questions.length;
+          const isOpen      = openSectionIndex === index;
+          const isFirstGeneral = !isCritical && FORM[index - 1] && CRITICAL.has(FORM[index - 1].title);
+          const borderColor = isCritical ? colors.errorBorder : (complete ? colors.successBorder : colors.line);
+
           return (
-            <View key={section.title} style={[s.sectionCard, { borderColor }]}>
-              <View style={[s.sectionTitleRow, { backgroundColor: isCritical ? colors.errorBg : colors.successBg }]}>
-                <Text style={[s.sectionTitle, { color: titleColor }]}>{section.title}</Text>
-              </View>
-              <View style={s.sectionBody}>
-                {section.questions.map(q => (
-                  <View key={q.id}>
-                    <Toggle
-                      label={q.label}
-                      value={answers[q.id]}
-                      onChange={v => setAnswer(q.id, v)}
-                      critical={isCritical}
-                    />
-                    {answers[q.id] === 'Yes' && (
-                      <View style={s.detailWrap}>
-                        <TextInput
-                          style={s.detailInput}
-                          value={detailsByQ[q.id] || ''}
-                          onChangeText={v => setDetailsByQ(prev => ({ ...prev, [q.id]: v }))}
-                          placeholder="Add details (optional)"
-                          placeholderTextColor={colors.mutedLight}
-                        />
-                      </View>
-                    )}
+            <React.Fragment key={section.title}>
+              {index === 0 && <Text style={s.groupHint}>EMERGENCY SYMPTOM CHECK</Text>}
+              {isFirstGeneral && <Text style={[s.groupHint, { marginTop: spacing.sm }]}>GENERAL HEALTH QUESTIONS</Text>}
+
+              <View style={[s.accordionItem, { borderColor }, isOpen && s.accordionItemOpen]}>
+                <TouchableOpacity
+                  style={s.accordionHeader}
+                  onPress={() => setOpenSectionIndex(index)}
+                  activeOpacity={0.7}
+                >
+                  <View style={s.accordionHeaderLeft}>
+                    {isCritical && <Text style={{ color: colors.error, fontSize: 14 }}>⚠️</Text>}
+                    <Text style={[s.accordionTitle, isCritical && { color: colors.error }]}>{section.title}</Text>
                   </View>
-                ))}
+                  <View style={s.accordionHeaderRight}>
+                    {complete ? (
+                      <Text style={{ color: colors.success, fontSize: 15 }}>✓</Text>
+                    ) : (
+                      <Text style={s.accordionCount}>{answeredIn}/{section.questions.length}</Text>
+                    )}
+                    <Text style={[s.accordionChevron, isOpen && s.accordionChevronOpen]}>▾</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {isOpen && (
+                  <View style={s.accordionBody}>
+                    {section.questions.map(q => {
+                      const val = answers[q.id];
+                      // Keep the question that actually triggered the emergency lock editable
+                      // so the patient can correct a misclick — everything else stays blocked.
+                      const questionDisabled = isLocked || (hasEmergencyAnswer && val !== 'Yes');
+                      return (
+                        <View key={q.id}>
+                          <Toggle
+                            label={q.label}
+                            value={val}
+                            onChange={v => answerQuestion(index, q.id, v)}
+                            critical={isCritical}
+                            disabled={questionDisabled}
+                          />
+                          {val === 'Yes' && (
+                            <View style={s.detailWrap}>
+                              <TextInput
+                                style={s.detailInput}
+                                value={detailsByQ[q.id] || ''}
+                                onChangeText={v => setDetailsByQ(prev => ({ ...prev, [q.id]: v }))}
+                                placeholder="Add details (optional)"
+                                placeholderTextColor={colors.mutedLight}
+                                editable={!questionDisabled}
+                              />
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-            </View>
+            </React.Fragment>
           );
         })}
 
         {/* ── Submit ── */}
-        <TouchableOpacity
-          style={[s.submitBtn, submitting && { opacity: 0.7 }]}
-          onPress={submit}
-          disabled={submitting}
-          activeOpacity={0.85}
-        >
-          {submitting
-            ? <ActivityIndicator color={colors.brandDark} />
-            : <Text style={s.submitBtnText}>{isEdit ? 'Update & Continue' : 'Submit & Continue'}</Text>
-          }
-        </TouchableOpacity>
+        {hasEmergencyAnswer ? (
+          <View style={s.blockedNotice}>
+            <Text style={s.blockedNoticeText}>⚠️ This checklist can't be submitted while an emergency symptom is reported. Please dial 999.</Text>
+          </View>
+        ) : !isLocked && (
+          <TouchableOpacity
+            style={[s.submitBtn, submitting && { opacity: 0.7 }]}
+            onPress={submit}
+            disabled={submitting}
+            activeOpacity={0.85}
+          >
+            {submitting
+              ? <ActivityIndicator color={colors.brandDark} />
+              : <Text style={s.submitBtnText}>{isEdit ? 'Update & Continue' : 'Submit & Continue'}</Text>
+            }
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
 
@@ -593,6 +623,11 @@ export default function PreConsultation() {
         onSelect={setSelectedPatientKey}
         onClose={() => setShowPatientSheet(false)}
       />
+
+      <EmergencyModal
+        visible={hasEmergencyAnswer && !emergencyModalDismissed}
+        onClose={() => setEmergencyModalDismissed(true)}
+      />
     </View>
   );
 }
@@ -601,6 +636,9 @@ export default function PreConsultation() {
 const s = StyleSheet.create({
   container: { padding: spacing.xl, paddingBottom: 60, gap: spacing.md },
 
+  lockNotice:     { backgroundColor: colors.accentBg, borderWidth: 1, borderColor: colors.accentBorder, borderRadius: radius.lg, padding: spacing.md },
+  lockNoticeText: { color: colors.accentText, fontSize: typography.sm, lineHeight: 18 },
+
   progressPill: { height: 32, backgroundColor: colors.white, borderRadius: radius.full, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', justifyContent: 'center', position: 'relative' },
   progressBar:  { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.brandLight, borderRadius: radius.full },
   progressText: { textAlign: 'center', fontSize: typography.xs, fontWeight: '700', color: colors.brand, zIndex: 1 },
@@ -608,34 +646,43 @@ const s = StyleSheet.create({
   card:       { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md, ...shadow.sm },
   cardHeader: { fontSize: typography.base, fontWeight: '700', color: colors.text },
 
-  locationRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  locationCity:{ fontSize: typography.xs, color: colors.brand, marginTop: 4, fontWeight: '600' },
-  locError:    { fontSize: typography.xs, color: colors.error, marginTop: 4 },
-  gpsBtn:      { backgroundColor: colors.brand, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', minWidth: 72 },
-  gpsBtnText:  { color: '#fff', fontWeight: '700', fontSize: typography.sm },
-
   fieldWrap:   { gap: 4 },
   fieldLabel:  { fontSize: typography.xs, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   fieldRow:    { flexDirection: 'row', gap: spacing.md },
   input:       { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 10, fontSize: typography.base, color: colors.text, backgroundColor: colors.bgGray, minHeight: 46 },
+  inputDisabled: { color: colors.muted, backgroundColor: colors.surface },
   textarea:    { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 10, fontSize: typography.base, color: colors.text, backgroundColor: colors.bgGray, minHeight: 80 },
 
-  selector:       { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.brand + '60', borderRadius: radius.md, backgroundColor: colors.brandLight, paddingHorizontal: spacing.md, paddingVertical: 12, gap: spacing.sm },
-  selectorText:   { flex: 1, fontSize: typography.base, color: colors.text, fontWeight: '600' },
-  selectorChevron:{ fontSize: 20, color: colors.muted },
-  selectorNote:   { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
+  selector:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.brand + '60', borderRadius: radius.md, backgroundColor: colors.brandLight, paddingHorizontal: spacing.md, paddingVertical: 10, gap: spacing.sm },
+  avatarBadge:     { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  avatarBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  selectorText:    { flex: 1, fontSize: typography.base, color: colors.text, fontWeight: '600' },
+  selectorChevron: { fontSize: 20, color: colors.muted },
 
-  emergencyBanner: { backgroundColor: colors.error, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs, ...shadow.md },
-  emergencyTitle:  { color: '#fff', fontWeight: '800', fontSize: typography.md },
-  emergencyText:   { color: 'rgba(255,255,255,0.9)', fontSize: typography.sm, lineHeight: 20 },
+  emergencyBanner:    { backgroundColor: colors.error, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs, ...shadow.md },
+  emergencyTitle:     { color: '#fff', fontWeight: '800', fontSize: typography.md },
+  emergencyText:      { color: 'rgba(255,255,255,0.9)', fontSize: typography.sm, lineHeight: 20 },
+  emergencyCallBtn:   { backgroundColor: '#fff', borderRadius: radius.full, paddingVertical: 10, alignItems: 'center', marginTop: spacing.xs },
+  emergencyCallBtnText: { color: colors.error, fontWeight: '800', fontSize: typography.sm },
 
-  sectionCard:     { borderRadius: radius.xl, borderWidth: 2, overflow: 'hidden', ...shadow.sm },
-  sectionTitleRow: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  sectionTitle:    { fontWeight: '700', fontSize: typography.base },
-  sectionBody:     { padding: spacing.lg, backgroundColor: colors.white, gap: spacing.md },
+  groupHint: { fontSize: typography.xs, fontWeight: '700', color: colors.muted, letterSpacing: 0.6, textTransform: 'uppercase' },
+
+  accordionItem:     { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1.5, overflow: 'hidden', ...shadow.sm },
+  accordionItemOpen: { borderColor: colors.brand },
+  accordionHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  accordionHeaderLeft:  { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
+  accordionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  accordionTitle:  { fontWeight: '700', fontSize: typography.base, color: colors.text },
+  accordionCount:  { fontSize: typography.xs, fontWeight: '600', color: colors.muted },
+  accordionChevron:     { fontSize: 14, color: colors.muted },
+  accordionChevronOpen: { color: colors.brand },
+  accordionBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
 
   detailWrap:  { marginTop: -spacing.sm, marginBottom: spacing.xs },
   detailInput: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 8, fontSize: typography.sm, color: colors.text, backgroundColor: colors.bgGray },
+
+  blockedNotice:     { backgroundColor: colors.errorBg, borderWidth: 1, borderColor: colors.errorBorder, borderRadius: radius.lg, padding: spacing.md },
+  blockedNoticeText: { color: colors.error, fontSize: typography.sm, fontWeight: '600', lineHeight: 18 },
 
   submitBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   submitBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
@@ -666,4 +713,17 @@ const ps = StyleSheet.create({
   optDob:      { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
   cancelBtn:   { marginHorizontal: spacing.xl, marginTop: spacing.md, paddingVertical: 14, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center' },
   cancelTxt:   { fontSize: typography.base, fontWeight: '600', color: colors.muted },
+});
+
+const em = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  centerWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  box:        { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.xl, gap: spacing.md, width: '100%', maxWidth: 360, ...shadow.md },
+  title:      { fontSize: typography.lg, fontWeight: '800', color: colors.error },
+  body:       { fontSize: typography.sm, color: colors.text, lineHeight: 20 },
+  actions:    { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  closeBtn:   { flex: 1, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
+  closeBtnText: { fontSize: typography.sm, fontWeight: '600', color: colors.muted },
+  callBtn:    { flex: 1, backgroundColor: colors.error, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
+  callBtnText:{ fontSize: typography.sm, fontWeight: '700', color: '#fff' },
 });

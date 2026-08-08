@@ -25,6 +25,9 @@ public class AppointmentController {
     private static final int DOCUMENTATION_MINUTES = 5;
     private static final int RESERVED_MINUTES = SLOT_MINUTES + DOCUMENTATION_MINUTES;
     private static final int BOOKING_DAYS = 2;
+    // Patients must book at least this far ahead so a doctor has time to prepare —
+    // slots inside this window are treated the same as already-passed slots.
+    private static final int MIN_LEAD_MINUTES = 120;
     private static final ZoneId CLINIC_ZONE = ZoneId.of("Europe/London");
     private static final LocalTime DAY_START = LocalTime.of(9, 0);
     private static final LocalTime DAY_END = LocalTime.of(17, 0);
@@ -96,7 +99,7 @@ public class AppointmentController {
                         schedules.isAvailable(doctor.getId(), start, reservedEnd)
                                 && bookedByDoctor.get(doctor.getId()).stream().noneMatch(a -> a.getStartTime().isBefore(reservedEnd)
                                 && a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)).isAfter(start)));
-                boolean disabled = !start.isAfter(now) || !doctorAvailable;
+                boolean disabled = !start.isAfter(now.plus(Duration.ofMinutes(MIN_LEAD_MINUTES))) || !doctorAvailable;
                 slots.add(Map.of(
                         "startTime", start.toString(),
                         "endTime", start.plus(Duration.ofMinutes(SLOT_MINUTES)).toString(),
@@ -140,7 +143,8 @@ public class AppointmentController {
         Instant start;
         try { start = Instant.parse(String.valueOf(body.get("startTime"))); }
         catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("message", "Invalid appointment time.")); }
-        if (!start.isAfter(Instant.now())) return ResponseEntity.badRequest().body(Map.of("message", "Please choose a future appointment time."));
+        if (!start.isAfter(Instant.now().plus(Duration.ofMinutes(MIN_LEAD_MINUTES))))
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointments must be booked at least 2 hours in advance."));
         LocalDate appointmentDate = start.atZone(CLINIC_ZONE).toLocalDate();
         LocalDate today = LocalDate.now(CLINIC_ZONE);
         if (appointmentDate.isBefore(today) || appointmentDate.isAfter(today.plusDays(BOOKING_DAYS - 1L)))
@@ -225,6 +229,26 @@ public class AppointmentController {
         return appointments.findByDoctorIdAndStartTimeGreaterThanEqualOrderByStartTimeAsc(doctor.getId(), Instant.now()).stream().map(this::toDto).toList();
     }
 
+    @PatchMapping("/doctor/consultations/{consultationId}/no-show")
+    @PreAuthorize("hasRole('DOCTOR')")
+    @Transactional
+    public ResponseEntity<?> markNoShow(Authentication auth, @PathVariable Long consultationId, @RequestBody Map<String, Object> body) {
+        User doctor = currentUser(auth);
+        if (doctor == null) return ResponseEntity.status(401).build();
+        Appointment appointment = appointments.findTopByConsultationIdOrderByIdDesc(consultationId).orElse(null);
+        if (appointment == null || !appointment.getDoctor().getId().equals(doctor.getId())) {
+            return ResponseEntity.notFound().build();
+        }
+        if (appointment.getStatus() != Appointment.Status.SCHEDULED) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Only a scheduled appointment can be marked as no-show."));
+        }
+        String note = String.valueOf(body.getOrDefault("note", "")).trim();
+        appointment.setStatus(Appointment.Status.NO_SHOW);
+        appointment.setNoShowNote(note.isEmpty() ? null : note);
+        appointments.save(appointment);
+        return ResponseEntity.ok(toDto(appointment));
+    }
+
     private Map<String, Object> toDto(Appointment a) {
         Consultation c = a.getConsultation();
         User patient = a.getPatient();
@@ -246,6 +270,7 @@ public class AppointmentController {
         row.put("consultationPatientId", c.getPatientId());
         row.put("consultationStatus", c.getStatus().name());
         row.put("reason", c.getHistoryOfPresentingComplaint() != null ? c.getHistoryOfPresentingComplaint() : c.getCurrentLocation());
+        row.put("noShowNote", a.getNoShowNote());
         return row;
     }
 
@@ -297,7 +322,8 @@ public class AppointmentController {
         return null;
     }
     private ResponseEntity<?> validateSlot(Instant start) {
-        if (!start.isAfter(Instant.now())) return ResponseEntity.badRequest().body(Map.of("message", "Please choose a future appointment time."));
+        if (!start.isAfter(Instant.now().plus(Duration.ofMinutes(MIN_LEAD_MINUTES))))
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointments must be booked at least 2 hours in advance."));
         LocalDate appointmentDate = start.atZone(CLINIC_ZONE).toLocalDate();
         LocalDate today = LocalDate.now(CLINIC_ZONE);
         if (appointmentDate.isBefore(today) || appointmentDate.isAfter(today.plusDays(BOOKING_DAYS - 1L)))

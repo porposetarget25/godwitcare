@@ -41,7 +41,10 @@ public class Appointment {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
-    public enum Status { SCHEDULED, COMPLETED, CANCELLED }
+    @Column(name = "no_show_note", length = 500)
+    private String noShowNote;
+
+    public enum Status { SCHEDULED, COMPLETED, CANCELLED, NO_SHOW }
 
     public Long getId() { return id; }
     public User getPatient() { return patient; }
@@ -58,4 +61,6 @@ public class Appointment {
     public void setStatus(Status status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getNoShowNote() { return noShowNote; }
+    public void setNoShowNote(String noShowNote) { this.noShowNote = noShowNote; }
 }

@@ -3,9 +3,11 @@ package com.godwitcare.web;
 
 import com.godwitcare.entity.Consultation;
 import com.godwitcare.entity.Prescription;
+import com.godwitcare.entity.ReferralLetter;
 import com.godwitcare.entity.User;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
+import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.repo.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +22,16 @@ public class CareHistoryController {
     private final UserRepository users;
     private final ConsultationRepository consultations;
     private final PrescriptionRepository prescriptions;
+    private final ReferralLetterRepo referrals;
 
     public CareHistoryController(UserRepository users,
                                  ConsultationRepository consultations,
-                                 PrescriptionRepository prescriptions) {
+                                 PrescriptionRepository prescriptions,
+                                 ReferralLetterRepo referrals) {
         this.users = users;
         this.consultations = consultations;
         this.prescriptions = prescriptions;
+        this.referrals = referrals;
     }
 
     @GetMapping("/care-history/mine")
@@ -67,8 +72,11 @@ public class CareHistoryController {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("consultationId", c.getId());
             m.put("date", c.getCreatedAt()); // ISO instant
+            m.put("status", c.getStatus() != null ? c.getStatus().name() : "LOGGED");
             // Location from Consultation
             m.put("locationTravellingTo", Optional.ofNullable(c.getCurrentLocation()).orElse(""));
+            referrals.findTopByConsultationIdOrderByIdDesc(c.getId())
+                    .ifPresent(ref -> m.put("referralPdfUrl", "/api/referrals/" + ref.getId() + "/pdf"));
 
             if (maybeRx.isPresent()) {
                 Prescription rx = maybeRx.get();
@@ -76,6 +84,7 @@ public class CareHistoryController {
                 m.put("diagnosis", Optional.ofNullable(rx.getDiagnosis()).orElse(""));
                 m.put("medicines", Optional.ofNullable(rx.getMedicines()).orElse(""));
                 m.put("recommendations", Optional.ofNullable(rx.getRecommendations()).orElse(""));
+                m.put("pdfUrl", "/api/prescriptions/" + rx.getId() + "/pdf");
                 items.add(m);
                 continue;
             }

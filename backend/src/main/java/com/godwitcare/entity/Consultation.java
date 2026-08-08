@@ -57,6 +57,7 @@ public class Consultation {
     private String detailsByQuestionJson;
 
     private Instant createdAt = Instant.now();
+    private Instant completedAt;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
@@ -119,6 +120,8 @@ public class Consultation {
     public void setDetailsByQuestionJson(String detailsByQuestionJson) { this.detailsByQuestionJson = detailsByQuestionJson; }
 
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getCompletedAt() { return completedAt; }
+    public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
 

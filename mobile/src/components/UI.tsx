@@ -2,7 +2,7 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, ScrollView, ViewStyle, TextStyle,
+  ActivityIndicator, ScrollView, ViewStyle, TextStyle, StyleProp,
 } from 'react-native';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 
@@ -133,12 +133,12 @@ export function Input({ error, style, icon, ...props }: InputProps) {
 }
 
 // ── Muted ─────────────────────────────────────────────────────────────────────
-export function Muted({ children, style }: { children: React.ReactNode; style?: TextStyle }) {
+export function Muted({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[styles.muted, style]}>{children}</Text>;
 }
 
 // ── Strong ────────────────────────────────────────────────────────────────────
-export function Strong({ children, style }: { children: React.ReactNode; style?: TextStyle }) {
+export function Strong({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[styles.strong, style]}>{children}</Text>;
 }
 

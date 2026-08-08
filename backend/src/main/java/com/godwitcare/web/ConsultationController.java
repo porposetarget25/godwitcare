@@ -6,6 +6,7 @@ import com.godwitcare.entity.Prescription;
 import com.godwitcare.entity.User;
 import com.godwitcare.entity.Registration;
 import com.godwitcare.entity.Traveler;
+import com.godwitcare.repo.AppointmentRepository;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.RegistrationRepository;
@@ -37,6 +38,7 @@ public class ConsultationController {
     private final PrescriptionRepository prescriptions;
     private RegistrationRepository registrations;
     private final PrescriptionPdfService pdfs;
+    private final AppointmentRepository appointments;
     @Value("${app.consultation.active-hours:48}")
     private long consultationActiveHours;
 
@@ -45,12 +47,14 @@ public class ConsultationController {
                                   ConsultationRepository consultations,
                                   RegistrationRepository registrations,
                                   PrescriptionRepository prescriptions,
-                                  PrescriptionPdfService pdfs) {
+                                  PrescriptionPdfService pdfs,
+                                  AppointmentRepository appointments) {
         this.users = users;
         this.consultations = consultations;
         this.registrations = registrations;
         this.prescriptions = prescriptions;
         this.pdfs = pdfs;
+        this.appointments = appointments;
     }
 
     @PostMapping("/consultations")
@@ -207,7 +211,8 @@ public class ConsultationController {
     @GetMapping("/consultations/mine/latest")
     public ResponseEntity<Map<String, Object>> myLatest(Authentication auth,
                                                         @RequestParam(name = "travelerId", required = false) Long travelerId,
-                                                       @RequestParam(name = "patientId", required = false) String patientId) throws Exception {
+                                                       @RequestParam(name = "patientId", required = false) String patientId,
+                                                       @RequestParam(name = "cid", required = false) Long cid) throws Exception {
         if (auth == null) return ResponseEntity.status(401).build();
 
         String principal = auth.getName();
@@ -219,17 +224,27 @@ public class ConsultationController {
             return ResponseEntity.status(403).build();
         }
 
-        var list = (patientId != null && !patientId.isBlank())
-                ? consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId)
-                : (travelerId == null
-                ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
-                : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId));
-        if (list.isEmpty()) return ResponseEntity.noContent().build();
+        Consultation c;
+        if (cid != null) {
+            // Viewing a specific (possibly historical) consultation, e.g. from the Consultations list.
+            c = consultations.findById(cid).orElse(null);
+            if (c == null || c.getUser() == null || !Objects.equals(c.getUser().getId(), u.getId())) {
+                return ResponseEntity.notFound().build();
+            }
+        } else {
+            var list = (patientId != null && !patientId.isBlank())
+                    ? consultations.findByUserEmailAndPatientIdOrderByIdDesc(u.getEmail(), patientId)
+                    : (travelerId == null
+                    ? consultations.findByUserEmailAndTravelerIsNullOrderByIdDesc(u.getEmail())
+                    : consultations.findByUserEmailAndTravelerIdOrderByIdDesc(u.getEmail(), travelerId));
+            if (list.isEmpty()) return ResponseEntity.noContent().build();
+            c = list.get(0);
+        }
 
-        var c = list.get(0);
         var res = new java.util.HashMap<String, Object>();
         res.put("id", c.getId());
         res.put("createdAt", c.getCreatedAt());
+        res.put("completedAt", c.getCompletedAt());
         res.put("status", c.getStatus().name());
         Instant expiresAt = c.getCreatedAt().plus(Duration.ofHours(consultationActiveHours));
         res.put("expiresAt", expiresAt);
@@ -331,6 +346,11 @@ public class ConsultationController {
                     d.put("diagnosis", nz(c.getDiagnosis()));
                     d.put("recommendations", nz(c.getRecommendations()));
                     d.put("prescriptionRequired", c.getPrescriptionRequired() == null || c.getPrescriptionRequired());
+
+                    appointments.findTopByConsultationIdOrderByIdDesc(c.getId()).ifPresent(appt -> {
+                        d.put("appointmentStatus", appt.getStatus().name());
+                        d.put("appointmentNoShowNote", appt.getNoShowNote());
+                    });
 
                     ObjectMapper mapper = new ObjectMapper();
                     try {
@@ -434,6 +454,7 @@ public class ConsultationController {
         }
 
         c.setStatus(Consultation.Status.COMPLETED);
+        c.setCompletedAt(Instant.now());
         c.setHistoryOfPresentingComplaint((String) body.getOrDefault("history", c.getHistoryOfPresentingComplaint()));
         c.setDiagnosis((String) body.getOrDefault("diagnosis", c.getDiagnosis()));
         c.setRecommendations((String) body.getOrDefault("recommendations", c.getRecommendations()));
@@ -517,6 +538,7 @@ public class ConsultationController {
                     body.put("createdAt", p.getCreatedAt());
                     body.put("fileName", p.getFileName());
                     body.put("size", p.getSize());
+                    body.put("consultationId", p.getConsultation() != null ? p.getConsultation().getId() : null);
                     // patient-safe PDF route (ownership checked below)
                     body.put("pdfUrl", "/api/prescriptions/" + p.getId() + "/pdf");
                     return ResponseEntity.ok(body);

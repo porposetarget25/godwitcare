@@ -1,15 +1,14 @@
 // src/screens/Home.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { usePatient } from '../state/patient'
-import { authFetch, confirmPaymentIntent, createPaymentIntent, getLatestPayment, getPaymentHistory, getStoredToken, getStripePaymentConfig, me, type PaymentHistoryResponse, type UserDto } from '../api'
-import { API_BASE_URL, resolveApiUrl } from '../api'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { usePatient, type PatientContextOption } from '../state/patient'
+import { authFetch, API_BASE_URL, getActivationPaymentSummary, type ActivationPaymentSummary } from '../api'
+import { useAuth } from '../state/auth'
+import Modal from '../components/portal/Modal'
+import MiniStepTrail from '../components/portal/MiniStepTrail'
+import { clinicDateTime12, clinicDateKey } from '../lib/appointmentTime'
 
-type Traveler = {
-  id?: number
-  fullName: string
-  dateOfBirth?: string
-}
+type Traveler = { id?: number; fullName: string; dateOfBirth?: string }
 
 type RegApi = {
   id: number
@@ -17,99 +16,12 @@ type RegApi = {
   travellingTo?: string
   travelStartDate?: string
   travelEndDate?: string
-  primaryWhatsAppNumber?: string
+  packageDays?: number
   travelers?: Traveler[]
-
   ['Travelling From']?: string
   ['Travelling To (UK & Europe)']?: string
   ['Travel Start Date']?: string
   ['Travel End Date']?: string
-  ['Primary WhatsApp Number']?: string
-}
-
-type DocInfo = {
-  id: number
-  fileName: string
-  sizeBytes: number
-  createdAt?: string
-  patientId: string
-  type: 'PASSPORT' | 'TRAVEL_DOCUMENT'
-}
-
-
-type StripeElementsInstance = {
-  create: (type: 'payment') => { mount: (target: HTMLElement) => void; unmount: () => void; destroy?: () => void }
-}
-
-type StripeInstance = {
-  elements: (options: { clientSecret: string; appearance?: Record<string, unknown> }) => StripeElementsInstance
-  confirmPayment: (options: {
-    elements: StripeElementsInstance
-    confirmParams?: { return_url?: string }
-    redirect: 'if_required'
-  }) => Promise<{ error?: { message?: string }; paymentIntent?: { id: string; status: string } }>
-}
-
-declare global {
-  interface Window {
-    Stripe?: (publishableKey: string) => StripeInstance
-  }
-}
-
-let stripeSdkPromise: Promise<void> | null = null
-
-function loadStripeSdk() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('Stripe is only available in the browser.'))
-  if (window.Stripe) return Promise.resolve()
-  if (!stripeSdkPromise) {
-    stripeSdkPromise = new Promise((resolve, reject) => {
-      const existing = document.querySelector<HTMLScriptElement>('script[src="https://js.stripe.com/v3/"]')
-      if (existing) {
-        existing.addEventListener('load', () => resolve(), { once: true })
-        existing.addEventListener('error', () => reject(new Error('Unable to load Stripe.js.')), { once: true })
-        return
-      }
-      const script = document.createElement('script')
-      script.src = 'https://js.stripe.com/v3/'
-      script.async = true
-      script.onload = () => resolve()
-      script.onerror = () => reject(new Error('Unable to load Stripe.js.'))
-      document.head.appendChild(script)
-    })
-  }
-  return stripeSdkPromise
-}
-
-function getStripeReturnUrl() {
-  if (typeof window === 'undefined') return undefined
-  const { origin, pathname, search, protocol } = window.location
-  if (protocol !== 'http:' && protocol !== 'https:') return undefined
-  return `${origin}${pathname}${search}`
-}
-
-function formatPaymentAmount(payment: PaymentHistoryResponse) {
-  const value = Number(payment.amount)
-  const currency = (payment.currency || 'GBP').toUpperCase()
-  try {
-    return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(value)
-  } catch {
-    return `${currency} ${Number.isFinite(value) ? value.toFixed(2) : payment.amount}`
-  }
-}
-
-function formatPaymentDate(value?: string) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
-}
-
-function paymentStatusCopy(status?: string) {
-  const normalized = (status || '').toLowerCase()
-  if (normalized === 'succeeded') return 'successful'
-  if (normalized === 'failed' || normalized === 'canceled' || normalized === 'cancelled' || normalized === 'requires_payment_method') return 'unsuccessful'
-  if (normalized === 'processing') return 'processing'
-  return status ? status.replace(/_/g, ' ').toLowerCase() : 'unknown'
 }
 
 function normalizeReg(r: RegApi | null | undefined) {
@@ -118,1027 +30,400 @@ function normalizeReg(r: RegApi | null | undefined) {
   const to = r['Travelling To (UK & Europe)'] ?? r.travellingTo ?? ''
   const start = r['Travel Start Date'] ?? r.travelStartDate ?? ''
   const end = r['Travel End Date'] ?? r.travelEndDate ?? ''
-  const phone = r['Primary WhatsApp Number'] ?? r.primaryWhatsAppNumber ?? ''
-  const travelers = Array.isArray(r.travelers) ? r.travelers : []
-  return { id: r.id, from, to, start, end, phone, travelers }
+  return { id: r.id, from, to, start, end, packageDays: r.packageDays || 0 }
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function queryForPatient(p: PatientContextOption) {
+  const qp = new URLSearchParams()
+  if (p.id !== 'PRIMARY') qp.set('travelerId', p.id)
+  qp.set('patientId', p.patientId)
+  return qp.toString()
+}
+
+const STAGE_LABELS = ['Checklist', 'Appointment Booked', 'Prescription', 'Pharmacy']
+
+type ActiveConsultation = {
+  patient: PatientContextOption
+  consultationId: number
+  stage: number
+  detail: string
+  expired: boolean
+  appointment: { startTime: string; endTime: string } | null
+}
+
+function formatCountdown(startTimeIso: string, now: number): string {
+  const diffMs = new Date(startTimeIso).getTime() - now
+  if (diffMs <= 0) return 'Starting shortly'
+  const totalSeconds = Math.floor(diffMs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (days > 0) return `in ${days}d ${hours}h ${minutes}m`
+  if (hours > 0) return `in ${hours}h ${minutes}m ${seconds}s`
+  return `in ${minutes}m ${seconds}s`
 }
 
 export default function Home() {
-  const location = useLocation()
+  return <PatientHome />
+}
+
+function PatientHome() {
+  const { user } = useAuth()
+  const { patients, loading: patientsLoading } = usePatient()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [user, setUser] = useState<UserDto | null>(null)
-  const [checking, setChecking] = useState(true)
-
   const [reg, setReg] = useState<ReturnType<typeof normalizeReg> | null>(null)
-  const [docs, setDocs] = useState<DocInfo[]>([])
-  const [loadingReg, setLoadingReg] = useState(false)
-  const [loadingDocs, setLoadingDocs] = useState(false)
-  const [showPaymentsModal, setShowPaymentsModal] = useState(false)
-  const [selectedMethod, setSelectedMethod] = useState<'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET'>('CARD')
-  const [amount, setAmount] = useState('49.99')
-  const [currency, setCurrency] = useState('GBP')
-  const [stripePublishableKey, setStripePublishableKey] = useState('')
-  const [stripeEnvironment, setStripeEnvironment] = useState('test')
-  const [clientSecret, setClientSecret] = useState('')
-  const [stripePaymentIntentId, setStripePaymentIntentId] = useState('')
-  const [paymentLoading, setPaymentLoading] = useState(false)
-  const [paymentError, setPaymentError] = useState<string | null>(null)
-  const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
-  const [paymentComplete, setPaymentComplete] = useState(false)
-  const [latestPayment, setLatestPayment] = useState<PaymentHistoryResponse | null>(null)
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryResponse[]>([])
-  const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false)
-  const [paymentHistoryError, setPaymentHistoryError] = useState<string | null>(null)
-  const [paymentHistoryLoaded, setPaymentHistoryLoaded] = useState(false)
-  const stripeRef = useRef<StripeInstance | null>(null)
-  const elementsRef = useRef<StripeElementsInstance | null>(null)
-  const paymentElementRef = useRef<{ unmount: () => void; destroy?: () => void } | null>(null)
-  const paymentElementContainerRef = useRef<HTMLDivElement | null>(null)
-
-
-  const isDoctor = !!user?.roles?.some?.(
-  r => typeof r === 'string' && r.toUpperCase().includes('DOCTOR')
-   )
-  const isTravelerUser = !!user?.roles?.some?.(
-    r => typeof r === 'string' && r.toUpperCase().includes('USER')
-  )
+  const [activation, setActivation] = useState<ActivationPaymentSummary | null>(null)
+  const [active, setActive] = useState<ActiveConsultation[]>([])
+  const [loadingActive, setLoadingActive] = useState(true)
+  const [showNewConsultModal, setShowNewConsultModal] = useState(false)
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    let alive = true
-      ; (async () => {
-        try {
-          const u = await me()
-          if (!alive) return
-          setUser(u)
-
-          // For doctors we keep Home as a minimal console landing,
-          // so we skip pulling Registration/Docs entirely.
-          if (!u?.email || u?.roles?.includes?.('DOCTOR')) return
-
-          setLoadingReg(true)
-          const res = await authFetch(
-            `${API_BASE_URL}/registrations?email=${encodeURIComponent(u.email)}`,
-            {}
-          )
-
-          let latest: RegApi | null = null
-          if (res.status === 200) {
-            const data = await res.json()
-            if (Array.isArray(data)) {
-              latest = data.length ? data[data.length - 1] : null
-            } else if (data && typeof data === 'object') {
-              latest = data as RegApi
-            }
-          } else if (res.status !== 204) {
-            console.warn('GET /registrations unexpected status:', res.status)
-          }
-
-          const normalized = normalizeReg(latest || undefined)
-          setReg(normalized)
-          setLoadingReg(false)
-
-          setDocs([])
-        } finally {
-          if (alive) setChecking(false)
-        }
-      })()
-    return () => {
-      alive = false
-    }
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
-    if ((location.hash.startsWith('#payments') || location.pathname.endsWith('/payment-history')) && isTravelerUser) {
-      setShowPaymentsModal(true)
-    }
-  }, [location.hash, location.pathname, isTravelerUser])
-
-  useEffect(() => {
-    if (!showPaymentsModal) return
-
-    if (!user?.id) {
-      if (!checking) {
-        setPaymentHistory([])
-        setLatestPayment(null)
-        setPaymentHistoryLoaded(true)
-        setPaymentHistoryError('Please sign in before viewing payment history.')
-      }
-      return
-    }
-
-    if (!getStoredToken()) {
-      setPaymentHistory([])
-      setLatestPayment(null)
-      setPaymentHistoryLoaded(true)
-      setPaymentHistoryError('Your session has expired. Please sign in again to view payment history.')
-      return
-    }
-
-    let alive = true
-    setPaymentHistoryLoading(true)
-    setPaymentHistoryLoaded(false)
-    setPaymentHistoryError(null)
-    ;(async () => {
-      try {
-        const [payment, history] = await Promise.all([getLatestPayment(), getPaymentHistory()])
-        if (alive) {
-          setLatestPayment(payment)
-          setPaymentHistory(Array.isArray(history) ? history : [])
-          setPaymentHistoryLoaded(true)
-        }
-      } catch (err: any) {
-        if (alive) {
-          setLatestPayment(null)
-          setPaymentHistory([])
-          setPaymentHistoryLoaded(true)
-          setPaymentHistoryError(err?.message || 'Unable to load payment history.')
-        }
-      } finally {
-        if (alive) setPaymentHistoryLoading(false)
-      }
-    })()
-    return () => { alive = false }
-  }, [checking, location.hash, location.pathname, showPaymentsModal, user?.id])
-
-  useEffect(() => {
-    if (!showPaymentsModal || !paymentComplete) return
-    const timer = window.setTimeout(() => {
-      closePaymentsModal()
-    }, 3000)
-    return () => window.clearTimeout(timer)
-  }, [showPaymentsModal, paymentComplete])
-
-
-  const resetStripePaymentElement = () => {
-    paymentElementRef.current?.unmount()
-    paymentElementRef.current?.destroy?.()
-    paymentElementRef.current = null
-    elementsRef.current = null
-    setClientSecret('')
-    setStripePaymentIntentId('')
-  }
-
-  const closePaymentsModal = () => {
-    resetStripePaymentElement()
-    setPaymentComplete(false)
-    setPaymentSuccess(null)
-    setPaymentError(null)
-    setShowPaymentsModal(false)
-    if (location.hash.startsWith('#payments')) {
-      navigate(location.pathname.endsWith('/payment-history') ? '/home' : '/home', { replace: true })
-    }
-  }
-
-  useEffect(() => {
-    if (!showPaymentsModal) return
+    if (!user?.email) return
     let alive = true
     ;(async () => {
       try {
-        const cfg = await getStripePaymentConfig()
-        if (!alive) return
-        setStripePublishableKey(cfg.publishableKey || '')
-        setStripeEnvironment(cfg.environment || 'test')
-        if (!cfg.frontendConfigured) {
-          setPaymentError('Stripe publishable key is not configured for the active backend profile. Please set STRIPE_PUBLISHABLE_KEY and restart the backend.')
-        } else if (cfg.backendConfigured === false) {
-          setPaymentError('Stripe secret key is not configured for the active backend profile. Please set STRIPE_SECRET_KEY and restart the backend.')
+        const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(user.email)}`, {})
+        let latest: RegApi | null = null
+        if (res.status === 200) {
+          const data = await res.json()
+          if (Array.isArray(data)) latest = data.length ? data[data.length - 1] : null
+          else if (data && typeof data === 'object') latest = data as RegApi
         }
-      } catch (err: any) {
-        if (alive) setPaymentError(err?.message || 'Unable to load payment configuration.')
+        if (alive) setReg(normalizeReg(latest))
+      } catch {
+        if (alive) setReg(null)
       }
     })()
     return () => { alive = false }
-  }, [showPaymentsModal])
+  }, [user?.email])
 
   useEffect(() => {
-    if (!clientSecret || !stripePublishableKey || !paymentElementContainerRef.current) return
-    let cancelled = false
+    if (!user?.email) return
+    let alive = true
+    getActivationPaymentSummary().then(s => { if (alive) setActivation(s) }).catch(() => { if (alive) setActivation(null) })
+    return () => { alive = false }
+  }, [user?.email])
+
+  useEffect(() => {
+    if (patientsLoading) return
+    if (patients.length === 0) { setActive([]); setLoadingActive(false); return }
+    let alive = true
+    setLoadingActive(true)
     ;(async () => {
-      try {
-        await loadStripeSdk()
-        if (cancelled || !window.Stripe || !paymentElementContainerRef.current) return
-        const stripe = window.Stripe(stripePublishableKey)
-        const elements = stripe.elements({
-          clientSecret,
-          appearance: { theme: 'stripe' },
-        })
-        const paymentElement = elements.create('payment')
-        paymentElement.mount(paymentElementContainerRef.current)
-        stripeRef.current = stripe
-        elementsRef.current = elements
-        paymentElementRef.current = paymentElement
-      } catch (err: any) {
-        if (!cancelled) setPaymentError(err?.message || 'Unable to initialise secure Stripe checkout.')
-      }
-    })()
-    return () => {
-      cancelled = true
-      paymentElementRef.current?.unmount()
-      paymentElementRef.current?.destroy?.()
-      paymentElementRef.current = null
-      elementsRef.current = null
-      stripeRef.current = null
-    }
-  }, [clientSecret, stripePublishableKey])
+      const appointmentsRes = await authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' }).catch(() => null)
+      const appointments = appointmentsRes && appointmentsRes.ok ? await appointmentsRes.json().catch(() => []) : []
+      const appointmentList: any[] = Array.isArray(appointments) ? appointments : []
 
-  const fullName = useMemo(() => {
-    if (!user) return ''
-    return [user.firstName, user.lastName].filter(Boolean).join(' ')
-  }, [user])
+      const results = await Promise.all(patients.map(async (p): Promise<ActiveConsultation | null> => {
+        const qs = queryForPatient(p)
+        const res = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${qs}`, { cache: 'no-store' }).catch(() => null)
+        if (!res || !res.ok || res.status === 204) return null
+        const c = await res.json().catch(() => null)
+        if (!c) return null
+        // Consultations completed today should still surface here, not just while the 48h window is open.
+        const completedToday = c.status === 'COMPLETED' && c.createdAt && clinicDateKey(c.createdAt) === clinicDateKey(new Date())
 
-  async function submitPayment() {
-    setPaymentError(null)
-    setPaymentSuccess(null)
-    setPaymentComplete(false)
+        const matchedAppointment = appointmentList.find(a => a.consultationId === c.id && a.consultationPatientId === p.patientId && a.status === 'SCHEDULED')
+        const hasAppointment = !!matchedAppointment
+        // Never got an appointment booked before the window closed — surface it as Expired instead of
+        // silently disappearing, so the patient understands why it's gone rather than being left to wonder.
+        const expiredPending = !c.active && !hasAppointment && c.status !== 'COMPLETED'
+        if (!c.active && !completedToday && !expiredPending) return null
 
-    const parsedAmount = Number(amount)
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setPaymentError('Please enter a valid amount greater than zero.')
-      return
-    }
-    if (!/^[A-Z]{3}$/.test(currency.trim().toUpperCase())) {
-      setPaymentError('Currency must be a valid 3-letter code, for example GBP.')
-      return
-    }
-    if (!stripePublishableKey) {
-      setPaymentError('Stripe publishable key is not configured for the active backend profile. Please set STRIPE_PUBLISHABLE_KEY and restart the backend.')
-      return
-    }
+        let stage = hasAppointment ? 2 : 1
 
-    setPaymentLoading(true)
-    try {
-      if (!clientSecret) {
-        const intent = await createPaymentIntent({
-          method: selectedMethod,
-          amount: parsedAmount,
-          currency,
-        })
-        setClientSecret(intent.clientSecret)
-        setStripePaymentIntentId(intent.stripePaymentIntentId)
-        setPaymentSuccess('Secure payment form loaded. Enter your card details below to complete payment.')
-        return
-      }
+        if (hasAppointment) {
+          const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest?${qs}`, { cache: 'no-store' }).catch(() => null)
+          if (rxRes && rxRes.ok && rxRes.status !== 204) {
+            const j = await rxRes.json().catch(() => null)
+            // Only count the prescription toward THIS consultation, not a stale one from a prior completed visit.
+            if (j?.pdfUrl && j?.consultationId === c.id) stage = 3
+          }
+        }
+        if (c.status === 'COMPLETED') stage = 4
 
-      if (!stripeRef.current || !elementsRef.current) {
-        setPaymentError('Secure payment form is still loading. Please try again in a moment.')
-        return
-      }
+        const detail = expiredPending ? 'Expired'
+          : stage === 1 ? 'Checklist Pending'
+          : stage === 2 ? 'Appointment Booked'
+          : stage === 3 ? 'Prescription Ready'
+          : 'Consultation Completed'
 
-      const returnUrl = getStripeReturnUrl()
-      const result = await stripeRef.current.confirmPayment({
-        elements: elementsRef.current,
-        confirmParams: returnUrl ? { return_url: returnUrl } : undefined,
-        redirect: 'if_required',
-      })
+        return {
+          patient: p,
+          consultationId: c.id,
+          stage,
+          detail,
+          expired: expiredPending,
+          appointment: matchedAppointment ? { startTime: matchedAppointment.startTime, endTime: matchedAppointment.endTime } : null,
+        }
+      }))
 
-      if (result.error) {
-        setPaymentError(result.error.message || 'Payment could not be completed. Please check your details and try again.')
-        return
-      }
+      if (alive) setActive(results.filter((r): r is ActiveConsultation => !!r))
+    })().finally(() => { if (alive) setLoadingActive(false) })
+    return () => { alive = false }
+  }, [patients, patientsLoading])
 
-      const paymentIntentId = result.paymentIntent?.id || stripePaymentIntentId
-      const synced = await confirmPaymentIntent(paymentIntentId)
-      const status = (synced.status || result.paymentIntent?.status || '').toLowerCase()
-      if (status === 'succeeded') {
-        setLatestPayment(synced)
-        setPaymentComplete(true)
-        setPaymentSuccess('Payment completed successfully. This window will close automatically in 3 seconds.')
-      } else if (status === 'processing') {
-        setPaymentSuccess('Payment is processing. We will update your account when Stripe confirms it.')
-      } else {
-        setPaymentError(synced.failureMessage || `Payment status: ${status || 'requires follow-up'}.`)
-      }
-      resetStripePaymentElement()
-    } catch (err: any) {
-      setPaymentError(err?.message || 'Payment failed. Please try again.')
-    } finally {
-      setPaymentLoading(false)
-    }
+  function goToConsultation(patient: PatientContextOption, consultationId?: number) {
+    const qp = new URLSearchParams(queryForPatient(patient))
+    if (consultationId) qp.set('cid', String(consultationId))
+    navigate(`/consultation?${qp.toString()}`)
   }
 
-
-
-  const { patients: travelerSelectOptions, activePatient: selectedTraveler, loading: patientSelectionLoading, selectPatient, queryString } = usePatient();
-  const selectedPatientId = selectedTraveler?.patientId || '';
-  // Keep one primitive snapshot of the active patient's identifiers. This avoids
-  // links and requests retaining a URLSearchParams object from a previous tab.
-  const selectedTravelerQuery = queryString;
-
-  useEffect(() => {
-    if (!reg?.id || !selectedPatientId) { setDocs([]); return }
-    let cancelled = false
-    setLoadingDocs(true)
-    authFetch(`${API_BASE_URL}/registrations/${reg.id}/patients/${encodeURIComponent(selectedPatientId)}/documents`, {})
-      .then(async response => response.ok ? response.json() : Promise.reject(new Error('Unable to load documents')))
-      .then(items => { if (!cancelled) setDocs(Array.isArray(items) ? items : []) })
-      .catch(() => { if (!cancelled) setDocs([]) })
-      .finally(() => { if (!cancelled) setLoadingDocs(false) })
-    return () => { cancelled = true }
-  }, [reg?.id, selectedPatientId])
-
-  // Latest prescription URL (if exists)
-  const [rxUrl, setRxUrl] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (patientSelectionLoading || !selectedTraveler) return;
-    let ignore = false;
-    (async () => {
-      try {
-        const res = await authFetch(`${API_BASE_URL}/prescriptions/latest?${selectedTravelerQuery}`, {});
-        if (ignore) return;
-        if (!res.ok || res.status === 204) { setRxUrl(null); return; }
-        const j = await res.json().catch(() => null);
-        setRxUrl(j?.pdfUrl ? resolveApiUrl(API_BASE_URL, j.pdfUrl) : null);
-      } catch {
-        if (!ignore) setRxUrl(null);
-      }
-    })();
-    return () => { ignore = true; };
-  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
-
-  // Latest referral URL (if exists)
-  const [referralUrl, setReferralUrl] = React.useState<string | null>(null);
-  const [careHistoryEnabled, setCareHistoryEnabled] = React.useState(false);
-  const [patientContextLoading, setPatientContextLoading] = React.useState(false);
-  const [latestConsultation, setLatestConsultation] = React.useState<any>(null);
-
-  React.useEffect(() => {
-    if (patientSelectionLoading || !selectedTraveler) return;
-    let ignore = false;
-    setPatientContextLoading(true);
-    setCareHistoryEnabled(false);
-    setRxUrl(null);
-    setReferralUrl(null);
-    setLatestConsultation(null);
-    (async () => {
-      try {
-        const res = await authFetch(`${API_BASE_URL}/referrals/latest?${selectedTravelerQuery}`, {
-      });
-        if (ignore) return;
-
-        // No referral yet
-        if (res.status === 204) { setReferralUrl(null); return; }
-        if (!res.ok) { setReferralUrl(null); return; }
-
-        const ct = res.headers.get('content-type') || '';
-
-        // Backend might stream the PDF directly
-        if (ct.includes('application/pdf')) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          setReferralUrl(url);
-          return;
-        }
-
-        // Otherwise expect JSON with a PDF URL
-        const j = await res.json().catch(() => null);
-        const raw = j?.pdfUrl || j?.url || j?.link || null;
-
-        // Normalize so we never end up with /api/api/...
-        setReferralUrl(raw ? resolveApiUrl(API_BASE_URL, raw) : null);
-      } catch {
-        if (!ignore) setReferralUrl(null);
-      }
-    })();
-    return () => { ignore = true; };
-  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
-
-  React.useEffect(() => {
-    if (patientSelectionLoading || !selectedTraveler) return;
-    let ignore = false;
-    (async () => {
-      try {
-        const res = await authFetch(`${API_BASE_URL}/care-history/mine?${selectedTravelerQuery}`, {});
-        if (ignore) return;
-        setCareHistoryEnabled(res.ok && res.status !== 204);
-        const latestRes = await authFetch(`${API_BASE_URL}/consultations/mine/latest?${selectedTravelerQuery}`, { cache: 'no-store' });
-        if (!ignore && latestRes.ok && latestRes.status !== 204) {
-          setLatestConsultation(await latestRes.json());
-        }
-      } catch {
-        if (!ignore) setCareHistoryEnabled(false);
-      } finally {
-        if (!ignore) setPatientContextLoading(false);
-      }
-    })();
-    return () => { ignore = true; };
-  }, [patientSelectionLoading, selectedTraveler, selectedTravelerQuery]);
-
-
-
-  // ---------- DOCTOR LANDING ----------
-  if (isDoctor) {
-    return (
-      <section className="section home">
-        <div className="page-head page-head--split">
-          <h1 className="page-title">Doctor Console</h1>
-          <div className="page-head-actions">
-            {!checking && user && (
-              <div className="signed-in-block">
-                {fullName && <div style={{ fontWeight: 700 }}>{fullName}</div>}
-                <div className="muted" style={{ fontSize: 14 }}>
-                  Signed in as <strong>{user.email}</strong>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="package-card">
-          <div className="pc-body" style={{ alignItems: 'flex-start' }}>
-            <div className="pc-lines">
-              <div className="muted">Access consultation requests and patient details.</div>
-            </div>
-            <div className="pc-actions">
-              <Link to="/doctor/consultations" className="btn">
-                Open Consultation Requests
-              </Link>
-              <Link to="/doctor/appointments" className="btn secondary">
-                View Appointments
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-    )
+  function startNewConsultation(patient: PatientContextOption) {
+    setShowNewConsultModal(false)
+    navigate(`/consultation/questionnaire?${queryForPatient(patient)}`)
   }
 
-  // ---------- TRAVELER VIEW (unchanged behavior) ----------
+  const today = useMemo(() => new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date()), [])
+  const hero = active[0]
+  const rest = active.slice(1)
+
+  const todayKey = clinicDateKey(new Date())
+  const isExpired = !!reg?.end && todayKey > reg.end
+  const daysLeft = reg?.end ? Math.max(0, Math.ceil((new Date(`${reg.end}T23:59:59`).getTime() - now) / 86400000)) : null
+  const packageDaysPurchased = activation?.packageDays || reg?.packageDays || 0
+
   return (
-    <section className="section home">
-      {/* Header with user + logout */}
-      <div className="page-head page-head--split">
-        <h1 className="page-title">My Travel Package</h1>
-        <div className="page-head-actions">
-          {!checking && user && (
-            <div className="signed-in-block">
-              {fullName && <div style={{ fontWeight: 700 }}>{fullName}</div>}
-              <div className="muted" style={{ fontSize: 14 }}>
-                Signed in as <strong>{user.email}</strong>
-              </div>
+    <>
+      <div className="page-title">Welcome back{user?.firstName ? `, ${user.firstName}` : ''}</div>
+      <div className="page-sub">{today}{reg?.to ? ` · Currently travelling in ${reg.to}` : ''}</div>
 
-              {/* Doctor link will never show here now because we returned early for doctors,
-                  but keeping this does no harm if roles change mid-session */}
-              {user.roles?.includes('DOCTOR') && (
-                <Link className="btn" to="/doctor/consultations" style={{ marginTop: 8, display: 'inline-block' }}>
-                  Doctor Console
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="patient-context" aria-label="Select patient">
-        <div className="patient-tabs" role="tablist">
-          {travelerSelectOptions.map((patient) => {
-            const active = patient.patientId === selectedPatientId
-            return (
-              <button
-                key={patient.patientId}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                className={`patient-tab${active ? ' active' : ''}`}
-                onClick={() => selectPatient(patient.patientId)}
-              >
-                <span className="patient-tab-avatar" aria-hidden="true">
-                  {patient.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
-                </span>
-                <span>{patient.name}{String(patient.id) === 'PRIMARY' ? <small>You</small> : <small>Co-traveller</small>}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Travel details card */}
-      {reg && (
-        <div className="package-card" style={{ marginBottom: 16 }}>
-          <div className="pc-body">
-            <div className="pc-lines">
-              <div>
-                <span className="muted strong">From:</span> <span className="strong">{reg.from || '—'}</span>
-              </div>
-              <div>
-                <span className="muted strong">To:</span> <span className="strong">{reg.to || '—'}</span>
-              </div>
-              <div className="muted">
-                <span className="strong">Travel Dates:</span> {reg.start || '—'} → {reg.end || '—'}
-              </div>
-              <div className="muted">
-                <span className="strong">Primary WhatsApp:</span> {reg.phone || '—'}
-              </div>
-            </div>
-
-            {/* Travelers list */}
-            {reg.travelers && reg.travelers.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <h3 className="h3">Travelers</h3>
-                <ul style={{ marginTop: 6, paddingLeft: 18 }}>
-                  {reg.travelers.map((t, i) => (
-                    <li key={t.id ?? `${t.fullName}-${i}`} style={{ marginBottom: 4 }}>
-                      <span className="strong">{t.fullName}</span>{' '}
-                      {t.dateOfBirth && (
-                        <span className="muted small">(DOB: {new Date(t.dateOfBirth).toLocaleDateString()})</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Static support card */}
-      <div className="package-card">
-        <div className="pc-body">
-          <div className="pc-lines">
+      {loadingActive || patientsLoading ? (
+        <div className="card">Loading your consultations…</div>
+      ) : active.length === 0 ? (
+        <div className="card" style={{ background: 'var(--bg-accent)', borderColor: 'var(--border-accent)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
             <div>
-              <span className="muted strong">Destination:</span> <span className="strong">Europe</span>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Need to speak to a doctor?</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Start a consultation and we&apos;ll guide you through a short checklist, then book you an appointment.
+              </div>
             </div>
-            <div className="muted">Daily Support: 9:00am - 9:00pm</div>
-            <div className="muted">Time Difference: +6 hours from Origin (GMT+2)</div>
-          </div>
-          <div className="pc-actions">
-            {/* <a className="btn" href="https://wa.me/447783579014" target="_blank" rel="noreferrer">
-              WhatsApp
-            </a> */}
-            <Link
-              to={selectedTravelerQuery ? `/consultation/questionnaire?${selectedTravelerQuery}` : '/consultation/questionnaire'}
-              className="btn"
-              style={{
-                backgroundColor: '#75b948ff',
-                color: 'white',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
+            <button
+              type="button"
+              className="bp"
+              style={{ padding: '12px 22px', fontSize: 14 }}
+              onClick={() => setShowNewConsultModal(true)}
+              disabled={isExpired}
+              title={isExpired ? 'Your coverage has expired — renew your package to start a new consultation.' : undefined}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="white"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6.6 10.8c1.2 2.4 3.2 4.4 5.6 5.6l2-2c.3-.3.7-.4 1.1-.3 1.2.4 2.6.6 4 .6.6 0 1 .4 1 1v3.5c0 .6-.4 1-1 1C11.3 20 4 12.7 4 4.5c0-.6.4-1 1-1H8.5c.6 0 1 .4 1 1 0 1.4.2 2.8.6 4 .1.4 0 .8-.3 1.1l-2.2 2.2Z"
-                />
-              </svg>
-              I Need a Consultation
-            </Link>
+              <i className="ti ti-stethoscope" aria-hidden="true" /> I Need a Consultation
+            </button>
           </div>
-        </div>
-      </div>
-
-      <div className="package-card patient-status-card" aria-live="polite">
-        <div className="pc-body">
-          <div>
-            <div className="muted small">Current consultation · {selectedTraveler?.name}</div>
-            <div className="strong" style={{ marginTop: 4 }}>
-              {patientContextLoading ? 'Loading patient information…' : latestConsultation ? latestConsultation.status.replace(/_/g, ' ') : 'No current consultation'}
+          {isExpired && (
+            <div className="notice n-warn" style={{ marginTop: 12 }}>
+              <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to start a new consultation.
             </div>
-          </div>
-          {latestConsultation && (
-            <Link className="btn secondary" to={`/consultation/tracker?${selectedTravelerQuery}`}>View consultation</Link>
           )}
         </div>
-      </div>
-
-      {(loadingDocs || loadingReg) && (
-        <div className="muted" style={{ margin: '10px 0' }}>
-          Loading your travel details…
-        </div>
-      )}
-
-      {/* Travel documents */}
-      {reg && docs.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h2 className="h2" style={{ textAlign: 'left' }}>
-            {selectedTraveler?.name}&apos;s Documents
-          </h2>
-          {docs.map((d) => {
-            const viewUrl = `${API_BASE_URL}/registrations/${reg.id}/patients/${encodeURIComponent(selectedPatientId)}/documents/${d.id}/view`
-            const dlUrl = `${API_BASE_URL}/registrations/${reg.id}/patients/${encodeURIComponent(selectedPatientId)}/documents/${d.id}/download`
-            const isPreviewable = /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.fileName || '')
-            return (
-              <div key={d.id} className="card" style={{ marginTop: 12 }}>
-                <div className="doc-head">
-                  <div>
-                    <div className="strong">{d.type === 'PASSPORT' ? 'Passport' : 'Travel Document'} · {d.fileName}</div>
-                    <div className="muted small">
-                      {(d.sizeBytes / 1024).toFixed(1)} KB
-                      {d.createdAt ? ` • ${new Date(d.createdAt).toLocaleString()}` : ''}
-                    </div>
-                  </div>
-                  <a className="btn" href={dlUrl} target="_blank" rel="noreferrer">
-                    Download
-                  </a>
-                </div>
-                {isPreviewable && (
-                  <iframe
-                    title={d.fileName}
-                    src={viewUrl}
-                    style={{ width: '100%', height: 200, marginTop: 10, border: '1px solid var(--line)', borderRadius: 12 }}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Quick Links */}
-      <div className="ql-head">Quick Links</div>
-
-      <div className="quick-grid">
-        {/* Care History — enabled if care history has at least one item */}
-        {careHistoryEnabled ? (
-          <Link
-            to={`/care-history?${selectedTravelerQuery}`}
-            className="quick"
-            style={{
-              borderRadius: 16,
-              padding: 16,
-              background: '#f3f7fb',
-              border: '1px solid #e6eef7',
-              textAlign: 'center',
-              textDecoration: 'none',
-              color: 'inherit',
-            }}
-          >
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'white', margin: '0 auto 10px',
-                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-              }}
+      ) : (
+        <div style={{ marginBottom: 11 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+            <div className="ct" style={{ marginBottom: 0 }}>Your Active Consultations</div>
+            <button
+              type="button"
+              className="bp"
+              style={{ boxShadow: '0 0 0 3px var(--bg-accent)' }}
+              onClick={() => setShowNewConsultModal(true)}
+              disabled={isExpired}
+              title={isExpired ? 'Your coverage has expired — renew your package to start a new consultation.' : undefined}
             >
-              {/* document icon */}
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-                <path d="M16 13H8M16 17H8M10 9H8" />
-              </svg>
-            </div>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>Care History</div>
-          </Link>
-        ) : (
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="quick"
-            style={{
-              borderRadius: 16,
-              padding: 16,
-              background: '#f3f7fb',
-              border: '1px solid #e6eef7',
-              cursor: 'not-allowed',
-              opacity: 0.45,
-              textAlign: 'center',
-            }}
-            title="Care history becomes available once consultation history is completed"
-          >
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'white', margin: '0 auto 10px',
-                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-              }}
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-                <path d="M16 13H8M16 17H8M10 9H8" />
-              </svg>
-            </div>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>Care History</div>
-          </button>
-        )}
-
-        {/* Tracker */}
-        <Link
-          to={`/consultation/tracker?${selectedTravelerQuery}`}
-          className="quick"
-          style={{
-            borderRadius: 16,
-            padding: 16,
-            background: '#f3f7fb',
-            border: '1px solid #e6eef7',
-            textAlign: 'center',
-            textDecoration: 'none',
-            color: 'inherit',
-          }}
-        >
-          <div
-            style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: 'white', margin: '0 auto 10px',
-              display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-            }}
-          >
-            {/* flag/bookmark icon */}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
+              <i className="ti ti-plus" aria-hidden="true" /> New Consultation
+            </button>
           </div>
-          <div style={{ fontWeight: 600, color: '#0f172a' }}>Tracker</div>
-        </Link>
-
-        {/* Prescription (enabled only if rx exists) */}
-        {rxUrl ? (
-          <a
-            href={rxUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="quick"
-            style={{
-              borderRadius: 16,
-              padding: 16,
-              background: '#f3f7fb',
-              border: '1px solid  #e6eef7',
-              textAlign: 'center',
-              textDecoration: 'none',
-              color: 'inherit',
-            }}
-          >
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'white', margin: '0 auto 10px',
-                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-              }}
-            >
-              {/* prescription/doc icon */}
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-                <path d="M16 13H8M16 17H8M10 9H8" />
-              </svg>
+          {isExpired && (
+            <div className="notice n-warn" style={{ marginBottom: 10 }}>
+              <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to start a new consultation.
             </div>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>Prescription</div>
-          </a>
-        ) : (
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="quick"
-            style={{
-              borderRadius: 16,
-              padding: 16,
-              background: '#f3f7fb',
-              border: '1px solid #e6eef7',
-              cursor: 'not-allowed',
-              opacity: 0.45,
-              textAlign: 'center',
-            }}
-            title="No prescription available yet"
-          >
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'white', margin: '0 auto 10px',
-                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-              }}
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12" />
-                <path d="M14 2v6h6" />
-                <path d="M9 12h6M9 16h6" />
-              </svg>
-            </div>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>Prescription</div>
-          </button>
-        )}
+          )}
 
-        {/* Referral Letter (enabled only if referral exists) */}
-        {referralUrl ? (
-          <a
-            href={referralUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="quick"
-            style={{
-              borderRadius: 16,
-              padding: 16,
-              background: '#f3f7fb',
-              border: '1px solid #e6eef7',
-              textAlign: 'center',
-              textDecoration: 'none',
-              color: 'inherit',
-            }}
-          >
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'white', margin: '0 auto 10px',
-                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-              }}
-            >
-              {/* document icon */}
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-                <path d="M16 13H8M16 17H8M10 9H8" />
-              </svg>
-            </div>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
-          </a>
-        ) : (
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="quick"
-            style={{
-              borderRadius: 16,
-              padding: 16,
-              background: '#f3f7fb',
-              border: '1px solid #e6eef7',
-              cursor: 'not-allowed',
-              opacity: 0.45,
-              textAlign: 'center',
-            }}
-            title="No referral letter available yet"
-          >
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'white', margin: '0 auto 10px',
-                display: 'grid', placeItems: 'center', border: '1px solid #e6eef7'
-              }}
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0e766e" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12" />
-                <path d="M14 2v6h6" />
-                <path d="M9 12h6M9 16h6" />
-              </svg>
-            </div>
-            <div style={{ fontWeight: 600, color: '#0f172a' }}>Referral Letter</div>
-          </button>
-        )}
-
-      </div>
-
-
-      {/* Offers */}
-      <div className="offers-head">Featured Offers</div>
-      <div className="offers">
-        <a className="offer-card" href="#">
-          <img
-            src="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1600&auto=format&fit=crop"
-            alt=""
-          />
-          <div className="offer-title">Food & Drink</div>
-        </a>
-        <a className="offer-card" href="#">
-          <img
-            src="https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=687&auto=format&fit=crop"
-            alt=""
-          />
-          <div className="offer-title">Taxi & Transport</div>
-        </a>
-        <a className="offer-card" href="#">
-          <img
-            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1600&auto=format&fit=crop"
-            alt=""
-          />
-          <div className="offer-title">Entertainment</div>
-        </a>
-        <a className="offer-card" href="#">
-          <img
-            src="https://images.unsplash.com/photo-1566073771259-6a8506099945?fm=jpg&q=60&w=3000&auto=format&fit=crop"
-            alt=""
-          />
-          <div className="offer-title">Accommodation</div>
-        </a>
-      </div>
-
-      {showPaymentsModal && (
-        <div className="payment-modal-backdrop" onClick={closePaymentsModal}>
-          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="payment-modal-header">
-              <h3>{location.pathname.endsWith('/payment-history') ? 'Payment History' : 'Complete Payment'}</h3>
-              <button className="payment-close-btn" onClick={closePaymentsModal} aria-label="Close payments">
-                ✕
+          {hero && (
+            <div className={`hero-consult-card${hero.expired ? '' : ' pulse'}`} onClick={() => goToConsultation(hero.patient, hero.consultationId)}>
+              <div className="hero-consult-top">
+                <span className="hero-eyebrow">{hero.patient.name}</span>
+                <span className={`tag ${hero.expired ? 'twarn' : 'tinfo'}`}>{hero.expired ? 'Expired' : STAGE_LABELS[hero.stage - 1]}</span>
+              </div>
+              <div className="hero-consult-time urgent">
+                <i className="ti ti-stethoscope" aria-hidden="true" />{hero.detail}
+              </div>
+              <div className="hero-consult-trail">
+                <MiniStepTrail steps={STAGE_LABELS} activeStage={hero.stage} />
+              </div>
+              {hero.expired && (
+                <div className="notice n-warn">
+                  <i className="ti ti-alert-triangle" aria-hidden="true" />No appointment was booked within the consultation window, so it has expired. Start a new consultation to continue.
+                </div>
+              )}
+              {hero.appointment && hero.stage === 2 && (
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="ti ti-calendar" aria-hidden="true" /> {clinicDateTime12(hero.appointment.startTime)}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fill-accent)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                    <i className="ti ti-brand-whatsapp" aria-hidden="true" /> {formatCountdown(hero.appointment.startTime, now)}
+                  </div>
+                </div>
+              )}
+              <div className="hero-consult-patient">
+                <div className="ava hero-ava">{initials(hero.patient.name)}</div>
+                <div>
+                  <div className="hero-patient-name">{hero.patient.name}</div>
+                  <div className="hero-patient-sub">
+                    {hero.expired ? 'This consultation window has closed'
+                      : hero.stage === 1 ? 'Complete your pre-consultation checklist to proceed'
+                      : hero.stage === 2 ? "We'll remind you over WhatsApp before your appointment"
+                      : hero.stage === 3 ? 'Your prescription is ready to view'
+                      : 'Connected with the next available doctor'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="bp btn-block hero-consult-btn"
+                onClick={e => { e.stopPropagation(); goToConsultation(hero.patient, hero.consultationId) }}
+              >
+                {hero.expired ? 'View Details' : hero.stage === 1 ? 'Continue Checklist' : 'View Details'}
               </button>
             </div>
+          )}
 
-            <p className="payment-subtitle">{location.pathname.endsWith('/payment-history') ? 'Read-only audit history for your account payments.' : 'Select a payment method and proceed securely.'}</p>
-
-            <div className="payment-history-summary">
-              {paymentHistoryLoading ? (
-                <span>Loading previous payment status…</span>
-              ) : paymentHistoryError ? (
-                <span>{paymentHistoryError}</span>
-              ) : latestPayment ? (
-                <span>
-                  Previous payment of {formatPaymentAmount(latestPayment)} was {paymentStatusCopy(latestPayment.status)}
-                  {formatPaymentDate(latestPayment.updatedAt || latestPayment.createdAt) ? ` on ${formatPaymentDate(latestPayment.updatedAt || latestPayment.createdAt)}` : ''}.
-                </span>
-              ) : paymentHistoryLoaded ? (
-                <span>No payment history available.</span>
-              ) : null}
-            </div>
-
-            {location.pathname.endsWith('/payment-history') ? (
-              <div className="payment-history-table">
-                {paymentHistoryLoading ? (
-                  <p>Loading payment transactions…</p>
-                ) : paymentHistoryError ? (
-                  <p className="payment-history-error">{paymentHistoryError}</p>
-                ) : paymentHistoryLoaded && paymentHistory.length === 0 ? (
-                  <p>No payment transactions available.</p>
-                ) : paymentHistory.map(p => (
-                  <div className="payment-history-row" key={p.id}>
-                    <strong>{formatPaymentAmount(p)}</strong><span>{paymentStatusCopy(p.status)}</span><span>{formatPaymentDate(p.updatedAt || p.createdAt)}</span><span>{p.packageLabel || 'Package not recorded'}</span><span>Registration: {p.registrationFee != null ? `£${Number(p.registrationFee).toFixed(2)}` : '—'}</span><span>Trip: {p.tripCoverageFee != null ? `£${Number(p.tripCoverageFee).toFixed(2)}` : '—'}</span><span>{p.method}</span><span>{p.stripePaymentIntentId || p.stripeChargeId || '—'}</span>
+          {rest.length > 0 && (
+            <div className="card">
+              {rest.map(item => (
+                <div key={item.patient.patientId} className="consult-row" onClick={() => goToConsultation(item.patient, item.consultationId)}>
+                  <div className="ava">{initials(item.patient.name)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{item.patient.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.detail}</div>
                   </div>
-                ))}
-              </div>
-            ) : !paymentComplete && (
-              <>
-            <div className="payment-methods">
-              {[
-                { code: 'CARD', label: 'Card' },
-                { code: 'EFT', label: 'EFT' },
-                { code: 'BANK_TRANSFER', label: 'Bank Transfer' },
-                { code: 'DIGITAL_WALLET', label: 'Digital Wallet' },
-              ].map((m) => (
-                <button
-                  key={m.code}
-                  type="button"
-                  className={`payment-method-chip ${selectedMethod === m.code ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedMethod(m.code as 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET')
-                    resetStripePaymentElement()
-                    setPaymentError(null)
-                    setPaymentSuccess(null)
-                    setPaymentComplete(false)
-                  }}
-                >
-                  {m.label}
-                </button>
+                  <span className={`tag ${item.expired ? 'twarn' : 'tinfo'}`}>{item.expired ? 'Expired' : STAGE_LABELS[item.stage - 1]}</span>
+                  <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+                </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
 
-            <div className="payment-form-grid">
-              <div className="field">
-                <label>Amount</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={amount}
-                  onChange={(e) => { setAmount(e.target.value); resetStripePaymentElement(); setPaymentComplete(false) }}
-                  placeholder="49.99"
-                />
-              </div>
-              <div className="field">
-                <label>Currency</label>
-                <input
-                  type="text"
-                  value={currency}
-                  maxLength={3}
-                  onChange={(e) => { setCurrency(e.target.value.toUpperCase()); resetStripePaymentElement(); setPaymentComplete(false) }}
-                  placeholder="GBP"
-                />
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderColor: 'var(--border-danger)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <i className="ti ti-alert-triangle" style={{ fontSize: 20, color: 'var(--text-danger)' }} aria-hidden="true" />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Medical emergency?</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              For life-threatening symptoms, please contact emergency services directly — GodwitCare&apos;s team is not equipped to respond to emergencies.
+            </div>
+          </div>
+        </div>
+        <button type="button" className="bd" style={{ whiteSpace: 'nowrap' }} onClick={() => setShowEmergencyModal(true)}>
+          <i className="ti ti-phone" aria-hidden="true" /> Call 999 (NHS Emergency)
+        </button>
+      </div>
+
+      {reg && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <div className="ct" style={{ marginBottom: 0 }}>Coverage Status</div>
+            <span className={`tag ${isExpired ? 'twarn' : activation?.activated ? 'tok' : 'tmute'}`}>
+              {isExpired ? 'Expired' : activation?.activated ? 'Activated' : 'Not Activated'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <i className="ti ti-map-pin" style={{ color: 'var(--text-accent)' }} aria-hidden="true" />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{reg.to || '—'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <i className="ti ti-calendar" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{reg.start || '—'} – {reg.end || '—'}</span>
+          </div>
+          <div className="g2" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="fi-hint">Days Purchased</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{packageDaysPurchased ? `${packageDaysPurchased} days` : '—'}</div>
+            </div>
+            <div>
+              <div className="fi-hint">Days Left</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: isExpired ? 'var(--text-danger)' : 'var(--text-primary)' }}>
+                {daysLeft === null ? '—' : isExpired ? 'Expired' : `${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
               </div>
             </div>
-
-            <div className="payment-secure-note">
-              Card details are collected by Stripe in {stripeEnvironment === 'live' ? 'production' : 'sandbox'} mode and are never stored by GodwitCare.
+          </div>
+          {isExpired && (
+            <div className="notice n-warn" style={{ marginBottom: 12 }}>
+              <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to book new consultations.
             </div>
-
-            {clientSecret && (
-              <div className="stripe-payment-element-panel">
-                <div ref={paymentElementContainerRef} />
+          )}
+          <div className="fi-hint" style={{ marginBottom: 8 }}>Members Covered</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {patients.map(p => (
+              <div key={p.patientId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="ava" style={{ width: 26, height: 26, fontSize: 10 }}>{initials(p.name)}</div>
+                <span style={{ fontSize: 13 }}>{p.name}</span>
+                {p.id === 'PRIMARY' && <span className="tag tinfo" style={{ marginLeft: 'auto' }}>Primary</span>}
               </div>
-            )}
-
-              </>
-            )}
-
-            {paymentError && <div className="payment-error">{paymentError}</div>}
-            {paymentSuccess && <div className="payment-success">{paymentSuccess}</div>}
-
-            {!location.pathname.endsWith('/payment-history') && !paymentComplete && (
-              <button className="btn block payment-submit-btn" onClick={submitPayment} disabled={paymentLoading}>
-                {paymentLoading ? 'Processing…' : clientSecret ? 'Pay securely with Stripe' : 'Continue to secure checkout'}
-              </button>
-            )}
+            ))}
           </div>
         </div>
       )}
-    </section>
+
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+          <div className="ct" style={{ marginBottom: 0 }}>Travel Support</div>
+          <span className="tag tok"><span className="live-dot" />Online Now</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <i className="ti ti-clock" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>9:00 AM – 5:00 PM local time</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <i className="ti ti-brand-whatsapp" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Video and audio consultations are conducted over WhatsApp</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className="ti ti-route" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>To book an appointment, use the &quot;New Consultation&quot; button</span>
+        </div>
+      </div>
+
+      {showNewConsultModal && (
+        <Modal title="Who is this consultation for?" onClose={() => setShowNewConsultModal(false)}>
+          {patients.map(p => (
+            <button key={p.patientId} type="button" className="traveler-pick" onClick={() => startNewConsultation(p)}>
+              <div className="ava" style={{ width: 26, height: 26, fontSize: 10 }}>{initials(p.name)}</div>
+              {p.name}
+            </button>
+          ))}
+        </Modal>
+      )}
+
+      {showEmergencyModal && (
+        <Modal
+          title="Medical emergency"
+          onClose={() => setShowEmergencyModal(false)}
+          footer={(
+            <>
+              <button type="button" className="bs" onClick={() => setShowEmergencyModal(false)}>Cancel</button>
+              <a className="bd" href="tel:999">Call 999 Now</a>
+            </>
+          )}
+        >
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            If this is a life-threatening emergency, call 999 immediately. GodwitCare&apos;s clinicians are not able to respond to emergencies in real time.
+          </p>
+        </Modal>
+      )}
+    </>
   )
 }

@@ -35,3 +35,26 @@ export function RequireRole({ user, role, loading, children }: Props) {
 
   return <>{children}</>;
 }
+
+type RequireAuthProps = {
+  user: UserDto | null;
+  loading?: boolean;
+  children: React.ReactNode;
+};
+
+/** Any authenticated user (patient or doctor) — used for patient-shell routes that aren't role-specific. */
+export function RequireAuth({ user, loading, children }: RequireAuthProps) {
+  if (loading) {
+    return (
+      <div style={{ padding: 24 }}>
+        <div className="muted">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}

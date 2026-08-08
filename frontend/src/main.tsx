@@ -14,12 +14,23 @@ import { RegProvider } from './state/registration';
 import ScrollToHash from './components/ScrollToHash';
 import ConsultationTracker from './screens/ConsultationTracker';
 import PreConsultation from './screens/PreConsultation';
-import ConsultationDetails from './screens/ConsultationDetails';
+import Documents from './screens/Documents';
+import PrescriptionView from './screens/PrescriptionView';
+import ReferralView from './screens/ReferralView';
+import PaymentHistory from './screens/PaymentHistory';
 import DoctorLogin from './screens/DoctorLogin';
 import DoctorConsultations from './screens/DoctorConsultations';
 import DoctorConsultationDetails from './screens/DoctorConsultationDetails';
-import DoctorAppointments from './screens/DoctorAppointments';
-import { RequireRole } from './screens/RequireRole';
+import DoctorDashboard from './screens/DoctorDashboard';
+import DoctorCalendar from './screens/DoctorCalendar';
+import DoctorAvailability from './screens/DoctorAvailability';
+import DoctorAvailabilityForm from './screens/DoctorAvailabilityForm';
+import DoctorLeave from './screens/DoctorLeave';
+import DoctorLeaveForm from './screens/DoctorLeaveForm';
+import DoctorSettings from './screens/DoctorSettings';
+import DoctorPrescriptionView from './screens/DoctorPrescriptionView';
+import DoctorGenerateLetter from './screens/DoctorGenerateLetter';
+import { RequireRole, RequireAuth } from './screens/RequireRole';
 import CareHistory from './screens/CareHistory';
 import ReferralLetter from './screens/ReferralLetter';
 import Profile from './screens/Profile';
@@ -29,17 +40,20 @@ import ChangePassword from './screens/ChangePassword';
 import AdminDashboard from './screens/AdminDashboard';
 import OtpVerification from './screens/OtpVerification';
 import ActivationPayment from './screens/ActivationPayment';
+import PatientShell, { type PatientNavId } from './components/portal/PatientShell';
+import DoctorShell, { type DoctorNavId } from './components/portal/DoctorShell';
+import './styles/portal.css';
 
 // NEW: shared auth context
-import { AuthProvider, useAuth } from './state/auth';
+import { AuthProvider, isDoctorUser, useAuth } from './state/auth';
 import { PatientProvider } from './state/patient';
-import { logout } from './api';
+import { logout, resolveApiUrl, API_BASE_URL } from './api';
+import AuthedAvatar from './components/AuthedAvatar';
 
 // ---------- Shell layout ----------
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
-  const logoSrc = `${import.meta.env.BASE_URL}assets/logo-header.png`;
   const logoColorSrc = `${import.meta.env.BASE_URL}assets/logo-header-color.png`;
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
@@ -81,7 +95,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <header>
         <div className="nav">
           <div className="nav-left">
-            <img className="logo" src={logoSrc} alt="GodwitCare" />
+            <img className="logo" src={logoColorSrc} alt="GodwitCare" />
             <span className="envBadge">Test Environment</span>
           </div>
 
@@ -105,14 +119,16 @@ function Shell({ children }: { children: React.ReactNode }) {
                   onClick={() => setMenuOpen(prev => !prev)}
                 >
                   <span className="menu-btn-avatar-wrap">
-                    {user.photoUrl ? (
-                      <img className="menu-btn-avatar" src={user.photoUrl} alt="" />
-                    ) : (
-                      <span className="menu-btn-initials">
-                        {`${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
-                          || (user.email?.[0]?.toUpperCase() ?? '?')}
-                      </span>
-                    )}
+                    <AuthedAvatar
+                      src={user.photoUrl ? resolveApiUrl(API_BASE_URL, user.photoUrl) : null}
+                      className="menu-btn-avatar"
+                      fallback={(
+                        <span className="menu-btn-initials">
+                          {`${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
+                            || (user.email?.[0]?.toUpperCase() ?? '?')}
+                        </span>
+                      )}
+                    />
                   </span>
                   <span className="menu-btn-name">{user.firstName}</span>
                   <span className="menu-btn-chevron" aria-hidden="true">▾</span>
@@ -195,6 +211,14 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Profile and Change Password are shared between patients and doctors.
+// Doctors get the DoctorShell (Settings is their equivalent nav item); patients get PatientShell.
+function RoleAwareShell({ activeId, children }: { activeId: PatientNavId; children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (isDoctorUser(user)) return <DoctorShell activeId="settings">{children}</DoctorShell>;
+  return <PatientShell activeId={activeId}>{children}</PatientShell>;
+}
+
 // ---------- Routes ----------
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -257,33 +281,61 @@ function AppRoutes() {
       <Route
         path="/consultation"
         element={
-          <Shell>
-            <Consultation />
-          </Shell>
+          <PatientShell activeId="tracker">
+            <RequireAuth user={user} loading={loading}>
+              <Consultation />
+            </RequireAuth>
+          </PatientShell>
         }
       />
       <Route
         path="/consultation/tracker"
         element={
-          <Shell>
-            <ConsultationTracker />
-          </Shell>
+          <PatientShell activeId="tracker">
+            <RequireAuth user={user} loading={loading}>
+              <ConsultationTracker />
+            </RequireAuth>
+          </PatientShell>
         }
       />
       <Route
         path="/consultation/questionnaire"
         element={
-          <Shell>
-            <PreConsultation />
-          </Shell>
+          <PatientShell activeId="tracker">
+            <RequireAuth user={user} loading={loading}>
+              <PreConsultation />
+            </RequireAuth>
+          </PatientShell>
         }
       />
       <Route
-        path="/consultation/details"
+        path="/documents"
         element={
-          <Shell>
-            <ConsultationDetails />
-          </Shell>
+          <PatientShell activeId="documents">
+            <RequireAuth user={user} loading={loading}>
+              <Documents />
+            </RequireAuth>
+          </PatientShell>
+        }
+      />
+      <Route
+        path="/prescription"
+        element={
+          <PatientShell activeId="carehistory">
+            <RequireAuth user={user} loading={loading}>
+              <PrescriptionView />
+            </RequireAuth>
+          </PatientShell>
+        }
+      />
+      <Route
+        path="/referral"
+        element={
+          <PatientShell activeId="carehistory">
+            <RequireAuth user={user} loading={loading}>
+              <ReferralView />
+            </RequireAuth>
+          </PatientShell>
         }
       />
       <Route
@@ -294,18 +346,20 @@ function AppRoutes() {
           </Shell>
         }
       />
-      <Route path="/profile" element={<Shell><Profile /></Shell>} />
-      <Route path="/payment-history" element={<Shell><Home /></Shell>} />
+      <Route path="/profile" element={<RoleAwareShell activeId="profile"><RequireAuth user={user} loading={loading}><Profile /></RequireAuth></RoleAwareShell>} />
+      <Route path="/payment-history" element={<PatientShell activeId="paymenthistory"><RequireAuth user={user} loading={loading}><PaymentHistory /></RequireAuth></PatientShell>} />
       <Route path="/activate" element={<Shell>{user ? <ActivationPayment /> : <Navigate to="/login" replace />}</Shell>} />
       <Route path="/forgot-password" element={<Shell><ForgotPassword /></Shell>} />
       <Route path="/reset-password" element={<Shell><ResetPassword /></Shell>} />
-      <Route path="/change-password" element={<Shell>{user ? <ChangePassword /> : <Navigate to="/login" replace />}</Shell>} />
+      <Route path="/change-password" element={<RoleAwareShell activeId="profile">{user ? <ChangePassword /> : <Navigate to="/login" replace />}</RoleAwareShell>} />
       <Route
         path="/doctor/referral/:id"
         element={
-          <Shell>
-            <ReferralLetter />
-          </Shell>
+          <DoctorShell activeId="consultations">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <ReferralLetter />
+            </RequireRole>
+          </DoctorShell>
         }
       />
 
@@ -324,60 +378,146 @@ function AppRoutes() {
       <Route
         path="/home"
         element={
-          <Shell>
-            {user && !user.otpVerified ? <Navigate to="/verify-otp" replace /> : user && !user.activated ? <Navigate to="/activate" replace /> : <Home />}
-          </Shell>
+          loading ? null
+            : !user ? <Navigate to="/login" replace />
+            : !user.otpVerified ? <Navigate to="/verify-otp" replace />
+            : !user.activated ? <Navigate to="/activate" replace />
+            : isDoctorUser(user) ? <Navigate to="/doctor/dashboard" replace />
+            : <PatientShell activeId="home"><Home /></PatientShell>
         }
       />
       <Route
         path="/care-history"
         element={
-          <Shell>
-            <CareHistory />
-          </Shell>
+          <PatientShell activeId="carehistory">
+            <RequireAuth user={user} loading={loading}>
+              <CareHistory />
+            </RequireAuth>
+          </PatientShell>
         }
       />
 
       <Route
+        path="/doctor/dashboard"
+        element={
+          <DoctorShell activeId="dashboard">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorDashboard />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
+        path="/doctor/calendar"
+        element={
+          <DoctorShell activeId="calendar">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorCalendar />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
         path="/doctor/consultations"
         element={
-          <Shell>
+          <DoctorShell activeId="consultations">
             <RequireRole user={user} role="DOCTOR" loading={loading}>
               <DoctorConsultations />
             </RequireRole>
-          </Shell>
+          </DoctorShell>
         }
       />
       <Route
         path="/doctor/consultations/:id"
         element={
-          <Shell>
+          <DoctorShell activeId="consultations">
             <RequireRole user={user} role="DOCTOR" loading={loading}>
               <DoctorConsultationDetails />
             </RequireRole>
-          </Shell>
+          </DoctorShell>
         }
       />
       <Route
         path="/doctor/consultations/:id/care-history"
         element={
-          <Shell>
+          <DoctorShell activeId="consultations">
             <RequireRole user={user} role="DOCTOR" loading={loading}>
               <CareHistory />
             </RequireRole>
-          </Shell>
+          </DoctorShell>
         }
       />
       <Route
-        path="/doctor/appointments"
+        path="/doctor/consultations/:id/prescription"
         element={
-          <Shell>
+          <DoctorShell activeId="consultations">
             <RequireRole user={user} role="DOCTOR" loading={loading}>
-              <DoctorAppointments />
+              <DoctorPrescriptionView />
             </RequireRole>
-          </Shell>
+          </DoctorShell>
         }
       />
+      <Route
+        path="/doctor/consultations/:id/letter"
+        element={
+          <DoctorShell activeId="consultations">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorGenerateLetter />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
+        path="/doctor/availability"
+        element={
+          <DoctorShell activeId="availability">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorAvailability />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
+        path="/doctor/availability/new"
+        element={
+          <DoctorShell activeId="availability">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorAvailabilityForm />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
+        path="/doctor/leave"
+        element={
+          <DoctorShell activeId="leave">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorLeave />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
+        path="/doctor/leave/new"
+        element={
+          <DoctorShell activeId="leave">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorLeaveForm />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route
+        path="/doctor/settings"
+        element={
+          <DoctorShell activeId="settings">
+            <RequireRole user={user} role="DOCTOR" loading={loading}>
+              <DoctorSettings />
+            </RequireRole>
+          </DoctorShell>
+        }
+      />
+      <Route path="/doctor/appointments" element={<Navigate to="/doctor/dashboard" replace />} />
 
       <Route
         path="*"

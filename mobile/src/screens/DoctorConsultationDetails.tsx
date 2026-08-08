@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput, Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { doctorGetConsultation, doctorLatestPrescriptionMeta, API_BASE_URL, resolveApiUrl } from '../api';
+import { doctorGetConsultation, doctorLatestPrescriptionMeta, doctorCreatePrescription, API_BASE_URL, resolveApiUrl } from '../api';
 import { Btn, Card, Muted, Strong, LoadingView } from '../components/UI';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
@@ -54,14 +54,9 @@ export default function DoctorConsultationDetails() {
     if (meds.length === 0) { setRxErr('Please add at least one medicine.'); return; }
     setCreatingRx(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/doctor/consultations/${data.id}/prescriptions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ history: history.trim(), diagnosis: diagnosis.trim(), medicines: meds, recommendations: recommendations.trim() }),
+      const j = await doctorCreatePrescription(data.id, {
+        history: history.trim(), diagnosis: diagnosis.trim(), medicines: meds, recommendations: recommendations.trim(),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const j = await res.json().catch(() => ({}));
       setRxId(typeof j.id === 'number' ? j.id : null);
       if (j.id) setRxPdfUrl(`${API_BASE_URL}/doctor/prescriptions/${j.id}/pdf`);
     } catch (err: any) {

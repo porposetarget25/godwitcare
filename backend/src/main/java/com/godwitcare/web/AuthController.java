@@ -66,18 +66,23 @@ public class AuthController {
                           String lastName,
                           String email,
                           String username,
+                          String photoUrl,
                           List<String> roles,
                           boolean otpVerified, boolean activated) {}
     public record AuthResponse(UserDto user, String token, long expiresInSeconds) {}
     public record AvailabilityDto(boolean emailRegistered, boolean whatsAppRegistered) {}
 
     private UserDto toDto(User u) {
+        String photoUrl = (u.getProfilePhotoFileName() == null || u.getProfilePhotoFileName().isBlank())
+                ? null
+                : "/api/users/me/photo";
         return new UserDto(
                 u.getId(),
                 u.getFirstName(),
                 u.getLastName(),
                 u.getEmail(),
                 u.getUsername(),
+                photoUrl,
                 List.of(u.getRole().name()),
                 u.isOtpVerified(),
                 u.isActivated()

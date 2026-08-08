@@ -5,12 +5,36 @@ import {
   Image, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL, authFetch, getActivationPaymentSummary, type ActivationPaymentSummary } from '../api';
 import { useAuth } from '../state/auth';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { Btn, Card, Muted, Strong, LoadingView } from '../components/UI';
 import { PageHeader } from '../components/PageHeader';
 import { openPdf } from '../utils/openPdf';
+import { clinicDateKey, clinicDateTime } from '../lib/appointmentTime';
+
+const STAGE_LABELS = ['Checklist', 'Appointment Booked', 'Prescription', 'Completed'];
+
+type ActiveConsult = {
+  consultationId: number;
+  stage: number;
+  detail: string;
+  expired: boolean;
+  appointment: { startTime: string; endTime: string } | null;
+};
+
+function formatCountdown(startTimeIso: string, now: number): string {
+  const diffMs = new Date(startTimeIso).getTime() - now;
+  if (diffMs <= 0) return 'Starting shortly';
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `in ${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `in ${hours}h ${minutes}m ${seconds}s`;
+  return `in ${minutes}m ${seconds}s`;
+}
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
@@ -175,13 +199,13 @@ function TravelCard({ reg }: { reg: RegData }) {
 }
 
 // ── Consultation CTA card ─────────────────────────────────────────────────────
-function ConsultCard({ onPress }: { onPress: () => void }) {
+function ConsultCard({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
   return (
-    <View style={cc.card}>
+    <View style={[cc.card, disabled && { opacity: 0.6 }]}>
       <View style={cc.left}>
         <Text style={cc.title}>Need Medical Help?</Text>
         <Text style={cc.sub}>Clinicians available Mon–Fri{'\n'}09:00 – 17:00 UK time</Text>
-        <TouchableOpacity style={cc.btn} onPress={onPress} activeOpacity={0.85}>
+        <TouchableOpacity style={cc.btn} onPress={disabled ? undefined : onPress} activeOpacity={disabled ? 1 : 0.85}>
           <Text style={cc.btnIcon}>📞</Text>
           <Text style={cc.btnText}>Start Consultation</Text>
         </TouchableOpacity>
@@ -193,6 +217,34 @@ function ConsultCard({ onPress }: { onPress: () => void }) {
   );
 }
 
+// ── Active consultation hero card ───────────────────────────────────────────────
+function ActiveConsultCard({ consult, now, onPress }: { consult: ActiveConsult; now: number; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[ac.card, consult.expired && ac.cardExpired]} onPress={onPress} activeOpacity={0.85}>
+      <View style={ac.topRow}>
+        <Text style={ac.eyebrow}>Your Consultation</Text>
+        <View style={[ac.tag, consult.expired && ac.tagWarn]}>
+          <Text style={[ac.tagText, consult.expired && ac.tagTextWarn]}>{consult.expired ? 'Expired' : STAGE_LABELS[consult.stage - 1]}</Text>
+        </View>
+      </View>
+      <Text style={ac.detail}>🩺 {consult.detail}</Text>
+
+      {consult.expired && (
+        <Text style={ac.expiredText}>No appointment was booked within the consultation window, so it has expired.</Text>
+      )}
+
+      {consult.appointment && consult.stage === 2 && (
+        <View style={{ marginTop: spacing.xs }}>
+          <Text style={ac.apptTime}>📅 {clinicDateTime(consult.appointment.startTime)}</Text>
+          <Text style={ac.countdown}>💬 {formatCountdown(consult.appointment.startTime, now)}</Text>
+        </View>
+      )}
+
+      <Text style={ac.btnText}>{consult.expired ? 'View Details' : consult.stage === 1 ? 'Continue Checklist →' : 'View Details →'}</Text>
+    </TouchableOpacity>
+  );
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
@@ -200,9 +252,19 @@ export default function Home() {
   const [reg,         setReg        ] = useState<RegData | null>(null);
   const [rxUrl,       setRxUrl      ] = useState<string | null>(null);
   const [referralUrl, setReferralUrl] = useState<string | null>(null);
+  const [activation,  setActivation ] = useState<ActivationPaymentSummary | null>(null);
+  const [activeConsult, setActiveConsult] = useState<ActiveConsult | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const router = useRouter();
 
   const isDoctor = !!user?.roles?.some(r => typeof r === 'string' && r.toUpperCase().includes('DOCTOR'));
+
+  // Only tick while there's a booked appointment countdown to show.
+  useEffect(() => {
+    if (activeConsult?.stage !== 2 || !activeConsult.appointment) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [activeConsult?.stage, activeConsult?.appointment]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -212,7 +274,7 @@ export default function Home() {
       try {
         if (!user.email || isDoctor) { setChecking(false); return; }
 
-        const res = await fetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(user.email)}`, { credentials: 'include' });
+        const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(user.email)}`);
         if (res.ok) {
           const data   = await res.json();
           const latest = Array.isArray(data) ? data[data.length - 1] : data;
@@ -229,13 +291,13 @@ export default function Home() {
           }
         }
 
-        const rxRes = await fetch(`${API_BASE_URL}/prescriptions/latest`, { credentials: 'include' });
+        const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest`);
         if (rxRes.ok && rxRes.status !== 204) {
           const j = await rxRes.json().catch(() => null);
           if (alive) setRxUrl(j?.pdfUrl ?? null);
         }
 
-        const refRes = await fetch(`${API_BASE_URL}/referrals/latest`, { credentials: 'include' });
+        const refRes = await authFetch(`${API_BASE_URL}/referrals/latest`);
         if (refRes.ok && refRes.status !== 204) {
           const j = await refRes.json().catch(() => null);
           if (alive) setReferralUrl(j?.pdfUrl ?? null);
@@ -246,7 +308,72 @@ export default function Home() {
     return () => { alive = false; };
   }, [user, authLoading]);
 
+  // Coverage activation summary (Days Purchased / Days Left / Activated tag)
+  useEffect(() => {
+    if (authLoading || !user?.email || isDoctor) return;
+    let alive = true;
+    getActivationPaymentSummary().then(a => { if (alive) setActivation(a); }).catch(() => { if (alive) setActivation(null); });
+    return () => { alive = false; };
+  }, [user?.email, authLoading, isDoctor]);
+
+  // Primary patient's active consultation — stage, expiry, and appointment countdown.
+  useEffect(() => {
+    if (authLoading || !user?.email || isDoctor) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await authFetch(`${API_BASE_URL}/consultations/mine/latest`, { cache: 'no-store' });
+        if (!alive) return;
+        if (res.status === 204 || !res.ok) { setActiveConsult(null); return; }
+        const c = await res.json().catch(() => null);
+        if (!c || !alive) { setActiveConsult(null); return; }
+
+        const completedToday = c.status === 'COMPLETED' && c.createdAt && clinicDateKey(c.createdAt) === clinicDateKey(new Date());
+
+        const apptRes = await authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' }).catch(() => null);
+        const appts: any[] = apptRes && apptRes.ok ? await apptRes.json().catch(() => []) : [];
+        const matchedAppointment = (Array.isArray(appts) ? appts : []).find(
+          a => a.consultationId === c.id && a.status === 'SCHEDULED'
+        );
+        const hasAppointment = !!matchedAppointment;
+        const expiredPending = !c.active && !hasAppointment && c.status !== 'COMPLETED';
+        if (!c.active && !completedToday && !expiredPending) { setActiveConsult(null); return; }
+
+        let stage = hasAppointment ? 2 : 1;
+        if (hasAppointment) {
+          const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest`, { cache: 'no-store' }).catch(() => null);
+          if (rxRes && rxRes.ok && rxRes.status !== 204) {
+            const j = await rxRes.json().catch(() => null);
+            if (j?.pdfUrl && j?.consultationId === c.id) stage = 3;
+          }
+        }
+        if (c.status === 'COMPLETED') stage = 4;
+
+        const detail = expiredPending ? 'Expired'
+          : stage === 1 ? 'Checklist Pending'
+          : stage === 2 ? 'Appointment Booked'
+          : stage === 3 ? 'Prescription Ready'
+          : 'Consultation Completed';
+
+        if (!alive) return;
+        setActiveConsult({
+          consultationId: c.id,
+          stage,
+          detail,
+          expired: expiredPending,
+          appointment: matchedAppointment ? { startTime: matchedAppointment.startTime, endTime: matchedAppointment.endTime } : null,
+        });
+      } catch { if (alive) setActiveConsult(null); }
+    })();
+    return () => { alive = false; };
+  }, [user?.email, authLoading, isDoctor]);
+
   const fullName = useMemo(() => [user?.firstName, user?.lastName].filter(Boolean).join(' '), [user]);
+
+  const todayKey = clinicDateKey(new Date());
+  const isExpired = !!reg?.end && todayKey > reg.end;
+  const daysLeft = reg?.end ? Math.max(0, Math.ceil((new Date(`${reg.end}T23:59:59`).getTime() - now) / 86400000)) : null;
+  const packageDaysPurchased = activation?.packageDays || reg?.packageDays || 0;
 
   if (checking) return <LoadingView />;
 
@@ -301,12 +428,55 @@ export default function Home() {
           )
         }
 
-        {/* Consultation CTA */}
-        <ConsultCard onPress={() => {
-          const t = reg?.travelers?.[0];
-          const qs = t?.id ? `?travelerId=${t.id}` : '';
-          router.push(`/(app)/consultation/tracker${qs}` as any);
-        }} />
+        {/* Consultation CTA — active-consultation hero when there's one in progress */}
+        {activeConsult ? (
+          <ActiveConsultCard
+            consult={activeConsult}
+            now={now}
+            onPress={() => router.push(`/(app)/consultation/tracker?cid=${activeConsult.consultationId}` as any)}
+          />
+        ) : (
+          <ConsultCard
+            disabled={isExpired}
+            onPress={() => {
+              if (isExpired) return;
+              const t = reg?.travelers?.[0];
+              const qs = t?.id ? `?travelerId=${t.id}` : '';
+              router.push(`/(app)/consultation/tracker${qs}` as any);
+            }}
+          />
+        )}
+        {isExpired && (
+          <View style={s.expiredNotice}>
+            <Text style={s.expiredNoticeText}>⚠️ Your coverage has expired. Renew your package to start a new consultation.</Text>
+          </View>
+        )}
+
+        {/* Coverage Status */}
+        {reg && (
+          <View style={s.covCard}>
+            <View style={s.covHeadRow}>
+              <Text style={s.covTitle}>Coverage Status</Text>
+              <View style={[s.covTag, isExpired ? s.covTagWarn : activation?.activated ? s.covTagOk : s.covTagMute]}>
+                <Text style={[s.covTagText, isExpired ? s.covTagTextWarn : activation?.activated ? s.covTagTextOk : s.covTagTextMute]}>
+                  {isExpired ? 'Expired' : activation?.activated ? 'Activated' : 'Not Activated'}
+                </Text>
+              </View>
+            </View>
+            <View style={s.covGrid}>
+              <View>
+                <Text style={s.covLabel}>Days Purchased</Text>
+                <Text style={s.covValue}>{packageDaysPurchased ? `${packageDaysPurchased} days` : '—'}</Text>
+              </View>
+              <View>
+                <Text style={s.covLabel}>Days Left</Text>
+                <Text style={[s.covValue, isExpired && { color: colors.error }]}>
+                  {daysLeft === null ? '—' : isExpired ? 'Expired' : `${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Quick Links */}
         <Text style={s.sectionLabel}>Quick Links</Text>
@@ -318,7 +488,7 @@ export default function Home() {
               router.push(`/(app)/care-history${qs}` as any);
             }}
           />
-          <QuickLink icon="🔖" label="Tracker"
+          <QuickLink icon="🔖" label="Tracker" disabled={isExpired}
             onPress={() => {
               const t = reg?.travelers?.[0];
               const qs = t?.id ? `?travelerId=${t.id}` : '';
@@ -370,6 +540,24 @@ const s = StyleSheet.create({
   doctorHero:     { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg, borderWidth: 1, borderColor: colors.line, ...shadow.sm },
   doctorTitle:    { fontSize: typography.md, fontWeight: '700', color: colors.text },
   doctorSub:      { fontSize: typography.sm, color: colors.muted },
+
+  expiredNotice:     { backgroundColor: colors.warningBg, borderWidth: 1, borderColor: colors.warningBorder, borderRadius: radius.lg, padding: spacing.md },
+  expiredNoticeText: { fontSize: typography.sm, color: colors.warning, lineHeight: 18 },
+
+  covCard:     { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md, ...shadow.sm },
+  covHeadRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  covTitle:    { fontSize: typography.base, fontWeight: '700', color: colors.text },
+  covTag:      { borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  covTagOk:    { backgroundColor: colors.successBg },
+  covTagWarn:  { backgroundColor: colors.warningBg },
+  covTagMute:  { backgroundColor: colors.surface },
+  covTagText:  { fontSize: typography.xs, fontWeight: '700' },
+  covTagTextOk:   { color: colors.success },
+  covTagTextWarn: { color: colors.warning },
+  covTagTextMute: { color: colors.muted },
+  covGrid:     { flexDirection: 'row', gap: spacing.xxl },
+  covLabel:    { fontSize: typography.xs, color: colors.muted },
+  covValue:    { fontSize: typography.base, fontWeight: '700', color: colors.text, marginTop: 2 },
 });
 
 // Travel card styles
@@ -425,6 +613,23 @@ const cc = StyleSheet.create({
   btnIcon: { fontSize: 14 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: typography.sm },
   iconWrap:{ width: 70, height: 70, alignItems: 'center', justifyContent: 'center' },
+});
+
+// Active-consultation hero card styles
+const ac = StyleSheet.create({
+  card:        { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.brand + '50', padding: spacing.xl, gap: spacing.xs, ...shadow.md },
+  cardExpired: { borderColor: colors.errorBorder },
+  topRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  eyebrow:     { fontSize: typography.xs, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  tag:         { backgroundColor: colors.brandLight, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  tagWarn:     { backgroundColor: colors.warningBg },
+  tagText:     { fontSize: typography.xs, fontWeight: '700', color: colors.brandDark },
+  tagTextWarn: { color: colors.warning },
+  detail:      { fontSize: typography.md, fontWeight: '700', color: colors.text, marginTop: 2 },
+  expiredText: { fontSize: typography.sm, color: colors.warning, lineHeight: 18, marginTop: 2 },
+  apptTime:    { fontSize: typography.sm, color: colors.textSec },
+  countdown:   { fontSize: typography.base, fontWeight: '700', color: colors.brand, marginTop: 2 },
+  btnText:     { fontSize: typography.sm, fontWeight: '700', color: colors.brand, marginTop: spacing.sm },
 });
 
 // Quick link styles

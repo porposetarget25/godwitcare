@@ -15,7 +15,7 @@ export default function DoctorLogin() {
     try {
       await login(email, password); // must be a DOCTOR account
       await refresh();              // update global auth state
-      nav('/doctor/consultations');
+      nav('/doctor/dashboard');
     } catch {
       alert('Login failed');
     }
