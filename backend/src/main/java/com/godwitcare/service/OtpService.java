@@ -28,7 +28,8 @@ public class OtpService {
         user.setOtpCodeHash(passwordEncoder.encode(otp));
         user.setOtpExpiresAt(Instant.now().plusSeconds(otpExpirySeconds));
 
-        String message = "Your GodwitCare verification OTP is " + otp + ". It expires in " + (otpExpirySeconds / 60) + " minutes.";
+        String message = "OTP Code: " + otp + ". This is your OTP code for Godwitcare. For your security, do not share this code.";
+        //String message = "Your GodwitCare verification OTP is " + otp + ". It expires in " + (otpExpirySeconds / 60) + " minutes.";
         whatsAppSender.send(user.getUsername(), message);
     }
 
