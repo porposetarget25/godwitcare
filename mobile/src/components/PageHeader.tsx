@@ -1,10 +1,13 @@
-// src/components/PageHeader.tsx
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+// src/components/PageHeader.tsx — mirrors web's plain .page-head (title + sub + actions), no color bar.
+// Screens with showBack merge into PortalShell's persistent topbar (single row: back + title +
+// actions) instead of rendering a second bar here; root screens (showBack={false}) still render
+// their own inline header, same as before.
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors, spacing, typography } from '../theme';
-
-const LOGO_DARK = require('../../assets/logo_dark.png');
+import { useFocusEffect } from '@react-navigation/native';
+import { ws, wc } from '../webStyle';
+import { usePortalHeader } from './PortalShell';
 
 type Props = {
   title: string;
@@ -12,102 +15,38 @@ type Props = {
   showBack?: boolean;
   onBack?: () => void;
   right?: React.ReactNode;
-  showLogo?: boolean;
+  showLogo?: boolean; // unused now that PortalShell owns the persistent logo; kept for call-site compatibility
 };
 
-export function PageHeader({ title, subtitle, showBack = true, onBack, right, showLogo = false }: Props) {
+export function PageHeader({ title, subtitle, showBack = true, onBack, right }: Props) {
   const router = useRouter();
-  const handleBack = () => { if (onBack) onBack(); else router.back(); };
+  const setHeader = usePortalHeader();
+
+  // Re-registered on every focus (not just mount) because expo-router keeps prior stack
+  // screens mounted — without this, navigating back to a screen wouldn't restore its header.
+  useFocusEffect(
+    useCallback(() => {
+      if (!showBack) return;
+      setHeader({ title, subtitle, right, onBack: () => { if (onBack) onBack(); else router.back(); } });
+      return () => setHeader(null);
+    }, [showBack, title, subtitle, right, onBack, router, setHeader])
+  );
+
+  if (showBack) return null;
 
   return (
-    <View style={styles.header}>
-      {/* Left */}
-      <View style={styles.sideLeft}>
-        {showBack ? (
-          <TouchableOpacity onPress={handleBack} style={styles.backBtn} activeOpacity={0.75}>
-            <View style={styles.chevronWrap}>
-              <View style={[styles.chevronBar, { transform: [{ rotate: '-45deg' }, { translateY: -3.5 }] }]} />
-              <View style={[styles.chevronBar, { transform: [{ rotate: '45deg'  }, { translateY:  3.5 }] }]} />
-            </View>
-          </TouchableOpacity>
-        ) : showLogo ? (
-          <Image source={LOGO_DARK} style={styles.logoMark} resizeMode="contain" />
-        ) : (
-          <View style={{ width: 36 }} />
-        )}
-      </View>
-
-      {/* Center */}
-      <View style={styles.centerWrap}>
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
-      </View>
-
-      {/* Right */}
-      <View style={styles.sideRight}>
-        {right ?? null}
+    <View style={s.wrap}>
+      <View style={ws.pageHead}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={ws.pageTitle} numberOfLines={1}>{title}</Text>
+          {subtitle ? <Text style={[ws.pageSub, { marginBottom: 0 }]} numberOfLines={1}>{subtitle}</Text> : null}
+        </View>
+        <View style={ws.pageHeadActions}>{right}</View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    backgroundColor: colors.brand,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    minHeight: 58,
-    elevation: 2,
-    shadowColor: colors.brandDark,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-  },
-  sideLeft: {
-    width: 44,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  sideRight: {
-    width: 44,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  centerWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    color: colors.white,
-    fontSize: typography.md,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.70)',
-    fontSize: typography.xs,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginTop: 1,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chevronWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  chevronBar: {
-    width: 10, height: 2.5,
-    backgroundColor: colors.white, borderRadius: 2,
-    position: 'absolute',
-  },
-  logoMark: { width: 44, height: 44 },
+const s = StyleSheet.create({
+  wrap: { paddingHorizontal: 20, paddingTop: 16, backgroundColor: wc.surface0 },
 });

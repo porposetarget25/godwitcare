@@ -1,26 +1,25 @@
 // app/(app)/_layout.tsx
 import { Stack } from 'expo-router';
-import { View, StatusBar, Platform } from 'react-native';
-import { BottomNav } from '../../src/components/BottomNav';
+import { View, StatusBar } from 'react-native';
+import { PortalShell } from '../../src/components/PortalShell';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../src/theme';
+import { wc } from '../../src/webStyle';
 
 export default function AppLayout() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.brand }}>
-      {/* Explicitly fill the status bar area with brand color */}
-      <View style={{ height: insets.top, backgroundColor: colors.brand }} />
+    <View style={{ flex: 1, backgroundColor: wc.surface2 }}>
+      {/* Explicitly fill the status bar area */}
+      <View style={{ height: insets.top, backgroundColor: wc.surface2 }} />
       <StatusBar
-        backgroundColor={colors.brand}
-        barStyle="light-content"
+        backgroundColor={wc.surface2}
+        barStyle="dark-content"
         translucent={false}
       />
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <PortalShell>
         <Stack screenOptions={{ headerShown: false }} />
-      </View>
-      <BottomNav />
+      </PortalShell>
     </View>
   );
 }

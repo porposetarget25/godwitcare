@@ -3,11 +3,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  TextInput, ActivityIndicator, Image, ScrollView,
+  TextInput, ActivityIndicator, Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { resetPassword } from '../api';
 import { colors, spacing, radius, typography, shadow } from '../theme';
+import { FormScrollView } from '../components/FormScrollView';
 
 const LOGO = require('../../assets/logo_dark.png');
 
@@ -43,12 +44,12 @@ export default function ResetPassword() {
 
   return (
     <View style={s.root}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" bounces={false}>
+      <FormScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" bounces={false}>
         <View style={s.hero}>
           <View style={s.decor1} /><View style={s.decor2} />
           <Image source={LOGO} style={s.logo} resizeMode="contain" />
           <View style={s.heroIconWrap}>
-            <Text style={{ fontSize: 40 }}>{success ? '✅' : '🔐'}</Text>
+            <Text style={{ fontSize: 41 }}>{success ? '✅' : '🔐'}</Text>
           </View>
           <Text style={s.heroTitle}>{success ? 'Password Reset!' : 'New Password'}</Text>
           <Text style={s.heroSub}>{success ? 'Redirecting you to sign in…' : 'Choose a strong password for your account.'}</Text>
@@ -134,7 +135,7 @@ export default function ResetPassword() {
             <Text style={s.backText}>← Back to Sign In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </FormScrollView>
     </View>
   );
 }
@@ -156,15 +157,15 @@ const s = StyleSheet.create({
   successCard:  { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.successBorder, padding: spacing.xl, alignItems: 'center', ...shadow.md },
   successText:  { fontSize: typography.base, color: colors.success, textAlign: 'center', fontWeight: '600' },
   errorBanner:  { backgroundColor: colors.errorBg, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.errorBorder },
-  errorIcon:    { fontSize: 14 },
+  errorIcon:    { fontSize: 15 },
   errorText:    { color: colors.error, fontSize: typography.sm, flex: 1, lineHeight: 18 },
   fieldWrap:    { gap: 6 },
   fieldLabel:   { fontSize: typography.xs, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   inputRow:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.bgGray, paddingHorizontal: spacing.md, minHeight: 50, gap: spacing.sm },
   inputRowErr:  { borderColor: colors.error },
-  inputIcon:    { fontSize: 15, opacity: 0.5 },
+  inputIcon:    { fontSize: 16, opacity: 0.5 },
   input:        { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 12 },
-  eyeIcon:      { fontSize: 16 },
+  eyeIcon:      { fontSize: 17 },
   matchErr:     { fontSize: typography.xs, color: colors.error, marginTop: 2 },
   submitBtn:    { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
   submitBtnText:{ fontSize: typography.md, fontWeight: '800', color: colors.brandDark },

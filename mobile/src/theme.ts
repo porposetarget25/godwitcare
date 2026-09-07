@@ -77,15 +77,15 @@ export const radius = {
 };
 
 export const typography = {
-  xxs:  10,
-  xs:   11,
-  sm:   13,
-  base: 14,
-  md:   16,
-  lg:   18,
-  xl:   22,
-  xxl:  26,
-  xxxl: 32,
+  xxs:  11,
+  xs:   12,
+  sm:   14,
+  base: 15,
+  md:   17,
+  lg:   19,
+  xl:   23,
+  xxl:  27,
+  xxxl: 33,
 };
 
 export const shadow = {

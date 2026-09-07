@@ -78,7 +78,7 @@ export default function Step2() {
             <View key={q.key} style={[s.card, answered && s.cardAnswered]}>
               <View style={s.cardHeader}>
                 <View style={[s.qIconWrap, answered && s.qIconWrapAnswered]}>
-                  <Text style={{ fontSize: 18 }}>{q.icon}</Text>
+                  <Text style={{ fontSize: 19 }}>{q.icon}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.qNum}>Question {i + 1}</Text>

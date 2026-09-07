@@ -6,12 +6,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  TextInput, ActivityIndicator, Image, ScrollView,
+  TextInput, ActivityIndicator, Image,
   Animated, Vibration,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { forgotPassword, verifyForgotPasswordOtp } from '../api';
 import { colors, spacing, radius, typography, shadow } from '../theme';
+import { FormScrollView } from '../components/FormScrollView';
 
 const LOGO      = require('../../assets/logo_dark.png');
 const OTP_LEN   = 6;
@@ -108,7 +109,7 @@ export default function ForgotPassword() {
 
   return (
     <View style={s.root}>
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
         bounces={false}
@@ -119,7 +120,7 @@ export default function ForgotPassword() {
           <View style={s.decor1} /><View style={s.decor2} />
           <Image source={LOGO} style={s.logo} resizeMode="contain" />
           <View style={s.heroIconWrap}>
-            <Text style={{ fontSize: 40 }}>{otpSent ? '📲' : '🔑'}</Text>
+            <Text style={{ fontSize: 41 }}>{otpSent ? '📲' : '🔑'}</Text>
           </View>
           <Text style={s.heroTitle}>{otpSent ? 'Enter OTP' : 'Forgot Password'}</Text>
           <Text style={s.heroSub}>
@@ -252,7 +253,7 @@ export default function ForgotPassword() {
             <Text style={s.backText}>← Back to Sign In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </FormScrollView>
     </View>
   );
 }
@@ -279,10 +280,10 @@ const s = StyleSheet.create({
 
   // Banners
   infoBanner:  { backgroundColor: colors.brandLight, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.brandMid },
-  infoIcon:    { fontSize: 14 },
+  infoIcon:    { fontSize: 15 },
   infoText:    { color: colors.brandDark, fontSize: typography.sm, flex: 1, lineHeight: 18 },
   errorBanner: { backgroundColor: colors.errorBg, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.errorBorder },
-  errorIcon:   { fontSize: 14 },
+  errorIcon:   { fontSize: 15 },
   errorText:   { color: colors.error, fontSize: typography.sm, flex: 1, lineHeight: 18 },
 
   // Fields
@@ -291,9 +292,9 @@ const s = StyleSheet.create({
   otpHint:     { fontSize: typography.xs, color: colors.muted },
   inputRow:    { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.bgGray, paddingHorizontal: spacing.md, minHeight: 50, gap: spacing.sm },
   inputRowDone:{ borderColor: colors.brand + '60', backgroundColor: colors.brandLight },
-  inputIcon:   { fontSize: 15, opacity: 0.5 },
+  inputIcon:   { fontSize: 16, opacity: 0.5 },
   input:       { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 12 },
-  doneCheck:   { fontSize: 16, color: colors.brand, fontWeight: '700' },
+  doneCheck:   { fontSize: 17, color: colors.brand, fontWeight: '700' },
 
   divider:     { height: 1, backgroundColor: colors.line, marginVertical: spacing.xs },
 

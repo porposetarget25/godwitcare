@@ -186,15 +186,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line,
     padding: spacing.lg, marginBottom: spacing.md, ...shadow.sm,
   },
-  howIcon:   { fontSize: 28, marginTop: 2 },
+  howIcon:   { fontSize: 29, marginTop: 2 },
   cardTitle: { fontWeight: '700', fontSize: typography.md, color: colors.text, marginBottom: spacing.xs },
   cardDesc:  { fontSize: typography.sm, color: colors.muted, lineHeight: 20 },
 
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   featureCard: { width: '47%', backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.md, ...shadow.sm },
-  featureIcon:  { fontSize: 24, marginBottom: spacing.xs },
+  featureIcon:  { fontSize: 25, marginBottom: spacing.xs },
   featureTitle: { fontWeight: '700', fontSize: typography.sm, color: colors.text, marginBottom: spacing.xs },
-  featureDesc:  { fontSize: 12, color: colors.muted, lineHeight: 17 },
+  featureDesc:  { fontSize: 13, color: colors.muted, lineHeight: 17 },
 
   consultImg: { width: '100%', height: 200, borderRadius: radius.xl },
   muted: { color: colors.muted, fontSize: typography.base, lineHeight: 22 },

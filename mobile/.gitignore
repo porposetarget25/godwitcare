@@ -145,3 +145,7 @@ android/
 ios/
 package-lock.json
 .expo/
+
+# Android App Bundles
+*.aab
+*.apk

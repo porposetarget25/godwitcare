@@ -1,12 +1,12 @@
-// src/components/UI.tsx — Polished typography + button styles
+// src/components/UI.tsx — shared primitives, mirroring web's .portal button/card/field classes exactly.
 import React from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, ScrollView, ViewStyle, TextStyle, StyleProp,
 } from 'react-native';
-import { colors, spacing, radius, typography, shadow } from '../theme';
+import { ws, wc } from '../webStyle';
 
-// ── Button ────────────────────────────────────────────────────────────────────
+// ── Button (.bp / .bs / .bg / .bd) ──────────────────────────────────────────
 type BtnVariant = 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost';
 
 type BtnProps = {
@@ -22,70 +22,57 @@ type BtnProps = {
   size?: 'sm' | 'md' | 'lg';
 };
 
+const ghostBox: ViewStyle = { backgroundColor: 'transparent', paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 };
+const ghostText: TextStyle = { color: wc.fillAccent, fontSize: 14, fontWeight: '500' };
+
+const VARIANT_STYLE: Record<BtnVariant, { box: ViewStyle; text: TextStyle }> = {
+  primary: { box: ws.bp, text: ws.bpText },
+  secondary: { box: ws.bs, text: ws.bsText },
+  outline: { box: ws.bg, text: ws.bgText },
+  ghost: { box: ghostBox, text: ghostText },
+  danger: { box: ws.bd, text: ws.bdText },
+};
+
 export function Btn({
   label, onPress, variant = 'primary', disabled, loading,
   style, textStyle, fullWidth, icon, size = 'md',
 }: BtnProps) {
-
-  const bg =
-    disabled    ? colors.surface
-    : variant === 'primary'   ? colors.brand
-    : variant === 'secondary' ? colors.surface
-    : variant === 'danger'    ? colors.errorBg
-    : 'transparent';
-
-  const tc =
-    disabled    ? colors.mutedLight
-    : variant === 'primary'   ? '#fff'
-    : variant === 'secondary' ? colors.text
-    : variant === 'danger'    ? colors.error
-    : variant === 'outline'   ? colors.brand
-    : colors.brand;
-
-  const borderColor  =
-    disabled    ? colors.lineMid
-    : variant === 'outline'   ? colors.brand
-    : variant === 'secondary' ? colors.lineMid
-    : variant === 'danger'    ? colors.errorBorder
-    : 'transparent';
-  const borderWidth  = variant === 'ghost' || variant === 'primary' ? 0 : 1;
-
-  const padV  = size === 'sm' ? 7  : size === 'lg' ? 14 : 11;
-  const padH  = size === 'sm' ? 14 : size === 'lg' ? 26 : 18;
-  const fSize = size === 'sm' ? typography.sm : size === 'lg' ? typography.md : typography.base;
+  const v = VARIANT_STYLE[variant];
+  const padScale = size === 'sm' ? 0.75 : size === 'lg' ? 1.35 : 1;
+  const fSize = size === 'sm' ? 12 : size === 'lg' ? 15 : 13;
+  const tc = v.text.color as string;
 
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      activeOpacity={0.75}
       style={[
-        styles.btn,
-        { backgroundColor: bg, borderColor, borderWidth, paddingVertical: padV, paddingHorizontal: padH },
-        fullWidth && { width: '100%', alignSelf: 'stretch' },
+        v.box,
+        { paddingVertical: (v.box.paddingVertical as number) * padScale, paddingHorizontal: (v.box.paddingHorizontal as number) * padScale },
+        fullWidth && ws.btnBlock,
+        disabled && ws.btnDisabled,
         style,
       ]}
     >
       {loading ? (
         <ActivityIndicator color={tc} size="small" />
       ) : (
-        <View style={styles.btnInner}>
+        <>
           {icon ? <Text style={{ fontSize: fSize }}>{icon}</Text> : null}
-          <Text style={[styles.btnText, { color: tc, fontSize: fSize }, textStyle]}>
-            {label}
-          </Text>
-        </View>
+          <Text style={[v.text, { fontSize: fSize }, textStyle]}>{label}</Text>
+        </>
       )}
     </TouchableOpacity>
   );
 }
 
-// ── Card ─────────────────────────────────────────────────────────────────────
+// ── Card (.card) ─────────────────────────────────────────────────────────────
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={[ws.card, style]}>{children}</View>;
 }
 
-// ── Field ────────────────────────────────────────────────────────────────────
+// ── Field (.fi / .fl2) ────────────────────────────────────────────────────────
 type FieldProps = {
   label?: string;
   error?: string;
@@ -95,11 +82,11 @@ type FieldProps = {
 };
 export function Field({ label, error, required, children, style }: FieldProps) {
   return (
-    <View style={[{ marginBottom: spacing.md }, style]}>
+    <View style={[ws.fi, style]}>
       {label && (
-        <Text style={styles.fieldLabel}>
+        <Text style={ws.fl2}>
           {label}
-          {required && <Text style={styles.fieldRequired}> *</Text>}
+          {required && <Text style={{ color: wc.textDanger }}> *</Text>}
         </Text>
       )}
       {children}
@@ -117,7 +104,7 @@ export function Input({ error, style, icon, ...props }: InputProps) {
         <Text style={styles.inputIcon}>{icon}</Text>
         <TextInput
           style={[styles.inputInline, style]}
-          placeholderTextColor={colors.mutedLight}
+          placeholderTextColor={wc.textMuted}
           {...props}
         />
       </View>
@@ -125,29 +112,28 @@ export function Input({ error, style, icon, ...props }: InputProps) {
   }
   return (
     <TextInput
-      style={[styles.input, error && styles.inputErr, style]}
-      placeholderTextColor={colors.mutedLight}
+      style={[ws.input, error && styles.inputErr, style]}
+      placeholderTextColor={wc.textMuted}
       {...props}
     />
   );
 }
 
-// ── Muted ─────────────────────────────────────────────────────────────────────
+// ── Muted / Strong ────────────────────────────────────────────────────────────
 export function Muted({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[styles.muted, style]}>{children}</Text>;
 }
 
-// ── Strong ────────────────────────────────────────────────────────────────────
 export function Strong({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[styles.strong, style]}>{children}</Text>;
 }
 
-// ── Error Banner ──────────────────────────────────────────────────────────────
+// ── Error Banner (.notice .n-danger) ─────────────────────────────────────────
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <View style={styles.errorBanner}>
+    <View style={[ws.notice, ws.nDanger]}>
       <Text style={styles.errorIcon}>⚠️</Text>
-      <Text style={styles.errorText}>{message}</Text>
+      <Text style={[ws.noticeText, ws.nDangerText]}>{message}</Text>
     </View>
   );
 }
@@ -156,17 +142,17 @@ export function ErrorBanner({ message }: { message: string }) {
 export function LoadingView() {
   return (
     <View style={styles.loadingView}>
-      <ActivityIndicator color={colors.brand} size="large" />
+      <ActivityIndicator color={wc.fillAccent} size="large" />
       <Text style={styles.loadingText}>Loading…</Text>
     </View>
   );
 }
 
-// ── Page Head ─────────────────────────────────────────────────────────────────
+// ── Page Head (.page-head / .page-title) ─────────────────────────────────────
 export function PageHead({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
-    <View style={styles.pageHead}>
-      <Text style={styles.pageTitle}>{title}</Text>
+    <View style={ws.pageHead}>
+      <Text style={ws.pageTitle}>{title}</Text>
       {right}
     </View>
   );
@@ -181,21 +167,20 @@ export function Section({ children, style }: { children: React.ReactNode; style?
   );
 }
 
-// ── Row ───────────────────────────────────────────────────────────────────────
+// ── Row / Divider ─────────────────────────────────────────────────────────────
 export function Row({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   return <View style={[{ flexDirection: 'row', alignItems: 'center' }, style]}>{children}</View>;
 }
 
-// ── Divider ───────────────────────────────────────────────────────────────────
 export function Divider({ style }: { style?: ViewStyle }) {
   return <View style={[styles.divider, style]} />;
 }
 
-// ── Badge ─────────────────────────────────────────────────────────────────────
-export function Badge({ label, color = colors.brand }: { label: string; color?: string }) {
+// ── Badge / Tag (.tag) ────────────────────────────────────────────────────────
+export function Badge({ label, color = wc.fillAccent }: { label: string; color?: string }) {
   return (
-    <View style={[styles.badge, { backgroundColor: color + '15', borderColor: color + '35' }]}>
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    <View style={[ws.tag, { backgroundColor: color + '15', borderWidth: StyleSheet.hairlineWidth, borderColor: color + '35' }]}>
+      <Text style={[ws.tagText, { color }]}>{label}</Text>
     </View>
   );
 }
@@ -204,7 +189,7 @@ export function Badge({ label, color = colors.brand }: { label: string; color?: 
 export function SectionHeader({ title, sub }: { title: string; sub?: string }) {
   return (
     <View style={styles.sectionHeaderWrap}>
-      <Text style={styles.sectionHeaderTitle}>{title}</Text>
+      <Text style={ws.ct}>{title}</Text>
       {sub ? <Text style={styles.sectionHeaderSub}>{sub}</Text> : null}
     </View>
   );
@@ -212,136 +197,30 @@ export function SectionHeader({ title, sub }: { title: string; sub?: string }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  // Button
-  btn: {
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 46,
-    minWidth: 80,
-  },
-  btnInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  btnText: {
-    fontWeight: '600',
-    letterSpacing: 0.1,
-  },
+  fieldError: { color: wc.textDanger, fontSize: 12, marginTop: 3 },
 
-  // Card
-  card: {
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.lineMid,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadow.sm,
-  },
-
-  // Field
-  fieldLabel: {
-    fontWeight: '500',
-    fontSize: typography.sm,
-    color: colors.textSec,
-    marginBottom: spacing.xs,
-    letterSpacing: 0.1,
-  },
-  fieldRequired: { color: colors.error, fontSize: typography.sm },
-  fieldError: {
-    color: colors.error,
-    fontSize: typography.xs,
-    marginTop: spacing.xs,
-  },
-
-  // Input
-  input: {
-    borderWidth: 1,
-    borderColor: colors.lineMid,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    fontSize: typography.base,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    minHeight: 46,
-  },
-  inputErr: { borderColor: colors.error },
   inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.lineMid,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    minHeight: 46,
-    gap: spacing.sm,
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: wc.borderStrong, borderRadius: 8,
+    backgroundColor: wc.surface2, paddingHorizontal: 12, gap: 8,
   },
-  inputRowErr: { borderColor: colors.error },
-  inputIcon: { fontSize: 16, opacity: 0.55 },
-  inputInline: {
-    flex: 1,
-    fontSize: typography.base,
-    color: colors.text,
-    paddingVertical: 12,
-  },
+  inputRowErr: { borderColor: wc.textDanger },
+  inputIcon: { fontSize: 16, opacity: 0.6 },
+  inputInline: { flex: 1, fontSize: 14, color: wc.textPrimary, paddingVertical: 9 },
+  inputErr: { borderColor: wc.textDanger },
 
-  // Text
-  muted: { color: colors.muted, fontSize: typography.base, lineHeight: typography.base * 1.55 },
-  strong: { fontWeight: '600', color: colors.text, fontSize: typography.base },
+  muted: { color: wc.textMuted, fontSize: 14, lineHeight: 19 },
+  strong: { fontWeight: '600', color: wc.textPrimary, fontSize: 14 },
 
-  // Error Banner
-  errorBanner: {
-    backgroundColor: colors.errorBg,
-    borderWidth: 1,
-    borderColor: colors.errorBorder,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
   errorIcon: { fontSize: 14 },
-  errorText: { color: colors.error, fontSize: typography.sm, flex: 1, lineHeight: 18 },
 
-  // Loading
-  loadingView: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    padding: spacing.xl, gap: spacing.md,
-  },
-  loadingText: { color: colors.muted, fontSize: typography.sm },
+  loadingView: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
+  loadingText: { color: wc.textMuted, fontSize: 14 },
 
-  // PageHead
-  pageHead: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: spacing.lg,
-  },
-  pageTitle: {
-    fontSize: typography.xl, fontWeight: '500',
-    color: colors.text, flex: 1, letterSpacing: -0.2,
-  },
+  section: { padding: 20, paddingBottom: 40 },
 
-  // Section
-  section: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: wc.border, marginVertical: 10 },
 
-  // Divider
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: spacing.md },
-
-  // Badge
-  badge: {
-    paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderRadius: radius.full, borderWidth: 1, alignSelf: 'flex-start',
-  },
-  badgeText: { fontSize: typography.xs, fontWeight: '500', letterSpacing: 0.2 },
-
-  // Section Header
-  sectionHeaderWrap: { marginBottom: spacing.lg, gap: 3 },
-  sectionHeaderTitle: {
-    fontSize: typography.lg, fontWeight: '500', color: colors.text, letterSpacing: -0.2,
-  },
-  sectionHeaderSub: { fontSize: typography.sm, color: colors.muted },
+  sectionHeaderWrap: { marginBottom: 14, gap: 2 },
+  sectionHeaderSub: { fontSize: 13, color: wc.textMuted },
 });

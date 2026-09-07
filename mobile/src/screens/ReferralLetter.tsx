@@ -1,14 +1,15 @@
 // src/screens/ReferralLetter.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, Linking, Alert,
+  View, Text, StyleSheet, TextInput, Linking, Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL, resolveApiUrl, authFetch } from '../api';
 import { Btn, Card, Muted, Strong, LoadingView, ErrorBanner } from '../components/UI';
-import { colors, spacing, radius, typography, shadow } from '../theme';
+import { ws, wc } from '../webStyle';
 import { PageHeader } from '../components/PageHeader';
 import { openPdf } from '../utils/openPdf';
+import { FormScrollView } from '../components/FormScrollView';
 
 const DOCTOR_NAME = 'Dr. Dimitris–Christos Zachariades';
 const DOCTOR_REG = 'GMS101Z';
@@ -96,15 +97,16 @@ Referring Practitioner`
 
   return (
     <View style={{ flex: 1 }}>
+      <PageHeader title="Referral Letter" subtitle={patientName !== '—' ? patientName : undefined} showBack />
       {loading ? <LoadingView /> : (
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       {err && <ErrorBanner message={err} />}
 
       {!err && (
         <>
           {/* Patient Information */}
           <Card>
-            <Strong style={{ marginBottom: spacing.md }}>Patient Information</Strong>
+            <Strong style={{ marginBottom: 10 }}>Patient Information</Strong>
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Muted style={styles.label}>Patient Name</Muted>
@@ -123,22 +125,22 @@ Referring Practitioner`
 
           {/* Referral From */}
           <Card>
-            <Strong style={{ marginBottom: spacing.md }}>Referral From</Strong>
+            <Strong style={{ marginBottom: 10 }}>Referral From</Strong>
             <Muted style={styles.label}>GP Name</Muted>
             <Strong>{DOCTOR_NAME}</Strong>
-            <Muted style={[styles.label, { marginTop: spacing.sm }]}>GMS Number</Muted>
+            <Muted style={[styles.label, { marginTop: 8 }]}>GMS Number</Muted>
             <Strong>{DOCTOR_REG}</Strong>
-            <Muted style={[styles.label, { marginTop: spacing.sm }]}>Address</Muted>
+            <Muted style={[styles.label, { marginTop: 8 }]}>Address</Muted>
             <Strong>{DOCTOR_ADDR}</Strong>
-            <Muted style={[styles.label, { marginTop: spacing.sm }]}>Email</Muted>
+            <Muted style={[styles.label, { marginTop: 8 }]}>Email</Muted>
             <Strong>{DOCTOR_EMAIL}</Strong>
-            <Muted style={[styles.label, { marginTop: spacing.sm }]}>Contact Number</Muted>
+            <Muted style={[styles.label, { marginTop: 8 }]}>Contact Number</Muted>
             <Strong>{DOCTOR_PHONE}</Strong>
           </Card>
 
           {/* Letter Body */}
           <Card>
-            <Strong style={{ marginBottom: spacing.sm }}>Letter Body</Strong>
+            <Strong style={{ marginBottom: 8 }}>Letter Body</Strong>
             <TextInput
               value={body}
               onChangeText={setBody}
@@ -150,7 +152,7 @@ Referring Practitioner`
           </Card>
 
           {/* Actions */}
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <Btn
               label="Generate PDF"
               onPress={onGeneratePdf}
@@ -160,24 +162,24 @@ Referring Practitioner`
           </View>
         </>
       )}
-      </ScrollView>
+      </FormScrollView>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.xl, paddingBottom: 60, backgroundColor: colors.bgGray },
-  row: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
-  label: { fontSize: 12, marginBottom: spacing.xs },
+  container: { padding: 20, paddingBottom: 40 },
+  row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  label: { fontSize: 12, marginBottom: 4 },
   textarea: {
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    fontSize: typography.base,
-    color: colors.text,
-    backgroundColor: colors.white,
+    borderColor: wc.borderStrong,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: wc.textPrimary,
+    backgroundColor: wc.surface2,
     textAlignVertical: 'top',
     minHeight: 200,
   },

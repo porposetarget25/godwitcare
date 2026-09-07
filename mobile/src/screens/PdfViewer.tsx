@@ -8,17 +8,18 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams } from 'expo-router';
 import { PageHeader } from '../components/PageHeader';
-import { colors, typography, spacing } from '../theme';
+import { ws, wc } from '../webStyle';
 import { authFetch } from '../api';
 
 function ShareIcon() {
+  const c = wc.textPrimary;
   return (
     <View style={{ width: 20, height: 22, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ position: 'absolute', top: 0, alignSelf: 'center', width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#fff' }} />
-      <View style={{ position: 'absolute', bottom: 0, left: 0, width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#fff' }} />
-      <View style={{ position: 'absolute', bottom: 0, right: 0, width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#fff' }} />
-      <View style={{ position: 'absolute', top: 3, left: 2, width: 1.5, height: 11, backgroundColor: '#fff', transform: [{ rotate: '28deg' }] }} />
-      <View style={{ position: 'absolute', top: 3, right: 2, width: 1.5, height: 11, backgroundColor: '#fff', transform: [{ rotate: '-28deg' }] }} />
+      <View style={{ position: 'absolute', top: 0, alignSelf: 'center', width: 7, height: 7, borderRadius: 3.5, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: 7, height: 7, borderRadius: 3.5, backgroundColor: c }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: 7, height: 7, borderRadius: 3.5, backgroundColor: c }} />
+      <View style={{ position: 'absolute', top: 3, left: 2, width: 1.5, height: 11, backgroundColor: c, transform: [{ rotate: '28deg' }] }} />
+      <View style={{ position: 'absolute', top: 3, right: 2, width: 1.5, height: 11, backgroundColor: c, transform: [{ rotate: '-28deg' }] }} />
     </View>
   );
 }
@@ -143,7 +144,7 @@ export default function PdfViewer() {
       activeOpacity={0.75}
     >
       {sharing
-        ? <ActivityIndicator size="small" color="#fff" />
+        ? <ActivityIndicator size="small" color={wc.textPrimary} />
         : <ShareIcon />
       }
     </TouchableOpacity>
@@ -155,14 +156,14 @@ export default function PdfViewer() {
 
       {loading && (
         <View style={s.overlay}>
-          <ActivityIndicator size="large" color={colors.brand} />
+          <ActivityIndicator size="large" color={wc.fillAccent} />
           <Text style={s.loadingText}>Loading PDF…</Text>
         </View>
       )}
 
       {error && !loading && (
         <View style={s.overlay}>
-          <Text style={{ fontSize: 40 }}>⚠️</Text>
+          <Text style={{ fontSize: 41 }}>⚠️</Text>
           <Text style={s.errorTitle}>Could not load PDF</Text>
           <Text style={s.errorMsg}>{error}</Text>
         </View>
@@ -187,14 +188,16 @@ const s = StyleSheet.create({
   overlay: {
     position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.bgGray, zIndex: 10, gap: spacing.sm,
+    backgroundColor: wc.surface0, zIndex: 10, gap: 8,
   },
-  loadingText: { fontSize: typography.base, color: colors.muted },
-  errorTitle:  { fontSize: typography.lg, fontWeight: '700', color: colors.text },
-  errorMsg:    { fontSize: typography.sm, color: colors.error, textAlign: 'center', paddingHorizontal: spacing.xl },
+  loadingText: { fontSize: 14, color: wc.textMuted },
+  errorTitle:  { fontSize: 17, fontWeight: '700', color: wc.textPrimary },
+  errorMsg:    { fontSize: 14, color: wc.textDanger, textAlign: 'center', paddingHorizontal: 20 },
   btn: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    width: 34, height: 34, borderRadius: 8,
+    backgroundColor: wc.surface1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: wc.borderStrong,
     alignItems: 'center', justifyContent: 'center',
   },
 });

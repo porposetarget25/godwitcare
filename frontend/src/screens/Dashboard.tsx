@@ -444,8 +444,8 @@ export default function Dashboard() {
               <h4>Account</h4>
               <Link to="/login">Log in</Link>
               <Link to="/register/1">Register</Link>
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Service</a>
+              <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/terms">Terms of Service</Link>
             </div>
           </div>
         </div>
@@ -454,9 +454,9 @@ export default function Dashboard() {
           <div className="footer-bottom-inner">
             <div>© {new Date().getFullYear()} GodwitCare. All rights reserved.</div>
             <div className="footer-legal">
-              <a href="#">Privacy</a>
-              <a href="#">Terms</a>
-              <a href="#">Cookie Policy</a>
+              <Link to="/privacy">Privacy</Link>
+              <Link to="/terms">Terms</Link>
+              <Link to="/cookies">Cookie Policy</Link>
             </div>
           </div>
         </div>

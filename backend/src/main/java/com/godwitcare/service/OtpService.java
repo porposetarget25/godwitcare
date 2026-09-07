@@ -11,6 +11,8 @@ import java.time.Instant;
 @Service
 public class OtpService {
 
+    private static final String OTP_TEMPLATE_CONTENT_SID = "HXd789b39a5eb40683469072c464d01f6e";
+
     private final PasswordEncoder passwordEncoder;
     private final WhatsAppSender whatsAppSender;
     private final SecureRandom random = new SecureRandom();
@@ -28,9 +30,8 @@ public class OtpService {
         user.setOtpCodeHash(passwordEncoder.encode(otp));
         user.setOtpExpiresAt(Instant.now().plusSeconds(otpExpirySeconds));
 
-        String message = "OTP Code: " + otp + ". This is your OTP code for Godwitcare. For your security, do not share this code.";
-        //String message = "Your GodwitCare verification OTP is " + otp + ". It expires in " + (otpExpirySeconds / 60) + " minutes.";
-        whatsAppSender.send(user.getUsername(), message);
+        String contentVariables = "{\"1\":\"" + otp + "\"}";
+        whatsAppSender.send(user.getUsername(), OTP_TEMPLATE_CONTENT_SID, contentVariables);
     }
 
     public boolean verifyOtp(User user, String code) {

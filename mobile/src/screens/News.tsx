@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
     gap: spacing.md,
   },
-  emptyIcon: { fontSize: 52 },
+  emptyIcon: { fontSize: 53 },
   emptyTitle: { fontSize: typography.lg, fontWeight: '700', color: colors.text },
   emptyBody: {
     fontSize: typography.base,

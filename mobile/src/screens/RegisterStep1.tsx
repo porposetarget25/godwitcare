@@ -1,7 +1,7 @@
 // src/screens/RegisterStep1.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   Platform, Modal, FlatList, TextInput,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,6 +10,7 @@ import { useReg } from '../state/registration';
 import { Btn, Field } from '../components/UI';
 import { colors, spacing, radius, typography } from '../theme';
 import { PageHeader } from '../components/PageHeader';
+import { FormScrollView } from '../components/FormScrollView';
 
 type Errors = Partial<Record<'firstName'|'lastName'|'dob'|'gender'|'primary'|'password'|'email', string>>;
 
@@ -124,7 +125,7 @@ function BottomSheet({
               />
               {q.length > 0 && (
                 <TouchableOpacity onPress={() => setQ('')}>
-                  <Text style={{ color: colors.muted, fontSize: 16, paddingHorizontal: 4 }}>✕</Text>
+                  <Text style={{ color: colors.muted, fontSize: 17, paddingHorizontal: 4 }}>✕</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -231,7 +232,7 @@ export default function Step1() {
     <View style={{ flex: 1 }}>
       <PageHeader title="Main Traveler Information" subtitle="Step 1 of 3" showBack />
 
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.stepBadge}><Text style={styles.stepBadgeText}>Step 1 of 3</Text></View>
         <Text style={styles.title}>Personal Information</Text>
         <Text style={styles.subtitle}>Please fill in your details as they appear on your passport.</Text>
@@ -333,7 +334,7 @@ export default function Step1() {
               <TextInput
                 style={sh.inputInner}
                 value={draft['Primary WhatsApp Number'] || ''}
-                onChangeText={v => setDraft({ ...draft, 'Primary WhatsApp Number': v })}
+                onChangeText={v => setDraft({ ...draft, 'Primary WhatsApp Number': v.replace(/^0+/, '') })}
                 placeholder="1234567890"
                 placeholderTextColor={colors.mutedLight}
                 keyboardType="phone-pad"
@@ -386,7 +387,7 @@ export default function Step1() {
         </Field>
 
         <Btn label="Save Information" onPress={next} fullWidth style={{ marginTop: spacing.md }} />
-      </ScrollView>
+      </FormScrollView>
 
       {/* Gender sheet */}
       <BottomSheet
@@ -436,10 +437,10 @@ const sh = StyleSheet.create({
     minHeight: 48, gap: spacing.sm,
   },
   inputRowErr: { borderColor: colors.error },
-  inputIcon:   { fontSize: 15, opacity: 0.5 },
+  inputIcon:   { fontSize: 16, opacity: 0.5 },
   inputInner:  { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 11 },
   eyeBtn:      { padding: 4 },
-  eyeIcon:     { fontSize: 16 },
+  eyeIcon:     { fontSize: 17 },
 
   // Selector button
   selectorBtn: {
@@ -449,10 +450,10 @@ const sh = StyleSheet.create({
     minHeight: 48, gap: spacing.sm,
   },
   selectorBtnErr:  { borderColor: colors.error },
-  selectorIcon:    { fontSize: 15, opacity: 0.5 },
+  selectorIcon:    { fontSize: 16, opacity: 0.5 },
   selectorText:    { flex: 1, fontSize: typography.base, color: colors.text },
   selectorPlaceholder: { color: colors.mutedLight },
-  chevron:         { fontSize: 20, color: colors.muted, marginTop: -2 },
+  chevron:         { fontSize: 21, color: colors.muted, marginTop: -2 },
 
   // Country button
   countryBtn: {
@@ -461,9 +462,9 @@ const sh = StyleSheet.create({
     backgroundColor: colors.white, paddingHorizontal: spacing.sm,
     minHeight: 48, gap: 4, minWidth: 88,
   },
-  countryFlag: { fontSize: 20 },
+  countryFlag: { fontSize: 21 },
   countryDial: { fontSize: typography.sm, fontWeight: '600', color: colors.text },
-  chevronSm:   { fontSize: 16, color: colors.muted },
+  chevronSm:   { fontSize: 17, color: colors.muted },
 
   // Bottom sheet
   overlay: {
@@ -491,7 +492,7 @@ const sh = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  closeX:      { fontSize: 13, color: colors.textSec, fontWeight: '700' },
+  closeX:      { fontSize: 14, color: colors.textSec, fontWeight: '700' },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: spacing.xl, marginBottom: spacing.sm,
@@ -499,7 +500,7 @@ const sh = StyleSheet.create({
     borderRadius: radius.xl, paddingHorizontal: spacing.md,
     gap: spacing.sm, backgroundColor: colors.bgGray,
   },
-  searchIcon:  { fontSize: 13, opacity: 0.45 },
+  searchIcon:  { fontSize: 14, opacity: 0.45 },
   searchInput: { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 10 },
   sep:         { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl },
 

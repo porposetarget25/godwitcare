@@ -30,3 +30,13 @@ export function clinicDateTime(value: string | Date) {
     hourCycle: 'h23',
   }).format(typeof value === 'string' ? new Date(value) : value);
 }
+
+export function clinicTodayLabel(value: Date = new Date()) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: CLINIC_TIME_ZONE,
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(value);
+}

@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     gap: spacing.xs,
   },
-  headerIcon: { fontSize: 44 },
+  headerIcon: { fontSize: 45 },
   headerTitle: { fontSize: typography.xl, fontWeight: '800', color: colors.text },
   headerSub: { fontSize: typography.sm, color: colors.muted },
   intro: {

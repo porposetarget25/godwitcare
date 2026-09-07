@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "GodwitCare",
+    "name": "GodwitCareGlobal",
     "slug": "godwitcare",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
     "userInterfaceStyle": "light",
@@ -14,14 +14,15 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.godwitcare.app"
+      "bundleIdentifier": "com.godwitcare.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.godwitcare.app",
+      "package": "com.godwitcare.mobile",
+      "versionCode": 3,
       "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.INTERNET",
@@ -61,6 +62,13 @@
           "android": {
             "usesCleartextTraffic": true
           }
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.godwitcare.app",
+          "enableGooglePay": false
         }
       ]
     ],

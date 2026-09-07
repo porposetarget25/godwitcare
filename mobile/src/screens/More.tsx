@@ -21,7 +21,7 @@ export default function More() {
             <React.Fragment key={item.label}>
               {i > 0 && <View style={s.sep} />}
               <TouchableOpacity style={s.row} onPress={() => router.push(item.href as any)} activeOpacity={0.7}>
-                <View style={s.iconWrap}><Text style={{ fontSize: 20 }}>{item.icon}</Text></View>
+                <View style={s.iconWrap}><Text style={{ fontSize: 21 }}>{item.icon}</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.rowLabel}>{item.label}</Text>
                   <Text style={s.rowSub}>{item.sub}</Text>
@@ -45,5 +45,5 @@ const s = StyleSheet.create({
   iconWrap: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: typography.base, fontWeight: '600', color: colors.text },
   rowSub:   { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
-  chevron:  { fontSize: 22, color: colors.muted },
+  chevron:  { fontSize: 23, color: colors.muted },
 });

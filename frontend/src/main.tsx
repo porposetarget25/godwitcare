@@ -4,6 +4,9 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 
 import Dashboard from './screens/Dashboard';
+import PrivacyPolicy from './screens/PrivacyPolicy';
+import TermsOfUse from './screens/TermsOfUse';
+import CookiePolicy from './screens/CookiePolicy';
 import Login from './screens/Login';
 import Step1 from './screens/RegisterStep1';
 import Step2 from './screens/RegisterStep2';
@@ -351,6 +354,9 @@ function AppRoutes() {
       <Route path="/activate" element={<Shell>{user ? <ActivationPayment /> : <Navigate to="/login" replace />}</Shell>} />
       <Route path="/forgot-password" element={<Shell><ForgotPassword /></Shell>} />
       <Route path="/reset-password" element={<Shell><ResetPassword /></Shell>} />
+      <Route path="/privacy" element={<Shell><PrivacyPolicy /></Shell>} />
+      <Route path="/terms" element={<Shell><TermsOfUse /></Shell>} />
+      <Route path="/cookies" element={<Shell><CookiePolicy /></Shell>} />
       <Route path="/change-password" element={<RoleAwareShell activeId="profile">{user ? <ChangePassword /> : <Navigate to="/login" replace />}</RoleAwareShell>} />
       <Route
         path="/doctor/referral/:id"

@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Image, TextInput, ActivityIndicator,
+  Image, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { login, API_BASE_URL } from '../api';
 import { useAuth } from '../state/auth';
 import { colors, spacing, radius, typography, shadow } from '../theme';
+import { FormScrollView } from '../components/FormScrollView';
 
 const LOGO_DARK = require('../../assets/logo_white.png');
 
@@ -45,7 +46,7 @@ export default function Login() {
 
   return (
     <View style={s.root}>
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -63,7 +64,7 @@ export default function Login() {
           {/* Brand text */}
           <View style={s.brandRow}>
             <Text style={s.brandGodwit}>Godwit</Text>
-            <Text style={s.brandCare}>Care</Text>
+            <Text style={s.brandCare}>CareGlobal</Text>
           </View>
           <Text style={s.tagline}>CARE BEYOND BORDERS</Text>
 
@@ -162,9 +163,9 @@ export default function Login() {
             <Text style={s.backText}>← Back to overview</Text>
           </TouchableOpacity>
 
-          <Text style={s.version}>GodwitCare · Secure Health Platform</Text>
+          <Text style={s.version}>GodwitCareGlobal · Secure Health Platform</Text>
         </View>
-      </ScrollView>
+      </FormScrollView>
     </View>
   );
 }
@@ -230,7 +231,7 @@ const s = StyleSheet.create({
     padding: spacing.md,
     flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
   },
-  errorIcon: { fontSize: 14 },
+  errorIcon: { fontSize: 15 },
   errorText: { color: colors.error, fontSize: typography.sm, flex: 1, lineHeight: 18 },
 
   // Fields
@@ -242,10 +243,10 @@ const s = StyleSheet.create({
     backgroundColor: colors.bgGray, paddingHorizontal: spacing.md,
     minHeight: 50, gap: spacing.sm,
   },
-  inputIcon: { fontSize: 15, opacity: 0.5 },
+  inputIcon: { fontSize: 16, opacity: 0.5 },
   input:     { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 12 },
   eyeBtn:    { padding: 4 },
-  eyeIcon:   { fontSize: 16 },
+  eyeIcon:   { fontSize: 17 },
 
   // Sign In button — gold like Home's consult CTA
   signInBtn: {

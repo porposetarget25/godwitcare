@@ -1,17 +1,18 @@
-// src/screens/PreConsultation.tsx
+// src/screens/PreConsultation.tsx — mirrors web's .portal card/field/notice styling.
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert, TextInput,
+  View, Text, StyleSheet, Alert, TextInput,
   TouchableOpacity, Modal, FlatList, ActivityIndicator, Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL, authFetch } from '../api';
-import { colors, spacing, radius, typography, shadow } from '../theme';
+import { ws, wc } from '../webStyle';
 import { PageHeader } from '../components/PageHeader';
+import { FormScrollView } from '../components/FormScrollView';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type YesNo = 'Yes' | 'No';
-type Ans   = YesNo | undefined;
+type Ans = YesNo | undefined;
 type PatientOpt = { key: string; label: string; dob: string };
 
 // ── Form definition ───────────────────────────────────────────────────────────
@@ -24,42 +25,42 @@ const CRITICAL = new Set([
 
 const FORM = [
   { title: 'Emergency Symptoms', questions: [
-    { id: 'emergency_pain',        label: 'Experiencing severe pain?' },
-    { id: 'emergency_breath',      label: 'Difficulty breathing or shortness of breath?' },
+    { id: 'emergency_pain', label: 'Experiencing severe pain?' },
+    { id: 'emergency_breath', label: 'Difficulty breathing or shortness of breath?' },
     { id: 'emergency_unconscious', label: 'Unconsciousness or altered mental state?' },
-    { id: 'emergency_bleeding',    label: 'Recent injury with heavy bleeding?' },
+    { id: 'emergency_bleeding', label: 'Recent injury with heavy bleeding?' },
   ]},
   { title: 'Signs of a Stroke (FAST)', questions: [
-    { id: 'stroke_face',     label: 'Facial droop?' },
+    { id: 'stroke_face', label: 'Facial droop?' },
     { id: 'stroke_weakness', label: 'Weakness on one side?' },
-    { id: 'stroke_speech',   label: 'Slurred speech?' },
+    { id: 'stroke_speech', label: 'Slurred speech?' },
   ]},
   { title: 'Indications of Sepsis', questions: [
     { id: 'sepsis_confusion', label: 'Slurred speech or confusion?' },
-    { id: 'sepsis_shiver',    label: 'Shivering or muscle pain?' },
-    { id: 'sepsis_skin',      label: 'Skin discoloration or rash?' },
+    { id: 'sepsis_shiver', label: 'Shivering or muscle pain?' },
+    { id: 'sepsis_skin', label: 'Skin discoloration or rash?' },
   ]},
   { title: 'Signs of Heart Attack', questions: [
     { id: 'heartattack_chest', label: 'Severe chest pain, pressure, or heavy weight on chest?' },
   ]},
   { title: 'General Symptoms', questions: [
-    { id: 'general_symptoms_fever',      label: 'Experiencing persistent fever?' },
-    { id: 'general_symptoms_fatigue',    label: 'Feeling extreme fatigue or weakness?' },
+    { id: 'general_symptoms_fever', label: 'Experiencing persistent fever?' },
+    { id: 'general_symptoms_fatigue', label: 'Feeling extreme fatigue or weakness?' },
     { id: 'general_symptoms_weightloss', label: 'Unexplained weight loss?' },
   ]},
   { title: 'Respiratory & ENT Issues', questions: [
-    { id: 'respiratory_ent_cough',  label: 'Persistent cough?' },
-    { id: 'respiratory_ent_taste',  label: 'Sudden loss of taste or smell?' },
+    { id: 'respiratory_ent_cough', label: 'Persistent cough?' },
+    { id: 'respiratory_ent_taste', label: 'Sudden loss of taste or smell?' },
     { id: 'respiratory_ent_throat', label: 'Severe sore throat?' },
   ]},
   { title: 'Digestive Issues', questions: [
     { id: 'digestive_abdominal_pain', label: 'Severe abdominal pain?' },
-    { id: 'digestive_gi',             label: 'Persistent nausea, vomiting, or diarrhea?' },
+    { id: 'digestive_gi', label: 'Persistent nausea, vomiting, or diarrhea?' },
   ]},
   { title: 'Neurological Symptoms', questions: [
     { id: 'neuro_headache', label: 'New or worsening severe headaches?' },
-    { id: 'neuro_vision',   label: 'Sudden onset of vision changes?' },
-    { id: 'neuro_balance',  label: 'Difficulty with balance or coordination?' },
+    { id: 'neuro_vision', label: 'Sudden onset of vision changes?' },
+    { id: 'neuro_balance', label: 'Difficulty with balance or coordination?' },
   ]},
   { title: 'Mental Well-being', questions: [
     { id: 'mental_anxiety', label: 'Experiencing severe anxiety or panic attacks?' },
@@ -115,20 +116,16 @@ function PatientSheet({ visible, options, selected, onSelect, onClose }: {
           data={options}
           keyExtractor={i => i.key}
           style={{ maxHeight: 300 }}
-          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl }} />}
+          ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: wc.border, marginHorizontal: 20 }} />}
           renderItem={({ item }) => {
             const active = item.key === selected;
             return (
-              <TouchableOpacity
-                style={[ps.option, active && ps.optionActive]}
-                onPress={() => { onSelect(item.key); onClose(); }}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={[ps.option, active && ps.optionActive]} onPress={() => { onSelect(item.key); onClose(); }} activeOpacity={0.7}>
                 <View style={{ flex: 1 }}>
                   <Text style={[ps.optLabel, active && ps.optLabelActive]}>{item.label}</Text>
                   {item.dob ? <Text style={ps.optDob}>DOB: {item.dob}</Text> : null}
                 </View>
-                {active && <Text style={{ color: colors.brand, fontWeight: '700', fontSize: 16 }}>✓</Text>}
+                {active && <Text style={{ color: wc.fillAccent, fontWeight: '700', fontSize: 16 }}>✓</Text>}
               </TouchableOpacity>
             );
           }}
@@ -151,11 +148,11 @@ function EmergencyModal({ visible, onClose }: { visible: boolean; onClose: () =>
           <Text style={em.title}>🚨 Medical Emergency</Text>
           <Text style={em.body}>You are experiencing emergency symptoms. Please dial 999 immediately.</Text>
           <View style={em.actions}>
-            <TouchableOpacity style={em.closeBtn} onPress={onClose} activeOpacity={0.75}>
-              <Text style={em.closeBtnText}>Close</Text>
+            <TouchableOpacity style={[ws.bs, { flex: 1 }]} onPress={onClose} activeOpacity={0.75}>
+              <Text style={ws.bsText}>Close</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={em.callBtn} onPress={() => Linking.openURL('tel:999')} activeOpacity={0.85}>
-              <Text style={em.callBtnText}>📞 Call 999 Now</Text>
+            <TouchableOpacity style={[ws.bd, { flex: 1 }]} onPress={() => Linking.openURL('tel:999')} activeOpacity={0.85}>
+              <Text style={ws.bdText}>📞 Call 999 Now</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -168,26 +165,16 @@ function EmergencyModal({ visible, onClose }: { visible: boolean; onClose: () =>
 function Toggle({ label, value, onChange, critical, disabled }: {
   label: string; value: Ans; onChange: (v: YesNo) => void; critical: boolean; disabled?: boolean;
 }) {
-  const labelColor = critical ? colors.error : colors.success;
+  const labelColor = critical ? wc.textDanger : wc.textSuccess;
   return (
     <View style={[t.wrap, disabled && { opacity: 0.5 }]}>
       <Text style={[t.label, { color: labelColor }]}>{label}</Text>
       {value === undefined && <Text style={t.hint}>← please choose</Text>}
       <View style={t.btnRow}>
-        <TouchableOpacity
-          style={[t.btn, value === 'No' ? t.btnNo : t.btnUnset]}
-          onPress={() => onChange('No')}
-          activeOpacity={0.75}
-          disabled={disabled}
-        >
+        <TouchableOpacity style={[t.btn, value === 'No' ? t.btnNo : t.btnUnset]} onPress={() => onChange('No')} activeOpacity={0.75} disabled={disabled}>
           <Text style={[t.btnTxt, value === 'No' && t.btnTxtActive]}>No</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[t.btn, value === 'Yes' ? t.btnYes : t.btnUnset]}
-          onPress={() => onChange('Yes')}
-          activeOpacity={0.75}
-          disabled={disabled}
-        >
+        <TouchableOpacity style={[t.btn, value === 'Yes' ? t.btnYes : t.btnUnset]} onPress={() => onChange('Yes')} activeOpacity={0.75} disabled={disabled}>
           <Text style={[t.btnTxt, value === 'Yes' && t.btnTxtActive]}>Yes</Text>
         </TouchableOpacity>
       </View>
@@ -199,39 +186,59 @@ function Toggle({ label, value, onChange, critical, disabled }: {
 export default function PreConsultation() {
   const router = useRouter();
   const params = useLocalSearchParams<{ cid?: string; travelerId?: string; patientId?: string; locked?: string }>();
-  const cid        = params.cid;
-  const isEdit     = !!cid;
-  const isLocked   = params.locked === '1';
+  const cid = params.cid;
+  const isEdit = !!cid;
+  const isLocked = params.locked === '1';
   const initTravId = params.travelerId;
-  const initPatId  = params.patientId;
+  const initPatId = params.patientId;
 
-  const [contactName,    setContactName   ] = useState('');
-  const [contactPhone,   setContactPhone  ] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [contactAddress, setContactAddress] = useState('');
-  const [dob,            setDob           ] = useState('');
-  const [submitting,     setSubmitting    ] = useState(false);
+  const [dob, setDob] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const [patientOptions,     setPatientOptions    ] = useState<PatientOpt[]>([]);
+  const [patientOptions, setPatientOptions] = useState<PatientOpt[]>([]);
   const [selectedPatientKey, setSelectedPatientKey] = useState<string>('primary');
-  const [showPatientSheet,   setShowPatientSheet  ] = useState(false);
+  const [showPatientSheet, setShowPatientSheet] = useState(false);
+  // Backend-computed patientId per patient key ('primary' / 'trav-{id}') — the create
+  // endpoint validates the submitted patientId against this exact server-side value.
+  const [patientIdByKey, setPatientIdByKey] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isEdit) return;
+    let ignore = false;
+    (async () => {
+      try {
+        const r = await authFetch(`${API_BASE_URL}/consultations/travelers`);
+        if (!ignore && r.ok) {
+          const rows: Array<{ id: string | number; patientId?: string }> = await r.json().catch(() => []);
+          const map: Record<string, string> = {};
+          for (const row of rows) {
+            if (!row.patientId) continue;
+            map[row.id === 'PRIMARY' ? 'primary' : `trav-${row.id}`] = row.patientId;
+          }
+          setPatientIdByKey(map);
+        }
+      } catch {}
+    })();
+    return () => { ignore = true; };
+  }, [isEdit]);
 
   const defaultAnswers = useMemo(() => {
     const all: Record<string, Ans> = {};
     for (const s of FORM) for (const q of s.questions) all[q.id] = undefined;
     return all;
   }, []);
-  const [answers,    setAnswers   ] = useState<Record<string, Ans>>(defaultAnswers);
+  const [answers, setAnswers] = useState<Record<string, Ans>>(defaultAnswers);
   const [detailsByQ, setDetailsByQ] = useState<Record<string, string>>({});
 
-  // Sections are walked through one at a time; only this index is expanded.
   const [openSectionIndex, setOpenSectionIndex] = useState(0);
 
-  // ── Prefill (new mode) ──────────────────────────────────────────────────────
   useEffect(() => {
     if (isEdit) return;
     let ignore = false;
     (async () => {
-      // 1. Latest registration → build patient options
       try {
         const r = await authFetch(`${API_BASE_URL}/registrations/mine/latest`);
         if (!ignore && r.ok) {
@@ -246,9 +253,8 @@ export default function PreConsultation() {
             const opts = buildPatientOptions(reg);
             if (opts.length > 0) {
               setPatientOptions(opts);
-              // Pre-select if travelerId/patientId passed via params
               const preKey = initTravId ? `trav-${initTravId}` : initPatId ? `trav-${initPatId}` : opts[0].key;
-              const match  = opts.find(o => o.key === preKey) ?? opts[0];
+              const match = opts.find(o => o.key === preKey) ?? opts[0];
               setSelectedPatientKey(match.key);
               setContactName(match.label.replace(/\s*\(Primary\)\s*$/, ''));
               if (match.dob) setDob(match.dob);
@@ -257,7 +263,6 @@ export default function PreConsultation() {
         }
       } catch {}
 
-      // 2. Latest consultation → prefill address
       try {
         const r0 = await authFetch(`${API_BASE_URL}/consultations/mine/latest`);
         if (!ignore && r0.ok) {
@@ -273,7 +278,6 @@ export default function PreConsultation() {
         }
       } catch {}
 
-      // 3. Fallback /auth/me
       try {
         const r = await authFetch(`${API_BASE_URL}/auth/me`);
         if (!ignore && r.ok) {
@@ -289,7 +293,6 @@ export default function PreConsultation() {
     return () => { ignore = true; };
   }, [isEdit]);
 
-  // ── Prefill (edit mode) ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!isEdit) return;
     let ignore = false;
@@ -311,7 +314,7 @@ export default function PreConsultation() {
               setPatientOptions(opts);
               const nameOnly = (j.contactName || '').trim();
               const matchByName = opts.find(o => o.label.replace(/\s*\(Primary\)\s*$/, '') === nameOnly);
-              const matchByDob  = opts.find(o => o.dob && o.dob === toYMD(j.dob || ''));
+              const matchByDob = opts.find(o => o.dob && o.dob === toYMD(j.dob || ''));
               setSelectedPatientKey((matchByName || matchByDob || opts[0])?.key || 'primary');
             }
           }
@@ -321,8 +324,6 @@ export default function PreConsultation() {
           });
           setAnswers(merged);
           setDetailsByQ(j.detailsByQuestion || {});
-          // A previously-submitted checklist means every section is already reviewed —
-          // land on the last section rather than forcing a walk-through.
           setOpenSectionIndex(FORM.length - 1);
         }
       } catch {}
@@ -330,7 +331,6 @@ export default function PreConsultation() {
     return () => { ignore = true; };
   }, [isEdit, cid]);
 
-  // ── Sync contact fields when patient selection changes ──────────────────────
   useEffect(() => {
     if (!patientOptions.length) return;
     const opt = patientOptions.find(o => o.key === selectedPatientKey);
@@ -339,7 +339,6 @@ export default function PreConsultation() {
     if (opt.dob) setDob(opt.dob);
   }, [selectedPatientKey]);
 
-  /** Lock the whole checklist and show the 999 warning if ANY "Yes" is answered inside a critical section. */
   const hasEmergencyAnswer = useMemo(() =>
     FORM.filter(s => CRITICAL.has(s.title))
         .some(s => s.questions.some(q => answers[q.id] === 'Yes'))
@@ -350,8 +349,6 @@ export default function PreConsultation() {
     if (!hasEmergencyAnswer) setEmergencyModalDismissed(false);
   }, [hasEmergencyAnswer]);
 
-  /** Answer a question and, if that completes the section with a "No", auto-advance to the next one.
-   *  A "Yes" reveals a details textbox the patient may want to fill in, so it never auto-folds. */
   function answerQuestion(sectionIndex: number, id: string, v: YesNo) {
     setAnswers(prev => {
       if (prev[id] === v) return prev;
@@ -366,7 +363,6 @@ export default function PreConsultation() {
     });
   }
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
   async function submit() {
     if (submitting || isLocked || hasEmergencyAnswer) return;
 
@@ -394,6 +390,13 @@ export default function PreConsultation() {
           })()
         : null;
 
+      const patientId = patientIdByKey[selectedPatientKey];
+      if (!isEdit && !patientId) {
+        Alert.alert('Please try again', 'Could not resolve the selected patient. Please try again in a moment.');
+        setSubmitting(false);
+        return;
+      }
+
       const payload = {
         currentLocation: null,
         contactName,
@@ -403,9 +406,10 @@ export default function PreConsultation() {
         detailsByQuestion: details,
         dob: dob || null,
         travelerId,
+        patientId,
       };
 
-      const url    = isEdit ? `${API_BASE_URL}/consultations/${cid}` : `${API_BASE_URL}/consultations`;
+      const url = isEdit ? `${API_BASE_URL}/consultations/${cid}` : `${API_BASE_URL}/consultations`;
       const method = isEdit ? 'PUT' : 'POST';
       const res = await authFetch(url, {
         method,
@@ -427,22 +431,19 @@ export default function PreConsultation() {
     }
   }
 
-  const selectedPatient  = patientOptions.find(o => o.key === selectedPatientKey);
-  const answeredCount    = Object.values(answers).filter(v => v !== undefined).length;
-  const totalCount       = Object.keys(answers).length;
-  const initials         = contactName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+  const selectedPatient = patientOptions.find(o => o.key === selectedPatientKey);
+  const answeredCount = Object.values(answers).filter(v => v !== undefined).length;
+  const totalCount = Object.keys(answers).length;
+  const initials = contactName.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgGray }}>
-      <PageHeader
-        title={isEdit ? 'Edit Consultation' : 'Pre-Consultation Checklist'}
-        subtitle="Health questionnaire"
-      />
-      <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+      <PageHeader title={isEdit ? 'Edit Consultation' : 'Pre-Consultation Checklist'} subtitle="Health questionnaire" />
+      <FormScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {isLocked && (
-          <View style={s.lockNotice}>
-            <Text style={s.lockNoticeText}>🔒 This checklist is locked while your appointment is booked. Cancel the appointment to make changes.</Text>
+          <View style={[ws.notice, ws.nInfo]}>
+            <Text style={[ws.noticeText, ws.nInfoText]}>🔒 This checklist is locked while your appointment is booked. Cancel the appointment to make changes.</Text>
           </View>
         )}
 
@@ -453,57 +454,44 @@ export default function PreConsultation() {
         </View>
 
         {/* ── Patient Contact & Address ── */}
-        <View style={s.card}>
-          <Text style={s.cardHeader}>👤  Patient Contact & Address</Text>
+        <View style={ws.card}>
+          <Text style={ws.ct}>👤  Patient Contact & Address</Text>
 
           {patientOptions.length > 0 ? (
-            <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>Consultation for</Text>
-              <TouchableOpacity
-                style={s.selector}
-                onPress={() => setShowPatientSheet(true)}
-                activeOpacity={0.75}
-                disabled={isLocked || hasEmergencyAnswer}
-              >
-                <View style={s.avatarBadge}><Text style={s.avatarBadgeText}>{initials}</Text></View>
+            <View style={ws.fi}>
+              <Text style={ws.fl2}>Consultation for</Text>
+              <TouchableOpacity style={s.selector} onPress={() => setShowPatientSheet(true)} activeOpacity={0.75} disabled={isLocked || hasEmergencyAnswer}>
+                <View style={ws.ava}><Text style={ws.avaText}>{initials}</Text></View>
                 <Text style={s.selectorText}>{selectedPatient?.label || 'Select patient'}</Text>
                 <Text style={s.selectorChevron}>›</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={s.fieldWrap}>
-              <Text style={s.fieldLabel}>Full Name</Text>
-              <TextInput
-                style={s.input}
-                value={contactName}
-                onChangeText={setContactName}
-                placeholder="Full name"
-                placeholderTextColor={colors.mutedLight}
-                autoCapitalize="words"
-                editable={!isLocked && !hasEmergencyAnswer}
-              />
+            <View style={ws.fi}>
+              <Text style={ws.fl2}>Full Name</Text>
+              <TextInput style={ws.input} value={contactName} onChangeText={setContactName} placeholder="Full name" placeholderTextColor={wc.textMuted} autoCapitalize="words" editable={!isLocked && !hasEmergencyAnswer} />
             </View>
           )}
 
-          <View style={s.fieldRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Phone / WhatsApp</Text>
-              <TextInput style={[s.input, s.inputDisabled]} value={contactPhone} editable={false} />
+          <View style={ws.g2Row}>
+            <View style={ws.g2Col}>
+              <Text style={ws.fl2}>Phone / WhatsApp</Text>
+              <TextInput style={[ws.input, ws.inputDisabled]} value={contactPhone} editable={false} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Date of Birth</Text>
-              <TextInput style={[s.input, s.inputDisabled]} value={dob} editable={false} />
+            <View style={ws.g2Col}>
+              <Text style={ws.fl2}>Date of Birth</Text>
+              <TextInput style={[ws.input, ws.inputDisabled]} value={dob} editable={false} />
             </View>
           </View>
 
-          <View style={s.fieldWrap}>
-            <Text style={s.fieldLabel}>Address</Text>
+          <View style={ws.fi}>
+            <Text style={ws.fl2}>Address</Text>
             <TextInput
-              style={s.textarea}
+              style={[ws.input, { minHeight: 70 }]}
               value={contactAddress}
               onChangeText={setContactAddress}
               placeholder="Street, City, Postal Code, Country"
-              placeholderTextColor={colors.mutedLight}
+              placeholderTextColor={wc.textMuted}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
@@ -525,31 +513,27 @@ export default function PreConsultation() {
 
         {/* ── Question sections (sequential accordion) ── */}
         {FORM.map((section, index) => {
-          const isCritical  = CRITICAL.has(section.title);
-          const answeredIn  = section.questions.filter(q => answers[q.id] !== undefined).length;
-          const complete    = answeredIn === section.questions.length;
-          const isOpen      = openSectionIndex === index;
+          const isCritical = CRITICAL.has(section.title);
+          const answeredIn = section.questions.filter(q => answers[q.id] !== undefined).length;
+          const complete = answeredIn === section.questions.length;
+          const isOpen = openSectionIndex === index;
           const isFirstGeneral = !isCritical && FORM[index - 1] && CRITICAL.has(FORM[index - 1].title);
-          const borderColor = isCritical ? colors.errorBorder : (complete ? colors.successBorder : colors.line);
+          const borderColor = isCritical ? wc.borderDanger : (complete ? wc.borderSuccess : wc.borderStrong);
 
           return (
             <React.Fragment key={section.title}>
               {index === 0 && <Text style={s.groupHint}>EMERGENCY SYMPTOM CHECK</Text>}
-              {isFirstGeneral && <Text style={[s.groupHint, { marginTop: spacing.sm }]}>GENERAL HEALTH QUESTIONS</Text>}
+              {isFirstGeneral && <Text style={[s.groupHint, { marginTop: 8 }]}>GENERAL HEALTH QUESTIONS</Text>}
 
               <View style={[s.accordionItem, { borderColor }, isOpen && s.accordionItemOpen]}>
-                <TouchableOpacity
-                  style={s.accordionHeader}
-                  onPress={() => setOpenSectionIndex(index)}
-                  activeOpacity={0.7}
-                >
+                <TouchableOpacity style={s.accordionHeader} onPress={() => setOpenSectionIndex(index)} activeOpacity={0.7}>
                   <View style={s.accordionHeaderLeft}>
-                    {isCritical && <Text style={{ color: colors.error, fontSize: 14 }}>⚠️</Text>}
-                    <Text style={[s.accordionTitle, isCritical && { color: colors.error }]}>{section.title}</Text>
+                    {isCritical && <Text style={{ color: wc.textDanger, fontSize: 14 }}>⚠️</Text>}
+                    <Text style={[s.accordionTitle, isCritical && { color: wc.textDanger }]}>{section.title}</Text>
                   </View>
                   <View style={s.accordionHeaderRight}>
                     {complete ? (
-                      <Text style={{ color: colors.success, fontSize: 15 }}>✓</Text>
+                      <Text style={{ color: wc.textSuccess, fontSize: 15 }}>✓</Text>
                     ) : (
                       <Text style={s.accordionCount}>{answeredIn}/{section.questions.length}</Text>
                     )}
@@ -561,18 +545,10 @@ export default function PreConsultation() {
                   <View style={s.accordionBody}>
                     {section.questions.map(q => {
                       const val = answers[q.id];
-                      // Keep the question that actually triggered the emergency lock editable
-                      // so the patient can correct a misclick — everything else stays blocked.
                       const questionDisabled = isLocked || (hasEmergencyAnswer && val !== 'Yes');
                       return (
                         <View key={q.id}>
-                          <Toggle
-                            label={q.label}
-                            value={val}
-                            onChange={v => answerQuestion(index, q.id, v)}
-                            critical={isCritical}
-                            disabled={questionDisabled}
-                          />
+                          <Toggle label={q.label} value={val} onChange={v => answerQuestion(index, q.id, v)} critical={isCritical} disabled={questionDisabled} />
                           {val === 'Yes' && (
                             <View style={s.detailWrap}>
                               <TextInput
@@ -580,7 +556,7 @@ export default function PreConsultation() {
                                 value={detailsByQ[q.id] || ''}
                                 onChangeText={v => setDetailsByQ(prev => ({ ...prev, [q.id]: v }))}
                                 placeholder="Add details (optional)"
-                                placeholderTextColor={colors.mutedLight}
+                                placeholderTextColor={wc.textMuted}
                                 editable={!questionDisabled}
                               />
                             </View>
@@ -597,133 +573,91 @@ export default function PreConsultation() {
 
         {/* ── Submit ── */}
         {hasEmergencyAnswer ? (
-          <View style={s.blockedNotice}>
-            <Text style={s.blockedNoticeText}>⚠️ This checklist can't be submitted while an emergency symptom is reported. Please dial 999.</Text>
+          <View style={[ws.notice, ws.nDanger]}>
+            <Text style={[ws.noticeText, ws.nDangerText]}>⚠️ This checklist can't be submitted while an emergency symptom is reported. Please dial 999.</Text>
           </View>
         ) : !isLocked && (
-          <TouchableOpacity
-            style={[s.submitBtn, submitting && { opacity: 0.7 }]}
-            onPress={submit}
-            disabled={submitting}
-            activeOpacity={0.85}
-          >
-            {submitting
-              ? <ActivityIndicator color={colors.brandDark} />
-              : <Text style={s.submitBtnText}>{isEdit ? 'Update & Continue' : 'Submit & Continue'}</Text>
-            }
+          <TouchableOpacity style={[ws.bp, submitting && ws.btnDisabled]} onPress={submit} disabled={submitting} activeOpacity={0.85}>
+            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={ws.bpText}>{isEdit ? 'Update & Continue' : 'Submit & Continue'}</Text>}
           </TouchableOpacity>
         )}
 
-      </ScrollView>
+      </FormScrollView>
 
-      <PatientSheet
-        visible={showPatientSheet}
-        options={patientOptions}
-        selected={selectedPatientKey}
-        onSelect={setSelectedPatientKey}
-        onClose={() => setShowPatientSheet(false)}
-      />
+      <PatientSheet visible={showPatientSheet} options={patientOptions} selected={selectedPatientKey} onSelect={setSelectedPatientKey} onClose={() => setShowPatientSheet(false)} />
 
-      <EmergencyModal
-        visible={hasEmergencyAnswer && !emergencyModalDismissed}
-        onClose={() => setEmergencyModalDismissed(true)}
-      />
+      <EmergencyModal visible={hasEmergencyAnswer && !emergencyModalDismissed} onClose={() => setEmergencyModalDismissed(true)} />
     </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { padding: spacing.xl, paddingBottom: 60, gap: spacing.md },
+  container: { padding: 20, paddingBottom: 40, gap: 11 },
 
-  lockNotice:     { backgroundColor: colors.accentBg, borderWidth: 1, borderColor: colors.accentBorder, borderRadius: radius.lg, padding: spacing.md },
-  lockNoticeText: { color: colors.accentText, fontSize: typography.sm, lineHeight: 18 },
+  progressPill: { height: 30, backgroundColor: wc.surface2, borderRadius: 15, borderWidth: 1, borderColor: wc.borderStrong, overflow: 'hidden', justifyContent: 'center', position: 'relative' },
+  progressBar: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: wc.bgAccent },
+  progressText: { textAlign: 'center', fontSize: 12, fontWeight: '600', color: wc.textAccent, zIndex: 1 },
 
-  progressPill: { height: 32, backgroundColor: colors.white, borderRadius: radius.full, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', justifyContent: 'center', position: 'relative' },
-  progressBar:  { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: colors.brandLight, borderRadius: radius.full },
-  progressText: { textAlign: 'center', fontSize: typography.xs, fontWeight: '700', color: colors.brand, zIndex: 1 },
+  selector: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: wc.borderAccent, borderRadius: 8, backgroundColor: wc.bgAccent, paddingHorizontal: 12, paddingVertical: 9, gap: 8 },
+  selectorText: { flex: 1, fontSize: 14, color: wc.textPrimary, fontWeight: '500' },
+  selectorChevron: { fontSize: 19, color: wc.textMuted },
 
-  card:       { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md, ...shadow.sm },
-  cardHeader: { fontSize: typography.base, fontWeight: '700', color: colors.text },
+  emergencyBanner: { backgroundColor: wc.fillDanger, borderRadius: 8, padding: 14, gap: 4 },
+  emergencyTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  emergencyText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, lineHeight: 18 },
+  emergencyCallBtn: { backgroundColor: '#fff', borderRadius: 6, paddingVertical: 9, alignItems: 'center', marginTop: 4 },
+  emergencyCallBtnText: { color: wc.textDanger, fontWeight: '700', fontSize: 14 },
 
-  fieldWrap:   { gap: 4 },
-  fieldLabel:  { fontSize: typography.xs, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  fieldRow:    { flexDirection: 'row', gap: spacing.md },
-  input:       { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 10, fontSize: typography.base, color: colors.text, backgroundColor: colors.bgGray, minHeight: 46 },
-  inputDisabled: { color: colors.muted, backgroundColor: colors.surface },
-  textarea:    { borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 10, fontSize: typography.base, color: colors.text, backgroundColor: colors.bgGray, minHeight: 80 },
+  groupHint: { fontSize: 12, fontWeight: '600', color: wc.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
 
-  selector:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.brand + '60', borderRadius: radius.md, backgroundColor: colors.brandLight, paddingHorizontal: spacing.md, paddingVertical: 10, gap: spacing.sm },
-  avatarBadge:     { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
-  avatarBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  selectorText:    { flex: 1, fontSize: typography.base, color: colors.text, fontWeight: '600' },
-  selectorChevron: { fontSize: 20, color: colors.muted },
+  accordionItem: { backgroundColor: wc.surface2, borderRadius: 8, borderWidth: 1.5, overflow: 'hidden' },
+  accordionItemOpen: { borderColor: wc.fillAccent },
+  accordionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 11 },
+  accordionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  accordionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  accordionTitle: { fontWeight: '600', fontSize: 14, color: wc.textPrimary },
+  accordionCount: { fontSize: 12, fontWeight: '500', color: wc.textMuted },
+  accordionChevron: { fontSize: 14, color: wc.textMuted },
+  accordionChevronOpen: { color: wc.fillAccent },
+  accordionBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: wc.border },
 
-  emergencyBanner:    { backgroundColor: colors.error, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs, ...shadow.md },
-  emergencyTitle:     { color: '#fff', fontWeight: '800', fontSize: typography.md },
-  emergencyText:      { color: 'rgba(255,255,255,0.9)', fontSize: typography.sm, lineHeight: 20 },
-  emergencyCallBtn:   { backgroundColor: '#fff', borderRadius: radius.full, paddingVertical: 10, alignItems: 'center', marginTop: spacing.xs },
-  emergencyCallBtnText: { color: colors.error, fontWeight: '800', fontSize: typography.sm },
-
-  groupHint: { fontSize: typography.xs, fontWeight: '700', color: colors.muted, letterSpacing: 0.6, textTransform: 'uppercase' },
-
-  accordionItem:     { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1.5, overflow: 'hidden', ...shadow.sm },
-  accordionItemOpen: { borderColor: colors.brand },
-  accordionHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  accordionHeaderLeft:  { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
-  accordionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  accordionTitle:  { fontWeight: '700', fontSize: typography.base, color: colors.text },
-  accordionCount:  { fontSize: typography.xs, fontWeight: '600', color: colors.muted },
-  accordionChevron:     { fontSize: 14, color: colors.muted },
-  accordionChevronOpen: { color: colors.brand },
-  accordionBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.line },
-
-  detailWrap:  { marginTop: -spacing.sm, marginBottom: spacing.xs },
-  detailInput: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 8, fontSize: typography.sm, color: colors.text, backgroundColor: colors.bgGray },
-
-  blockedNotice:     { backgroundColor: colors.errorBg, borderWidth: 1, borderColor: colors.errorBorder, borderRadius: radius.lg, padding: spacing.md },
-  blockedNoticeText: { color: colors.error, fontSize: typography.sm, fontWeight: '600', lineHeight: 18 },
-
-  submitBtn:     { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', ...shadow.brand },
-  submitBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
+  detailWrap: { marginTop: -6, marginBottom: 4 },
+  detailInput: { borderWidth: 1, borderColor: wc.borderStrong, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: wc.textPrimary, backgroundColor: wc.surface2 },
 });
 
 const t = StyleSheet.create({
-  wrap:        { gap: 6 },
-  label:       { fontSize: typography.sm, fontWeight: '700', lineHeight: 20 },
-  hint:        { fontSize: typography.xs, color: colors.mutedLight, fontStyle: 'italic' },
-  btnRow:      { flexDirection: 'row', gap: spacing.sm },
-  btn:         { flex: 1, paddingVertical: 10, borderRadius: radius.lg, alignItems: 'center', borderWidth: 1.5 },
-  btnUnset:    { backgroundColor: colors.bgGray, borderColor: colors.line },
-  btnNo:       { backgroundColor: colors.brand, borderColor: colors.brand },
-  btnYes:      { backgroundColor: colors.error, borderColor: colors.error },
-  btnTxt:      { fontSize: typography.base, fontWeight: '600', color: colors.muted },
-  btnTxtActive:{ color: '#fff' },
+  wrap: { gap: 6 },
+  label: { fontSize: 14, fontWeight: '600', lineHeight: 18 },
+  hint: { fontSize: 12, color: wc.textMuted, fontStyle: 'italic' },
+  btnRow: { flexDirection: 'row', gap: 8 },
+  btn: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1 },
+  btnUnset: { backgroundColor: wc.surface1, borderColor: wc.borderStrong },
+  btnNo: { backgroundColor: wc.fillAccent, borderColor: wc.fillAccent },
+  btnYes: { backgroundColor: wc.fillDanger, borderColor: wc.fillDanger },
+  btnTxt: { fontSize: 14, fontWeight: '500', color: wc.textMuted },
+  btnTxtActive: { color: '#fff' },
 });
 
 const ps = StyleSheet.create({
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet:       { backgroundColor: colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 28 },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, alignSelf: 'center', marginTop: 12 },
-  title:       { fontSize: typography.lg, fontWeight: '700', color: colors.text, textAlign: 'center', padding: spacing.lg },
-  option:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 14 },
-  optionActive:{ backgroundColor: colors.brandLight },
-  optLabel:    { fontSize: typography.base, color: colors.text, fontWeight: '500' },
-  optLabelActive: { color: colors.brand, fontWeight: '700' },
-  optDob:      { fontSize: typography.xs, color: colors.muted, marginTop: 2 },
-  cancelBtn:   { marginHorizontal: spacing.xl, marginTop: spacing.md, paddingVertical: 14, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center' },
-  cancelTxt:   { fontSize: typography.base, fontWeight: '600', color: colors.muted },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet: { backgroundColor: wc.surface2, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 26 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: wc.borderStronger, alignSelf: 'center', marginTop: 12 },
+  title: { fontSize: 16, fontWeight: '600', color: wc.textPrimary, textAlign: 'center', padding: 14 },
+  option: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 13 },
+  optionActive: { backgroundColor: wc.bgAccent },
+  optLabel: { fontSize: 14, color: wc.textPrimary, fontWeight: '500' },
+  optLabelActive: { color: wc.textAccent, fontWeight: '600' },
+  optDob: { fontSize: 12, color: wc.textMuted, marginTop: 2 },
+  cancelBtn: { marginHorizontal: 20, marginTop: 10, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: wc.borderStrong, alignItems: 'center' },
+  cancelTxt: { fontSize: 14, fontWeight: '500', color: wc.textMuted },
 });
 
 const em = StyleSheet.create({
-  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  centerWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  box:        { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.xl, gap: spacing.md, width: '100%', maxWidth: 360, ...shadow.md },
-  title:      { fontSize: typography.lg, fontWeight: '800', color: colors.error },
-  body:       { fontSize: typography.sm, color: colors.text, lineHeight: 20 },
-  actions:    { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  closeBtn:   { flex: 1, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
-  closeBtnText: { fontSize: typography.sm, fontWeight: '600', color: colors.muted },
-  callBtn:    { flex: 1, backgroundColor: colors.error, borderRadius: radius.full, paddingVertical: 12, alignItems: 'center' },
-  callBtnText:{ fontSize: typography.sm, fontWeight: '700', color: '#fff' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  centerWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  box: { backgroundColor: wc.surface2, borderRadius: 12, padding: 20, gap: 10, width: '100%', maxWidth: 360 },
+  title: { fontSize: 17, fontWeight: '700', color: wc.textDanger },
+  body: { fontSize: 14, color: wc.textPrimary, lineHeight: 18 },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
 });

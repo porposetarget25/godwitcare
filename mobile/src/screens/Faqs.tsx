@@ -1,8 +1,8 @@
-// src/screens/Faqs.tsx
+// src/screens/Faqs.tsx — mirrors web's .portal card/accordion styling.
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { PageHeader } from '../components/PageHeader';
-import { colors, spacing, typography, radius, shadow } from '../theme';
+import { ws, wc } from '../webStyle';
 
 if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
@@ -94,7 +94,7 @@ const SECTIONS: Section[] = [
       },
       {
         q: 'How do I update my personal details?',
-        a: 'Go to the Profile tab (bottom navigation), tap the pencil icon to enter edit mode, update your information, and tap the tick ✓ to save.',
+        a: 'Go to Profile in the sidebar, tap "Edit" to enter edit mode, update your information, and tap "Save".',
       },
       {
         q: 'How do I add or change my profile photo?',
@@ -161,17 +161,17 @@ export default function Faqs() {
   return (
     <View style={{ flex: 1 }}>
       <PageHeader title="FAQs" subtitle="Frequently asked questions" />
-      <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <Text style={s.intro}>
           Everything you need to know about GodwitCare. Can't find your answer? Contact us via WhatsApp.
         </Text>
         {SECTIONS.map(section => (
           <View key={section.title} style={s.section}>
             <View style={s.sectionHeader}>
-              <Text style={{ fontSize: 18 }}>{section.icon}</Text>
+              <Text style={{ fontSize: 17 }}>{section.icon}</Text>
               <Text style={s.sectionTitle}>{section.title}</Text>
             </View>
-            <View style={s.card}>
+            <View style={ws.card}>
               {section.faqs.map((faq, i) => (
                 <React.Fragment key={faq.q}>
                   {i > 0 && <View style={s.sep} />}
@@ -188,21 +188,19 @@ export default function Faqs() {
 }
 
 const s = StyleSheet.create({
-  scroll:        { flex: 1, backgroundColor: colors.bgGray },
-  content:       { padding: spacing.xl, paddingBottom: 60 },
-  intro:         { fontSize: typography.sm, color: colors.muted, lineHeight: 20, marginBottom: spacing.xl },
-  section:       { marginBottom: spacing.xl },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-  sectionTitle:  { fontSize: typography.md, fontWeight: '700', color: colors.text },
-  card:          { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', ...shadow.sm },
-  sep:           { height: 1, backgroundColor: colors.line },
+  content: { padding: 20, paddingBottom: 40 },
+  intro: { fontSize: 14, color: wc.textMuted, lineHeight: 18, marginBottom: 14 },
+  section: { marginBottom: 14 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  sectionTitle: { fontSize: 15, fontWeight: '600', color: wc.textPrimary },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: wc.border },
 });
 
 const f = StyleSheet.create({
-  item:        { padding: spacing.lg },
-  question:    { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  questionTxt: { flex: 1, fontSize: typography.base, fontWeight: '600', color: colors.text, lineHeight: 22 },
-  caret:       { fontSize: 20, color: colors.brand, transform: [{ rotate: '0deg' }], marginTop: -2, fontWeight: '300' },
-  caretOpen:   { transform: [{ rotate: '90deg' }] },
-  answer:      { fontSize: typography.sm, color: colors.muted, lineHeight: 22, marginTop: spacing.md, paddingRight: spacing.md },
+  item: { padding: 14 },
+  question: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  questionTxt: { flex: 1, fontSize: 14, fontWeight: '500', color: wc.textPrimary, lineHeight: 19 },
+  caret: { fontSize: 19, color: wc.fillAccent, transform: [{ rotate: '0deg' }], marginTop: -2, fontWeight: '300' },
+  caretOpen: { transform: [{ rotate: '90deg' }] },
+  answer: { fontSize: 14, color: wc.textSecondary, lineHeight: 19, marginTop: 8, paddingRight: 12 },
 });

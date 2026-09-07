@@ -129,7 +129,7 @@ export default function PinSetup() {
         {/* Toggle row */}
         <View style={s.card}>
           <View style={s.toggleRow}>
-            <View style={s.toggleIcon}><Text style={{ fontSize: 20 }}>🔒</Text></View>
+            <View style={s.toggleIcon}><Text style={{ fontSize: 21 }}>🔒</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={s.toggleLabel}>PIN Lock</Text>
               <Text style={s.toggleSub}>Require PIN when reopening the app</Text>
@@ -146,7 +146,7 @@ export default function PinSetup() {
             <>
               <View style={s.divider} />
               <View style={s.toggleRow}>
-                <View style={s.toggleIcon}><Text style={{ fontSize: 20 }}>🔐</Text></View>
+                <View style={s.toggleIcon}><Text style={{ fontSize: 21 }}>🔐</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.toggleLabel}>Fingerprint / Face ID</Text>
                   <Text style={s.toggleSub}>Use biometrics instead of PIN</Text>
@@ -218,7 +218,7 @@ const s = StyleSheet.create({
   errorBanner: { backgroundColor: colors.errorBg, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
   errorTxt:    { color: colors.error, fontSize: typography.sm, fontWeight: '600' },
   successCard: { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: spacing.xl, alignItems: 'center', gap: spacing.md, ...shadow.sm },
-  successIcon: { fontSize: 48 },
+  successIcon: { fontSize: 49 },
   successTitle:{ fontSize: typography.xl, fontWeight: '700', color: colors.text },
   successSub:  { fontSize: typography.sm, color: colors.muted, textAlign: 'center' },
   changeBtn:   { marginTop: spacing.sm, backgroundColor: colors.brandLight, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full },

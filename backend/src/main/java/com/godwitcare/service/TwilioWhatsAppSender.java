@@ -28,7 +28,7 @@ public class TwilioWhatsAppSender implements WhatsAppSender {
     }
 
     @Override
-    public void send(String toPhoneNumber, String message) {
+    public void send(String toPhoneNumber, String contentSid, String contentVariables) {
         if (accountSid == null || accountSid.isBlank() || authToken == null || authToken.isBlank() || fromNumber == null || fromNumber.isBlank()) {
             throw new IllegalStateException("Twilio credentials are not configured");
         }
@@ -41,8 +41,11 @@ public class TwilioWhatsAppSender implements WhatsAppSender {
         Message twilioMessage = Message.creator(
                 new PhoneNumber("whatsapp:" + normalizedTo),
                 new PhoneNumber("whatsapp:" + normalizedFrom),
-                message
-        ).create();
+                (String) null
+        )
+                .setContentSid(contentSid)
+                .setContentVariables(contentVariables)
+                .create();
 
         log.info("Twilio WhatsApp OTP message created. sid={}, status={}, to={}",
                 twilioMessage.getSid(), twilioMessage.getStatus(), maskPhone(normalizedTo));

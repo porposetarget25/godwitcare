@@ -164,8 +164,8 @@ export default function OtpVerification() {
 
           const created = await saveRegistration({ ...draft, travelers });
 
-          if (pendingFile && created?.id) {
-            try { await uploadDocument(created.id, pendingFile); } catch {}
+          if (pendingFile && created?.id && created?.primaryPatientId) {
+            try { await uploadDocument(created.id, created.primaryPatientId, 'PASSPORT', pendingFile); } catch {}
           }
 
           clearDraft();
@@ -200,7 +200,7 @@ export default function OtpVerification() {
         <View style={s.decor2} />
         <Image source={LOGO} style={s.logo} resizeMode="contain" />
         <View style={s.heroIconWrap}>
-          <Text style={{ fontSize: 40 }}>📲</Text>
+          <Text style={{ fontSize: 41 }}>📲</Text>
         </View>
         <Text style={s.heroTitle}>OTP Verification</Text>
         <Text style={s.heroSub}>
@@ -328,7 +328,7 @@ const s = StyleSheet.create({
 
   // Success
   successBanner: { backgroundColor: colors.successBg, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.successBorder },
-  successIcon:   { fontSize: 14 },
+  successIcon:   { fontSize: 15 },
   successText:   { color: colors.success, fontSize: typography.sm, flex: 1, lineHeight: 18 },
 
   // OTP input
@@ -347,7 +347,7 @@ const s = StyleSheet.create({
 
   // Error
   errorBanner: { backgroundColor: colors.errorBg, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderColor: colors.errorBorder },
-  errorIcon:   { fontSize: 14 },
+  errorIcon:   { fontSize: 15 },
   errorText:   { color: colors.error, fontSize: typography.sm, flex: 1, lineHeight: 18 },
 
   // Verify button

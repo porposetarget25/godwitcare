@@ -68,6 +68,8 @@ export type UserDto = {
   email?: string;
   username?: string;
   roles?: string[];
+  otpVerified?: boolean;
+  activated?: boolean;
 };
 
 export type Registration = {
@@ -95,6 +97,49 @@ export type Registration = {
   travelers?: Array<{ fullName: string; dateOfBirth: string }>;
   [key: string]: any;
 };
+
+export type Traveler = {
+  id?: number;
+  patientId?: string;
+  fullName: string;
+  dateOfBirth: string;
+};
+
+export type RegistrationApi = {
+  id: number;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  primaryWhatsAppNumber?: string;
+  carerSecondaryWhatsAppNumber?: string;
+  emailAddress?: string;
+  longTermMedication?: boolean;
+  healthCondition?: boolean;
+  allergies?: boolean;
+  fitToFlyCertificate?: boolean;
+  travellingFrom?: string;
+  travellingTo?: string;
+  travelStartDate?: string;
+  travelEndDate?: string;
+  packageDays?: number;
+  travelers?: Traveler[];
+  primaryPatientId?: string;
+};
+
+export type DocumentType = 'PASSPORT' | 'TRAVEL_DOCUMENT';
+export type DocSummary = {
+  id: number;
+  fileName: string;
+  sizeBytes: number;
+  createdAt: string;
+  patientId: string;
+  type: DocumentType;
+};
+
+/** RN file reference shape used by expo-image-picker/expo-document-picker results. */
+export type RNFile = { uri: string; name: string; type: string };
 
 export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -148,7 +193,7 @@ function toBackend(draft: Registration) {
   };
 }
 
-export async function saveRegistration(draft: Registration): Promise<{ id?: number }> {
+export async function saveRegistration(draft: Registration): Promise<RegistrationApi> {
   const res = await authFetch(`${API_BASE_URL}/registrations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -180,14 +225,57 @@ export async function registerAuthUser(
   return res.json();
 }
 
-export async function uploadDocument(registrationId: number, file: { uri: string; name: string; type: string }) {
+export async function uploadDocument(registrationId: number, patientId: string, type: DocumentType, file: RNFile) {
   const formData = new FormData();
   formData.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
-  const res = await authFetch(`${API_BASE_URL}/registrations/${registrationId}/documents`, {
-    method: 'POST',
-    body: formData,
-  });
+  const res = await authFetch(
+    `${API_BASE_URL}/registrations/${registrationId}/patients/${encodeURIComponent(patientId)}/documents/${type}`,
+    { method: 'POST', body: formData },
+  );
   if (!res.ok) throw new Error('Upload failed');
+  return res.json();
+}
+
+export async function addTravelerWithDocuments(
+  registrationId: number,
+  traveler: { fullName: string; dateOfBirth: string },
+  passport: RNFile,
+  travelDocument: RNFile,
+): Promise<Traveler> {
+  const formData = new FormData();
+  formData.append('fullName', traveler.fullName);
+  formData.append('dateOfBirth', traveler.dateOfBirth);
+  formData.append('passport', { uri: passport.uri, name: passport.name, type: passport.type } as any);
+  formData.append('travelDocument', { uri: travelDocument.uri, name: travelDocument.name, type: travelDocument.type } as any);
+  const res = await authFetch(`${API_BASE_URL}/registrations/${registrationId}/travelers`, {
+    method: 'POST', body: formData,
+  });
+  if (!res.ok) throw new Error('Failed to add traveller');
+  return res.json();
+}
+
+export async function listDocuments(registrationId: number, patientId: string): Promise<DocSummary[]> {
+  const res = await authFetch(`${API_BASE_URL}/registrations/${registrationId}/patients/${encodeURIComponent(patientId)}/documents`);
+  if (!res.ok) throw new Error('Failed to load documents');
+  return res.json();
+}
+
+export async function getLatestRegistrationByEmail(email: string): Promise<RegistrationApi | null> {
+  const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(email)}`);
+  if (res.status === 204) return null;
+  if (!res.ok) throw new Error(`Failed to load registration (HTTP ${res.status})`);
+  const data = await res.json();
+  if (Array.isArray(data)) return data.length ? (data[data.length - 1] as RegistrationApi) : null;
+  return (data ?? null) as RegistrationApi | null;
+}
+
+export async function updateRegistrationById(id: number, payload: RegistrationApi): Promise<RegistrationApi> {
+  const res = await authFetch(`${API_BASE_URL}/registrations/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to update registration');
   return res.json();
 }
 
@@ -338,4 +426,97 @@ export async function getActivationPaymentSummary(): Promise<ActivationPaymentSu
   const res = await authFetch(`${API_BASE_URL}/payments/activation-summary`);
   if (!res.ok) throw new Error(`Failed to load activation summary (${res.status})`);
   return res.json();
+}
+
+export type PaymentHistoryResponse = {
+  id: number;
+  method: 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET';
+  amount: number;
+  currency: string;
+  status: string;
+  failureMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  packageLabel?: string;
+  registrationFee?: number;
+  tripCoverageFee?: number;
+};
+
+export async function getLatestPayment(): Promise<PaymentHistoryResponse | null> {
+  const res = await authFetch(`${API_BASE_URL}/payments/latest`);
+  if (res.status === 204 || res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to load latest payment (${res.status})`);
+  return res.json();
+}
+
+export async function getPaymentHistory(): Promise<PaymentHistoryResponse[]> {
+  const res = await authFetch(`${API_BASE_URL}/payments/history`);
+  if (!res.ok) throw new Error(`Failed to load payment history (${res.status})`);
+  return res.json();
+}
+
+// ── Stripe activation checkout ───────────────────────────────────────────────
+export type PaymentMethodKind = 'CARD' | 'EFT' | 'BANK_TRANSFER' | 'DIGITAL_WALLET';
+
+export type StripePaymentConfig = {
+  publishableKey: string;
+  environment: string;
+  frontendConfigured: boolean;
+  backendConfigured?: boolean;
+};
+
+export type ActivationPaymentIntentResponse = PaymentHistoryResponse & {
+  clientSecret: string;
+  stripePaymentIntentId: string;
+  packageDays: number;
+  totalAmount: number;
+};
+
+async function readJsonOrThrow<T>(res: Response, fallbackMessage: string): Promise<T> {
+  if (res.ok) return res.json();
+  const body = await res.json().catch(() => null);
+  throw new Error(body?.message || `${fallbackMessage} (HTTP ${res.status})`);
+}
+
+export async function getStripePaymentConfig(): Promise<StripePaymentConfig> {
+  const res = await authFetch(`${API_BASE_URL}/payments/config`);
+  return readJsonOrThrow(res, 'Failed to load payment configuration');
+}
+
+export async function createActivationPaymentIntent(payload: { method: PaymentMethodKind; currency: string }): Promise<ActivationPaymentIntentResponse> {
+  const res = await authFetch(`${API_BASE_URL}/payments/activation-intents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return readJsonOrThrow(res, 'Unable to start checkout');
+}
+
+export async function confirmPaymentIntent(paymentIntentId: string): Promise<PaymentHistoryResponse> {
+  const res = await authFetch(`${API_BASE_URL}/payments/payment-intents/${encodeURIComponent(paymentIntentId)}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return readJsonOrThrow(res, 'Unable to confirm payment');
+}
+
+// ── Document management (Documents screen) ──────────────────────────────────
+export async function deleteDocument(registrationId: number, docId: number): Promise<void> {
+  const res = await authFetch(`${API_BASE_URL}/registrations/${registrationId}/documents/${docId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete document');
+}
+
+/** Fetches a document's bytes as a base64 data URI (for saving/sharing on-device). */
+export async function downloadDocumentAsDataUri(registrationId: number, patientId: string, docId: number): Promise<string> {
+  const res = await authFetch(`${API_BASE_URL}/registrations/${registrationId}/patients/${encodeURIComponent(patientId)}/documents/${docId}/download`);
+  if (!res.ok) throw new Error('Failed to download document');
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read document bytes'));
+    reader.readAsDataURL(blob);
+  });
 }

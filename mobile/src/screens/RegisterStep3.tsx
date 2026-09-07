@@ -1,7 +1,7 @@
 // src/screens/RegisterStep3.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, Alert,
   TouchableOpacity, Modal, FlatList, TextInput, Platform, Animated,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -13,6 +13,7 @@ import { saveRegistration, uploadDocument, registerAuthUser, login } from '../ap
 import { Btn, Field } from '../components/UI';
 import { colors, spacing, radius, typography } from '../theme';
 import { PageHeader } from '../components/PageHeader';
+import { FormScrollView } from '../components/FormScrollView';
 
 type Person = { fullName: string; dateOfBirth: string };
 type Errors = Partial<Record<'from'|'to'|'start'|'end'|'package'|'travelers', string>>;
@@ -343,7 +344,7 @@ function SearchSheet({ visible, title, items, selected, onSelect, onClose }: {
             </TouchableOpacity>
           </View>
           <View style={sh.searchWrap}>
-            <Text style={{ fontSize: 13, opacity: 0.45 }}>🔍</Text>
+            <Text style={{ fontSize: 14, opacity: 0.45 }}>🔍</Text>
             <TextInput
               style={sh.searchInput}
               value={q}
@@ -354,7 +355,7 @@ function SearchSheet({ visible, title, items, selected, onSelect, onClose }: {
             />
             {q.length > 0 && (
               <TouchableOpacity onPress={() => setQ('')}>
-                <Text style={{ color: colors.muted, fontSize: 16, paddingHorizontal: 4 }}>✕</Text>
+                <Text style={{ color: colors.muted, fontSize: 17, paddingHorizontal: 4 }}>✕</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -372,7 +373,7 @@ function SearchSheet({ visible, title, items, selected, onSelect, onClose }: {
                   onPress={() => { onSelect(item.name); onClose(); setQ(''); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={{ fontSize: 20, marginRight: spacing.md }}>{item.flag}</Text>
+                  <Text style={{ fontSize: 21, marginRight: spacing.md }}>{item.flag}</Text>
                   <Text style={[sh.radioLabel, active && { color: colors.brand, fontWeight: '700' }]}>{item.name}</Text>
                   {active && <Text style={{ color: colors.brand, fontWeight: '700', marginLeft: 'auto' }}>✓</Text>}
                 </TouchableOpacity>
@@ -530,13 +531,13 @@ function DocPickerSheet({ visible, onClose, onPick }: {
           {OPTIONS.map(opt => (
             <TouchableOpacity key={opt.label} style={sh.docOption} onPress={opt.onPress} activeOpacity={0.7}>
               <View style={sh.docIconWrap}>
-                <Text style={{ fontSize: 22 }}>{opt.icon}</Text>
+                <Text style={{ fontSize: 23 }}>{opt.icon}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.docLabel}>{opt.label}</Text>
                 <Text style={sh.docSub}>{opt.sub}</Text>
               </View>
-              <Text style={{ color: colors.muted, fontSize: 18 }}>›</Text>
+              <Text style={{ color: colors.muted, fontSize: 19 }}>›</Text>
             </TouchableOpacity>
           ))}
           <View style={{ height: spacing.lg }} />
@@ -590,7 +591,7 @@ export default function Step3() {
   return (
     <View style={{ flex: 1 }}>
       <PageHeader title="Trip Details" subtitle="Step 3 of 3" showBack />
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
         <View style={styles.heroCard}>
           <View style={styles.heroDecor1} />
@@ -674,13 +675,13 @@ export default function Step3() {
         <Field label="Boarding Pass / E-Ticket (optional)">
           <TouchableOpacity style={sh.docBtn} onPress={() => setShowDocPick(true)} activeOpacity={0.75}>
             <View style={sh.docBtnIcon}>
-              <Text style={{ fontSize: 20 }}>☁️</Text>
+              <Text style={{ fontSize: 21 }}>☁️</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={sh.docBtnLabel}>{file ? file.name : 'Upload Document'}</Text>
               <Text style={sh.docBtnSub}>{file ? 'Tap to replace' : 'Tap to upload or take a picture'}</Text>
             </View>
-            {file && <Text style={{ color: colors.brand, fontSize: 13, fontWeight: '600' }}>✓</Text>}
+            {file && <Text style={{ color: colors.brand, fontSize: 14, fontWeight: '600' }}>✓</Text>}
           </TouchableOpacity>
           <Text style={styles.formatNote}>JPG, PNG, PDF formats supported</Text>
         </Field>
@@ -710,7 +711,7 @@ export default function Step3() {
         >
           <Text style={styles.saveBtnText}>Verify & Complete</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </FormScrollView>
 
       {/* Sheets */}
       <SearchSheet visible={showFrom} title="Travelling From" items={COUNTRIES}
@@ -772,12 +773,12 @@ const styles = StyleSheet.create({
 const sh = StyleSheet.create({
   selectorBtn:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.white, paddingHorizontal: spacing.md, minHeight: 48, gap: spacing.sm },
   selectorBtnErr:  { borderColor: colors.error },
-  selectorIcon:    { fontSize: 15, opacity: 0.5 },
+  selectorIcon:    { fontSize: 16, opacity: 0.5 },
   selectorText:    { flex: 1, fontSize: typography.base, color: colors.text },
   placeholder:     { color: colors.mutedLight },
-  chevron:         { fontSize: 20, color: colors.muted, marginTop: -2 },
+  chevron:         { fontSize: 21, color: colors.muted, marginTop: -2 },
   inputRow:        { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.white, paddingHorizontal: spacing.md, minHeight: 48, gap: spacing.sm },
-  inputIcon:       { fontSize: 15, opacity: 0.5 },
+  inputIcon:       { fontSize: 16, opacity: 0.5 },
   inputInner:      { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 11 },
   removeBtn:       { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, borderWidth: 1, borderColor: colors.errorBorder, backgroundColor: colors.errorBg },
   removeText:      { fontSize: typography.xs, color: colors.error, fontWeight: '600' },
@@ -788,7 +789,7 @@ const sh = StyleSheet.create({
   sheetTitle:      { fontSize: typography.lg, fontWeight: '700', color: colors.text },
   sheetSub:        { fontSize: typography.sm, color: colors.muted, paddingHorizontal: spacing.xl, marginBottom: spacing.md, marginTop: -spacing.sm },
   closeCircle:     { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  closeX:          { fontSize: 13, color: colors.textSec, fontWeight: '700' },
+  closeX:          { fontSize: 14, color: colors.textSec, fontWeight: '700' },
   searchWrap:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.xl, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.xl, paddingHorizontal: spacing.md, gap: spacing.sm, backgroundColor: colors.bgGray },
   searchInput:     { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 10 },
   sep:             { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl },
@@ -812,12 +813,12 @@ const cal = StyleSheet.create({
   header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.sm },
   headerTitle:      { fontSize: typography.lg, fontWeight: '700', color: colors.text },
   closeCircle:      { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  closeX:           { fontSize: 13, color: colors.textSec, fontWeight: '700' },
+  closeX:           { fontSize: 14, color: colors.textSec, fontWeight: '700' },
   rangePill:        { marginHorizontal: spacing.xl, marginBottom: spacing.sm, backgroundColor: colors.brandLight, borderRadius: radius.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   rangePillText:    { fontSize: typography.sm, color: colors.brand, fontWeight: '600', textAlign: 'center' },
   monthNav:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingVertical: spacing.sm },
   navBtn:           { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bgGray, alignItems: 'center', justifyContent: 'center' },
-  navArrow:         { fontSize: 22, color: colors.text, lineHeight: 26 },
+  navArrow:         { fontSize: 23, color: colors.text, lineHeight: 26 },
   monthLabel:       { fontSize: typography.md, fontWeight: '700', color: colors.text },
   weekRow:          { flexDirection: 'row', paddingHorizontal: spacing.md, marginBottom: spacing.xs },
   weekCell:         { flex: 1, alignItems: 'center', paddingVertical: 4 },

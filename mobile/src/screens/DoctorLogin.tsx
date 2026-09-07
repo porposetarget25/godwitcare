@@ -22,7 +22,7 @@ export default function DoctorLogin() {
     try {
       await login(email, password);
       await refresh();
-      router.replace('/(app)/doctor/consultations');
+      router.replace('/(app)/doctor/dashboard' as any);
     } catch {
       setError('Login failed. Please check your credentials.');
     } finally {
