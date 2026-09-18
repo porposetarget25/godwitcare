@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useReg } from '../state/registration';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
+import { ArrowIcon } from '../components/UI';
 
 const QUESTIONS = [
   {
@@ -100,10 +101,17 @@ export default function Step2() {
           );
         })}
 
-        {/* Save button */}
-        <TouchableOpacity style={s.saveBtn} onPress={() => router.push('/(app)/register/step3')} activeOpacity={0.85}>
-          <Text style={s.saveBtnText}>Save Information</Text>
-        </TouchableOpacity>
+        {/* Prev / Next */}
+        <View style={s.navRow}>
+          <TouchableOpacity style={s.prevBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <ArrowIcon color={colors.brand} size={14} direction="left" />
+            <Text style={s.prevBtnText}>Prev</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.nextBtn} onPress={() => router.push('/(app)/register/step3')} activeOpacity={0.85}>
+            <Text style={s.nextBtnText}>Next</Text>
+            <ArrowIcon size={15} />
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
     </View>
@@ -160,11 +168,19 @@ const s = StyleSheet.create({
   toggleBtnTextActive:{ color: colors.brandDark },
   toggleBtnTextWhite: { color: '#fff' },
 
-  // Save button
-  saveBtn: {
-    backgroundColor: colors.amber, borderRadius: radius.full,
-    paddingVertical: 15, alignItems: 'center', marginTop: spacing.sm,
+  // Prev / Next
+  navRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
+  prevBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.brand,
+    paddingVertical: 13, paddingHorizontal: spacing.xl,
+  },
+  prevBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brand },
+  nextBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    backgroundColor: colors.brand, borderRadius: radius.full,
+    paddingVertical: 14, paddingHorizontal: spacing.xxl,
     ...shadow.brand,
   },
-  saveBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
+  nextBtnText: { fontSize: typography.md, fontWeight: '800', color: '#fff' },
 });

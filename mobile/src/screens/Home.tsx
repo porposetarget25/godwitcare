@@ -1,7 +1,8 @@
 // src/screens/Home.tsx — mirrors web's screens/Home.tsx (.portal card layout, no native hero/offers patterns).
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL, authFetch, getActivationPaymentSummary, type ActivationPaymentSummary } from '../api';
 import { useAuth } from '../state/auth';
 import { ws, wc } from '../webStyle';
@@ -38,6 +39,15 @@ type RegData = { id: number; from: string; to: string; start: string; end: strin
 
 function initialsOf(name: string) {
   return name.split(/\s+/).filter(Boolean).map(p => p[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function fmtDate(v?: string): string {
+  if (!v) return '—';
+  const d = new Date(v.length <= 10 ? `${v}T00:00:00` : v);
+  if (isNaN(d.getTime())) return v;
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mmm = d.toLocaleDateString('en-GB', { month: 'short' });
+  return `${dd}-${mmm}-${d.getFullYear()}`;
 }
 
 // ── Tag helper (.tag .tok/.twarn/.tinfo/.tmute) ───────────────────────────────
@@ -125,102 +135,121 @@ export default function Home() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.replace('/(app)/login'); return; }
-    let alive = true;
-    (async () => {
-      try {
-        if (!user.email || isDoctor) { setChecking(false); return; }
-
-        const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(user.email)}`);
-        if (res.ok) {
-          const data = await res.json();
-          const latest = Array.isArray(data) ? data[data.length - 1] : data;
-          if (latest && alive) {
-            setReg({
-              id: latest.id,
-              from: latest['Travelling From'] ?? latest.travellingFrom ?? '',
-              to: latest['Travelling To (UK & Europe)'] ?? latest.travellingTo ?? '',
-              start: latest['Travel Start Date'] ?? latest.travelStartDate ?? '',
-              end: latest['Travel End Date'] ?? latest.travelEndDate ?? '',
-              packageDays: latest['Package Days'] ?? latest.packageDays ?? null,
-              travelers: Array.isArray(latest.travelers) ? latest.travelers : [],
-            });
-          }
-        }
-
-        const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest`);
-        if (rxRes.ok && rxRes.status !== 204) {
-          const j = await rxRes.json().catch(() => null);
-          if (alive) setRxUrl(j?.pdfUrl ?? null);
-        }
-
-        const refRes = await authFetch(`${API_BASE_URL}/referrals/latest`);
-        if (refRes.ok && refRes.status !== 204) {
-          const j = await refRes.json().catch(() => null);
-          if (alive) setReferralUrl(j?.pdfUrl ?? null);
-        }
-      } catch { /* ignore */ }
-      finally { if (alive) setChecking(false); }
-    })();
-    return () => { alive = false; };
   }, [user, authLoading]);
 
-  useEffect(() => {
-    if (authLoading || !user?.email || isDoctor) return;
-    let alive = true;
-    getActivationPaymentSummary().then(a => { if (alive) setActivation(a); }).catch(() => { if (alive) setActivation(null); });
-    return () => { alive = false; };
-  }, [user?.email, authLoading, isDoctor]);
-
-  useEffect(() => {
-    if (authLoading || !user?.email || isDoctor) return;
-    let alive = true;
-    (async () => {
-      try {
-        const res = await authFetch(`${API_BASE_URL}/consultations/mine/latest`, { cache: 'no-store' });
-        if (!alive) return;
-        if (res.status === 204 || !res.ok) { setActiveConsult(null); return; }
-        const c = await res.json().catch(() => null);
-        if (!c || !alive) { setActiveConsult(null); return; }
-
-        const completedToday = c.status === 'COMPLETED' && c.createdAt && clinicDateKey(c.createdAt) === clinicDateKey(new Date());
-
-        const apptRes = await authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' }).catch(() => null);
-        const appts: any[] = apptRes && apptRes.ok ? await apptRes.json().catch(() => []) : [];
-        const matchedAppointment = (Array.isArray(appts) ? appts : []).find(
-          a => a.consultationId === c.id && a.status === 'SCHEDULED'
-        );
-        const hasAppointment = !!matchedAppointment;
-        const expiredPending = !c.active && !hasAppointment && c.status !== 'COMPLETED';
-        if (!c.active && !completedToday && !expiredPending) { setActiveConsult(null); return; }
-
-        let stage = hasAppointment ? 2 : 1;
-        if (hasAppointment) {
-          const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest`, { cache: 'no-store' }).catch(() => null);
-          if (rxRes && rxRes.ok && rxRes.status !== 204) {
-            const j = await rxRes.json().catch(() => null);
-            if (j?.pdfUrl && j?.consultationId === c.id) stage = 3;
+  // Registration / prescription / referral — refetched on every focus, not just on mount.
+  // Home is a plain Stack screen (see PortalShell), so returning here from e.g. the
+  // consultation tracker after a prescription is issued does NOT remount it — a mount-only
+  // effect would keep showing whatever was fetched the first time Home ever opened.
+  useFocusEffect(
+    useCallback(() => {
+      if (authLoading || !user) return;
+      const email = user.email;
+      if (!email || isDoctor) { setChecking(false); return; }
+      let alive = true;
+      (async () => {
+        try {
+          const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(email)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const latest = Array.isArray(data) ? data[data.length - 1] : data;
+            if (latest && alive) {
+              setReg({
+                id: latest.id,
+                from: latest['Travelling From'] ?? latest.travellingFrom ?? '',
+                to: latest['Travelling To (UK & Europe)'] ?? latest.travellingTo ?? '',
+                start: latest['Travel Start Date'] ?? latest.travelStartDate ?? '',
+                end: latest['Travel End Date'] ?? latest.travelEndDate ?? '',
+                packageDays: latest['Package Days'] ?? latest.packageDays ?? null,
+                travelers: Array.isArray(latest.travelers) ? latest.travelers : [],
+              });
+            }
           }
-        }
-        if (c.status === 'COMPLETED') stage = 4;
 
-        const detail = expiredPending ? 'Expired'
-          : stage === 1 ? 'Checklist Pending'
-          : stage === 2 ? 'Appointment Booked'
-          : stage === 3 ? 'Prescription Ready'
-          : 'Consultation Completed';
+          const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest`);
+          if (rxRes.ok && rxRes.status !== 204) {
+            const j = await rxRes.json().catch(() => null);
+            if (alive) setRxUrl(j?.pdfUrl ?? null);
+          }
 
-        if (!alive) return;
-        setActiveConsult({
-          consultationId: c.id,
-          stage,
-          detail,
-          expired: expiredPending,
-          appointment: matchedAppointment ? { startTime: matchedAppointment.startTime, endTime: matchedAppointment.endTime } : null,
-        });
-      } catch { if (alive) setActiveConsult(null); }
-    })();
-    return () => { alive = false; };
-  }, [user?.email, authLoading, isDoctor]);
+          const refRes = await authFetch(`${API_BASE_URL}/referrals/latest`);
+          if (refRes.ok && refRes.status !== 204) {
+            const j = await refRes.json().catch(() => null);
+            if (alive) setReferralUrl(j?.pdfUrl ?? null);
+          }
+        } catch { /* ignore */ }
+        finally { if (alive) setChecking(false); }
+      })();
+      return () => { alive = false; };
+    }, [user, authLoading, isDoctor])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (authLoading || !user?.email || isDoctor) return;
+      let alive = true;
+      getActivationPaymentSummary().then(a => { if (alive) setActivation(a); }).catch(() => { if (alive) setActivation(null); });
+      return () => { alive = false; };
+    }, [user?.email, authLoading, isDoctor])
+  );
+
+  // Active consultation / appointment status — this is what "Your Active Consultation" and
+  // its stage badge (Checklist → Appointment Booked → …) are driven by. Booking happens on
+  // the consultation tracker screen, which is pushed on top of Home rather than replacing
+  // it, so Home doesn't remount when the user navigates back — only useFocusEffect catches
+  // that the appointment now exists.
+  useFocusEffect(
+    useCallback(() => {
+      if (authLoading || !user?.email || isDoctor) return;
+      let alive = true;
+      (async () => {
+        try {
+          const res = await authFetch(`${API_BASE_URL}/consultations/mine/latest`, { cache: 'no-store' });
+          if (!alive) return;
+          if (res.status === 204 || !res.ok) { setActiveConsult(null); return; }
+          const c = await res.json().catch(() => null);
+          if (!c || !alive) { setActiveConsult(null); return; }
+
+          const completedToday = c.status === 'COMPLETED' && c.createdAt && clinicDateKey(c.createdAt) === clinicDateKey(new Date());
+
+          const apptRes = await authFetch(`${API_BASE_URL}/appointments/mine`, { cache: 'no-store' }).catch(() => null);
+          const appts: any[] = apptRes && apptRes.ok ? await apptRes.json().catch(() => []) : [];
+          const matchedAppointment = (Array.isArray(appts) ? appts : []).find(
+            a => a.consultationId === c.id && a.status === 'SCHEDULED'
+          );
+          const hasAppointment = !!matchedAppointment;
+          const expiredPending = !c.active && !hasAppointment && c.status !== 'COMPLETED';
+          if (!c.active && !completedToday && !expiredPending) { setActiveConsult(null); return; }
+
+          let stage = hasAppointment ? 2 : 1;
+          if (hasAppointment) {
+            const rxRes = await authFetch(`${API_BASE_URL}/prescriptions/latest`, { cache: 'no-store' }).catch(() => null);
+            if (rxRes && rxRes.ok && rxRes.status !== 204) {
+              const j = await rxRes.json().catch(() => null);
+              if (j?.pdfUrl && j?.consultationId === c.id) stage = 3;
+            }
+          }
+          if (c.status === 'COMPLETED') stage = 4;
+
+          const detail = expiredPending ? 'Expired'
+            : stage === 1 ? 'Checklist Pending'
+            : stage === 2 ? 'Appointment Booked'
+            : stage === 3 ? 'Prescription Ready'
+            : 'Consultation Completed';
+
+          if (!alive) return;
+          setActiveConsult({
+            consultationId: c.id,
+            stage,
+            detail,
+            expired: expiredPending,
+            appointment: matchedAppointment ? { startTime: matchedAppointment.startTime, endTime: matchedAppointment.endTime } : null,
+          });
+        } catch { if (alive) setActiveConsult(null); }
+      })();
+      return () => { alive = false; };
+    }, [user?.email, authLoading, isDoctor])
+  );
 
   const fullName = useMemo(() => [user?.firstName, user?.lastName].filter(Boolean).join(' '), [user]);
   const today = useMemo(() => new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date()), []);
@@ -263,7 +292,7 @@ export default function Home() {
           <>
             <View style={s.activeHeadRow}>
               <Text style={s.activeHeadTitle}>Your Active Consultation</Text>
-              <TouchableOpacity style={[ws.bp, s.newConsultBtn]} onPress={goConsult} disabled={isExpired} activeOpacity={0.8}>
+              <TouchableOpacity style={[ws.bp, s.newConsultBtn, isExpired && ws.btnDisabled]} onPress={goConsult} disabled={isExpired} activeOpacity={0.8}>
                 <Text style={ws.bpText}>+ New Consultation</Text>
               </TouchableOpacity>
             </View>
@@ -295,7 +324,7 @@ export default function Home() {
                 <Text style={s.ctaTitle}>Need to speak to a doctor?</Text>
                 <Text style={s.ctaSub}>Start a consultation and we'll guide you through a short checklist, then book you an appointment.</Text>
               </View>
-              <TouchableOpacity style={[ws.bp, s.ctaBtn]} onPress={goConsult} disabled={isExpired} activeOpacity={0.8}>
+              <TouchableOpacity style={[ws.bp, s.ctaBtn, isExpired && ws.btnDisabled]} onPress={goConsult} disabled={isExpired} activeOpacity={0.8}>
                 <Text style={ws.bpText}>🩺 I Need a Consultation</Text>
               </TouchableOpacity>
             </View>
@@ -325,7 +354,7 @@ export default function Home() {
               <Tag label={isExpired ? 'Expired' : activation?.activated ? 'Activated' : 'Not Activated'} kind={isExpired ? 'warn' : activation?.activated ? 'ok' : 'mute'} />
             </View>
             <Text style={s.covDestination}>📍 {reg.to || '—'}</Text>
-            <Text style={s.covDates}>📅 {reg.start || '—'} – {reg.end || '—'}</Text>
+            <Text style={s.covDates}>📅 {fmtDate(reg.start)} – {fmtDate(reg.end)}</Text>
             <View style={ws.g2Row}>
               <View style={ws.g2Col}>
                 <Text style={ws.fiHint}>Days Purchased</Text>

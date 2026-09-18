@@ -7,10 +7,11 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useReg } from '../state/registration';
-import { Btn, Field } from '../components/UI';
-import { colors, spacing, radius, typography } from '../theme';
+import { Field, ArrowIcon } from '../components/UI';
+import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { FormScrollView } from '../components/FormScrollView';
+import { SearchPickerModal, PickerOption } from '../components/SearchPickerModal';
 
 type Errors = Partial<Record<'firstName'|'lastName'|'dob'|'gender'|'primary'|'password'|'email', string>>;
 
@@ -53,6 +54,13 @@ const COUNTRY_CODES = [
   { name: 'United States',  flag: '🇺🇸', dial: '+1'   },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+// Picker value is the country name (unique — several countries share a dial code, e.g. +1
+// for both Canada and the US, so the dial code alone can't identify a row).
+const COUNTRY_CODE_OPTIONS: PickerOption[] = COUNTRY_CODES.map(c => ({
+  value: c.name, label: c.name, sub: c.dial, flag: c.flag,
+}));
+const POPULAR_COUNTRY_CODES = ['New Zealand', 'Australia', 'India', 'United Kingdom', 'United States'];
+
 // ── Reusable selector button ──────────────────────────────────────────────────
 function SelectorBtn({
   value, placeholder, onPress, error, icon,
@@ -73,27 +81,22 @@ function SelectorBtn({
 }
 
 // ── Bottom-sheet modal list picker ───────────────────────────────────────────
+// Short, non-searchable lists only (Gender here) — nothing in this sheet opens a keyboard,
+// so it doesn't run into the iOS keyboard-covers-the-sheet issue the country picker had.
+// The country/city pickers use the full-screen SearchPickerModal instead.
 type SheetItem = { label: string; value: string; sub?: string };
 function BottomSheet({
   visible, title, items, selected, onSelect, onClose,
-  searchable,
 }: {
   visible: boolean; title: string; items: SheetItem[];
   selected?: string; onSelect: (v: string) => void; onClose: () => void;
-  searchable?: boolean;
 }) {
-  const [q, setQ]           = useState('');
   const [pending, setPending] = useState(selected || '');
 
   // Sync pending with selected when sheet opens
   React.useEffect(() => { if (visible) setPending(selected || ''); }, [visible]);
 
-  const filtered = searchable && q
-    ? items.filter(i => i.label.toLowerCase().includes(q.toLowerCase()) ||
-                        (i.sub || '').toLowerCase().includes(q.toLowerCase()))
-    : items;
-
-  function save() { if (pending) { onSelect(pending); } onClose(); setQ(''); }
+  function save() { if (pending) { onSelect(pending); } onClose(); }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -111,29 +114,9 @@ function BottomSheet({
             </TouchableOpacity>
           </View>
 
-          {/* Search (for country picker) */}
-          {searchable && (
-            <View style={sh.searchWrap}>
-              <Text style={sh.searchIcon}>🔍</Text>
-              <TextInput
-                style={sh.searchInput}
-                value={q}
-                onChangeText={setQ}
-                placeholder="Search…"
-                placeholderTextColor={colors.mutedLight}
-                autoFocus
-              />
-              {q.length > 0 && (
-                <TouchableOpacity onPress={() => setQ('')}>
-                  <Text style={{ color: colors.muted, fontSize: 17, paddingHorizontal: 4 }}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
           {/* Radio list */}
           <FlatList
-            data={filtered}
+            data={items}
             keyExtractor={i => i.value}
             style={{ maxHeight: 320 }}
             showsVerticalScrollIndicator={false}
@@ -193,8 +176,12 @@ export default function Step1() {
     ? new Date(`${draft['Date of Birth']}T00:00:00`)
     : cutoff18;
 
-  // Selected country object
-  const selectedCountry = COUNTRY_CODES.find(c => c.dial === (draft.primaryDial || '+64'));
+  // Selected country object — dial code alone doesn't identify one country (several share a
+  // code), so the actual selection is tracked by name and falls back to dial-code match only
+  // for drafts saved before this field existed.
+  const selectedCountry =
+    COUNTRY_CODES.find(c => c.name === draft.primaryCountry) ||
+    COUNTRY_CODES.find(c => c.dial === (draft.primaryDial || '+64'));
 
   function onDateChange(_: any, selected?: Date) {
     setShowDob(Platform.OS === 'ios');
@@ -386,7 +373,10 @@ export default function Step1() {
           </View>
         </Field>
 
-        <Btn label="Save Information" onPress={next} fullWidth style={{ marginTop: spacing.md }} />
+        <TouchableOpacity style={styles.saveBtn} onPress={next} activeOpacity={0.85}>
+          <Text style={styles.saveBtnText}>Next</Text>
+          <ArrowIcon />
+        </TouchableOpacity>
       </FormScrollView>
 
       {/* Gender sheet */}
@@ -399,18 +389,20 @@ export default function Step1() {
         onClose={() => setShowGender(false)}
       />
 
-      {/* Country code sheet */}
-      <BottomSheet
+      {/* Country code — full-screen picker so the search field never gets covered by the
+          keyboard the way the old bottom sheet did on iOS. */}
+      <SearchPickerModal
         visible={showCountry}
         title="Select Country Code"
-        searchable
-        items={COUNTRY_CODES.map(c => ({
-          label: `${c.flag}  ${c.name}`,
-          value: c.dial,
-          sub:   c.dial,
-        }))}
-        selected={draft.primaryDial || '+64'}
-        onSelect={v => setDraft({ ...draft, primaryDial: v })}
+        subtitle="For your WhatsApp number"
+        options={COUNTRY_CODE_OPTIONS}
+        popular={POPULAR_COUNTRY_CODES}
+        searchPlaceholder="Search countries"
+        selected={selectedCountry?.name}
+        onSelect={name => {
+          const c = COUNTRY_CODES.find(c => c.name === name);
+          if (c) setDraft({ ...draft, primaryDial: c.dial, primaryCountry: c.name });
+        }}
         onClose={() => setShowCountry(false)}
       />
     </View>
@@ -425,6 +417,15 @@ const styles = StyleSheet.create({
   stepBadge:     { backgroundColor: colors.brandLight, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, alignSelf: 'flex-start', marginBottom: spacing.md },
   stepBadgeText: { fontSize: typography.xs, color: colors.brand, fontWeight: '600' },
   row:           { flexDirection: 'row', gap: spacing.md },
+
+  // Save button — right-aligned teal pill CTA
+  saveBtn: {
+    flexDirection: 'row', backgroundColor: colors.brand, borderRadius: radius.full,
+    paddingVertical: 14, paddingHorizontal: spacing.xxl, alignItems: 'center',
+    justifyContent: 'center', gap: spacing.sm, alignSelf: 'flex-end',
+    marginTop: spacing.md, ...shadow.brand,
+  },
+  saveBtnText:  { fontSize: typography.md, fontWeight: '800', color: '#fff' },
 });
 
 // ── Shared component styles ───────────────────────────────────────────────────
@@ -493,15 +494,6 @@ const sh = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   closeX:      { fontSize: 14, color: colors.textSec, fontWeight: '700' },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: spacing.xl, marginBottom: spacing.sm,
-    borderWidth: 1.5, borderColor: colors.line,
-    borderRadius: radius.xl, paddingHorizontal: spacing.md,
-    gap: spacing.sm, backgroundColor: colors.bgGray,
-  },
-  searchIcon:  { fontSize: 14, opacity: 0.45 },
-  searchInput: { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 10 },
   sep:         { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl },
 
   // Radio row

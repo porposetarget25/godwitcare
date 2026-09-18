@@ -25,12 +25,10 @@ public class AppointmentController {
     private static final int DOCUMENTATION_MINUTES = 5;
     private static final int RESERVED_MINUTES = SLOT_MINUTES + DOCUMENTATION_MINUTES;
     private static final int BOOKING_DAYS = 2;
-    // Patients must book at least this far ahead so a doctor has time to prepare —
-    // slots inside this window are treated the same as already-passed slots.
-    private static final int MIN_LEAD_MINUTES = 120;
     private static final ZoneId CLINIC_ZONE = ZoneId.of("Europe/London");
-    private static final LocalTime DAY_START = LocalTime.of(9, 0);
-    private static final LocalTime DAY_END = LocalTime.of(17, 0);
+    // Once the clinic day's last working hour has passed, same-day booking is closed —
+    // the bookable window shifts to start tomorrow instead of showing an already-passed today.
+    private static final LocalTime SAME_DAY_CUTOFF = LocalTime.of(16, 0);
 
     private final AppointmentRepository appointments;
     private final ConsultationRepository consultations;
@@ -68,7 +66,7 @@ public class AppointmentController {
                 : Optional.ofNullable(resolveDoctor(doctorId)).map(List::of).orElseGet(List::of);
         if (doctors.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "No doctor is available for booking."));
 
-        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        LocalDate today = earliestBookableDate();
         LocalDate lastBookableDate = today.plusDays(BOOKING_DAYS - 1L);
         LocalDate fromDate = parseDate(from, today);
         if (fromDate.isBefore(today)) fromDate = today;
@@ -88,22 +86,29 @@ public class AppointmentController {
             bookedByDoctor.put(doctor.getId(), booked);
         }
 
-        Instant now = Instant.now();
+        Instant minBookable = nextHourCutoff();
         List<Map<String, Object>> days = new ArrayList<>();
         for (LocalDate day = fromDate; !day.isAfter(toDate); day = day.plusDays(1)) {
+            // Candidate slot times are whatever each doctor has actually configured for this
+            // day — not a clinic-wide fixed grid — so e.g. a doctor available only 09:50-10:00
+            // correctly yields a 09:50 slot instead of being silently dropped by a :00/:15/:30/:45
+            // cadence it doesn't align to.
+            Set<LocalTime> candidateTimes = new TreeSet<>();
+            for (User doctor : doctors) candidateTimes.addAll(schedules.slotStartsFor(doctor.getId(), day, RESERVED_MINUTES));
+
             List<Map<String, Object>> slots = new ArrayList<>();
-            for (LocalDateTime cursor = LocalDateTime.of(day, DAY_START); !cursor.plusMinutes(RESERVED_MINUTES).toLocalTime().isAfter(DAY_END); cursor = cursor.plusMinutes(RESERVED_MINUTES)) {
-                Instant start = cursor.atZone(CLINIC_ZONE).toInstant();
+            for (LocalTime label : candidateTimes) {
+                Instant start = LocalDateTime.of(day, label).atZone(CLINIC_ZONE).toInstant();
                 Instant reservedEnd = start.plus(Duration.ofMinutes(RESERVED_MINUTES));
                 boolean doctorAvailable = doctors.stream().anyMatch(doctor ->
                         schedules.isAvailable(doctor.getId(), start, reservedEnd)
                                 && bookedByDoctor.get(doctor.getId()).stream().noneMatch(a -> a.getStartTime().isBefore(reservedEnd)
                                 && a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)).isAfter(start)));
-                boolean disabled = !start.isAfter(now.plus(Duration.ofMinutes(MIN_LEAD_MINUTES))) || !doctorAvailable;
+                boolean disabled = start.isBefore(minBookable) || !doctorAvailable;
                 slots.add(Map.of(
                         "startTime", start.toString(),
                         "endTime", start.plus(Duration.ofMinutes(SLOT_MINUTES)).toString(),
-                        "label", cursor.toLocalTime().toString(),
+                        "label", label.toString(),
                         "available", !disabled
                 ));
             }
@@ -143,10 +148,10 @@ public class AppointmentController {
         Instant start;
         try { start = Instant.parse(String.valueOf(body.get("startTime"))); }
         catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("message", "Invalid appointment time.")); }
-        if (!start.isAfter(Instant.now().plus(Duration.ofMinutes(MIN_LEAD_MINUTES))))
-            return ResponseEntity.badRequest().body(Map.of("message", "Appointments must be booked at least 2 hours in advance."));
+        if (start.isBefore(nextHourCutoff()))
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointments must be booked from the next hour onwards."));
         LocalDate appointmentDate = start.atZone(CLINIC_ZONE).toLocalDate();
-        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        LocalDate today = earliestBookableDate();
         if (appointmentDate.isBefore(today) || appointmentDate.isAfter(today.plusDays(BOOKING_DAYS - 1L)))
             return ResponseEntity.badRequest().body(Map.of("message", "Appointments can only be booked within the next two days."));
         if (!isClinicSlot(start)) return ResponseEntity.badRequest().body(Map.of("message", "Please choose one of the available appointment slots."));
@@ -322,21 +327,36 @@ public class AppointmentController {
         return null;
     }
     private ResponseEntity<?> validateSlot(Instant start) {
-        if (!start.isAfter(Instant.now().plus(Duration.ofMinutes(MIN_LEAD_MINUTES))))
-            return ResponseEntity.badRequest().body(Map.of("message", "Appointments must be booked at least 2 hours in advance."));
+        if (start.isBefore(nextHourCutoff()))
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointments must be booked from the next hour onwards."));
         LocalDate appointmentDate = start.atZone(CLINIC_ZONE).toLocalDate();
-        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        LocalDate today = earliestBookableDate();
         if (appointmentDate.isBefore(today) || appointmentDate.isAfter(today.plusDays(BOOKING_DAYS - 1L)))
             return ResponseEntity.badRequest().body(Map.of("message", "Appointments can only be booked within the next two days."));
         if (!isClinicSlot(start)) return ResponseEntity.badRequest().body(Map.of("message", "Please choose one of the available appointment slots."));
         return null;
     }
+    // Earliest bookable date: today, unless the clinic day's last working hour has already
+    // passed, in which case today is closed for booking and the window starts tomorrow.
+    private LocalDate earliestBookableDate() {
+        LocalDate today = LocalDate.now(CLINIC_ZONE);
+        return LocalTime.now(CLINIC_ZONE).isBefore(SAME_DAY_CUTOFF) ? today : today.plusDays(1);
+    }
+    // Earliest bookable moment: the start of the next clock hour in clinic time, so a slot
+    // becomes bookable as soon as the current hour rolls over (not a fixed lead-time buffer).
+    private Instant nextHourCutoff() {
+        return ZonedDateTime.now(CLINIC_ZONE).withMinute(0).withSecond(0).withNano(0).plusHours(1).toInstant();
+    }
+    // A slot is valid if it's one of the actual candidate start times for at least one doctor
+    // on that date (see DoctorScheduleService.slotStartsFor) — driven by each doctor's own
+    // configured availability rather than a hardcoded clinic-wide grid.
     private boolean isClinicSlot(Instant start) {
         ZonedDateTime z = start.atZone(CLINIC_ZONE);
         LocalTime t = z.toLocalTime();
-        long minutesFromOpen = Duration.between(DAY_START, t).toMinutes();
-        return !t.isBefore(DAY_START) && !t.plusMinutes(RESERVED_MINUTES).isAfter(DAY_END)
-                && minutesFromOpen % RESERVED_MINUTES == 0 && t.getSecond() == 0 && t.getNano() == 0;
+        if (t.getSecond() != 0 || t.getNano() != 0) return false;
+        LocalDate date = z.toLocalDate();
+        return users.findByRoleOrderByIdDesc(Role.DOCTOR).stream()
+                .anyMatch(doctor -> schedules.slotStartsFor(doctor.getId(), date, RESERVED_MINUTES).contains(t));
     }
     private static LocalDate parseDate(String s, LocalDate fallback) { try { return s == null || s.isBlank() ? fallback : LocalDate.parse(s); } catch (Exception e) { return fallback; } }
     private static Long toLong(Object o) { try { return o == null ? null : Long.valueOf(String.valueOf(o)); } catch (Exception e) { return null; } }

@@ -1,12 +1,13 @@
 // src/screens/DoctorConsultationDetails.tsx — mirrors web's .portal card/tag styling (Card/Btn/Muted/Strong already updated in UI.tsx).
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Linking, Modal,
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import {
-  doctorGetConsultation, doctorLatestPrescriptionMeta, doctorCreatePrescription,
+  doctorGetConsultation, doctorLatestPrescriptionMeta, doctorSaveConsultation, doctorCreatePrescription,
   API_BASE_URL, authFetch,
 } from '../api';
 import { QUESTIONNAIRE_SECTIONS } from '../questionnaire';
@@ -31,6 +32,9 @@ export default function DoctorConsultationDetails() {
   const [medicines, setMedicines] = useState<string[]>(['']);
   const [recommendations, setRecommendations] = useState('');
   const [prescriptionRequired, setPrescriptionRequired] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [creatingRx, setCreatingRx] = useState(false);
   const [rxErr, setRxErr] = useState<string | null>(null);
   const [rxId, setRxId] = useState<number | null>(null);
@@ -63,6 +67,10 @@ export default function DoctorConsultationDetails() {
         setDiagnosis(d?.diagnosis || '');
         setRecommendations(d?.recommendations || '');
         setPrescriptionRequired(d?.prescriptionRequired !== false);
+        // A consultation reopened after a previous Save (or already completed) already has
+        // its notes persisted server-side — treat that as "saved" so re-visiting the screen
+        // doesn't re-lock Create Prescription / Complete behind a fresh Save.
+        setSaved(d?.status === 'COMPLETED' || !!(d?.historyOfPresentingComplaint || d?.diagnosis || d?.recommendations));
 
         const meta = await doctorLatestPrescriptionMeta(Number(id)).catch(() => null);
         if (meta?.id) {
@@ -79,6 +87,30 @@ export default function DoctorConsultationDetails() {
       } catch {}
     })();
   }, [id]);
+
+  // Keep a ref mirroring the latest draft fields so the focus-blur handler below always sees
+  // what's currently typed, without re-subscribing the effect on every keystroke.
+  const draftRef = useRef({ history, diagnosis, recommendations, prescriptionRequired });
+  useEffect(() => {
+    draftRef.current = { history, diagnosis, recommendations, prescriptionRequired };
+  }, [history, diagnosis, recommendations, prescriptionRequired]);
+
+  // Silently persist whatever the doctor has typed when they navigate away without tapping
+  // Save, so reopening this consultation later shows exactly what they left off with.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (!data || data.status === 'COMPLETED') return;
+        const draft = draftRef.current;
+        doctorSaveConsultation(data.id, {
+          history: draft.history.trim(),
+          diagnosis: draft.diagnosis.trim(),
+          recommendations: draft.recommendations.trim(),
+          prescriptionRequired: draft.prescriptionRequired,
+        }).catch(() => {});
+      };
+    }, [data])
+  );
 
   if (!data) return <LoadingView />;
 
@@ -99,6 +131,21 @@ export default function DoctorConsultationDetails() {
       if (next.has(title)) next.delete(title); else next.add(title);
       return next;
     });
+  }
+
+  async function saveDraft() {
+    setSaveErr(null);
+    setSaving(true);
+    try {
+      await doctorSaveConsultation(data.id, {
+        history: history.trim(), diagnosis: diagnosis.trim(), recommendations: recommendations.trim(), prescriptionRequired,
+      });
+      setSaved(true);
+    } catch (err: any) {
+      setSaveErr(err?.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function createPrescription() {
@@ -331,9 +378,21 @@ export default function DoctorConsultationDetails() {
 
         {/* Actions */}
         <Card>
-          {prescriptionRequired && !readOnly && (
-            <Btn label={creatingRx ? 'Creating…' : 'Create Prescription'} onPress={createPrescription} loading={creatingRx} />
+          {!readOnly && (
+            <Btn label={saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'} onPress={saveDraft} loading={saving} variant={saved ? 'secondary' : 'primary'} />
           )}
+          {saveErr && <Muted style={{ color: wc.textDanger, marginTop: 8 }}>{saveErr}</Muted>}
+
+          {prescriptionRequired && !readOnly && (
+            <Btn
+              label={creatingRx ? 'Creating…' : 'Create Prescription'}
+              onPress={createPrescription}
+              loading={creatingRx}
+              disabled={!saved}
+              style={{ marginTop: 10 }}
+            />
+          )}
+          {prescriptionRequired && !readOnly && !saved && <Muted style={{ marginTop: 6 }}>Save your notes first to enable prescription creation.</Muted>}
           {rxErr && <Muted style={{ color: wc.textDanger, marginTop: 8 }}>{rxErr}</Muted>}
           {rxId && <Muted style={{ marginTop: 8 }}>Prescription created (#{rxId})</Muted>}
           {!isNoShow && appointmentStatus === 'SCHEDULED' && !readOnly && (
@@ -346,11 +405,12 @@ export default function DoctorConsultationDetails() {
                 label={completing ? 'Completing…' : 'Complete Consultation'}
                 onPress={completeConsultation}
                 loading={completing}
-                disabled={prescriptionRequired && !rxId}
+                disabled={!saved || (prescriptionRequired && !rxId)}
                 style={{ marginTop: 10 }}
               />
               {completeErr && <Muted style={{ color: wc.textDanger, marginTop: 6 }}>{completeErr}</Muted>}
-              {prescriptionRequired && !rxId && <Muted style={{ marginTop: 6 }}>Create a prescription first, or switch to No Prescription to complete.</Muted>}
+              {!saved && <Muted style={{ marginTop: 6 }}>Save your notes first to enable completion.</Muted>}
+              {saved && prescriptionRequired && !rxId && <Muted style={{ marginTop: 6 }}>Create a prescription first, or switch to No Prescription to complete.</Muted>}
             </>
           )}
         </Card>
@@ -366,19 +426,18 @@ export default function DoctorConsultationDetails() {
               variant="secondary"
             />
             <Btn label="Patient Care History" onPress={() => router.push(`/(app)/care-history?doctorConsultationId=${id}` as any)} variant="secondary" />
-            {prescriptionRequired && !readOnly ? (
+            {readOnly ? (
               <Btn label="Referral Letter" onPress={() => router.push(`/(app)/doctor/referral/${id}` as any)} variant="secondary" />
             ) : (
               <Btn label="Referral Letter" onPress={() => {}} disabled variant="secondary" />
             )}
-            {prescriptionRequired && (
-              <Btn
-                label={openingReferral ? 'Opening…' : 'View Generated Referral Letter'}
-                onPress={onViewReferral}
-                disabled={!referralPdfUrl || openingReferral}
-                variant="secondary"
-              />
-            )}
+            {!readOnly && <Muted>Complete the consultation to generate a referral letter.</Muted>}
+            <Btn
+              label={openingReferral ? 'Opening…' : 'View Generated Referral Letter'}
+              onPress={onViewReferral}
+              disabled={!referralPdfUrl || openingReferral}
+              variant="secondary"
+            />
           </View>
         </Card>
       </FormScrollView>

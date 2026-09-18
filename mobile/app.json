@@ -2,6 +2,7 @@
   "expo": {
     "name": "GodwitCareGlobal",
     "slug": "godwitcare",
+    "owner": "shekharchauhan",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
@@ -14,7 +15,15 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.godwitcare.mobile"
+      "bundleIdentifier": "com.godwitcare.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "GodwitCareGlobal uses your camera to take a profile photo and to photograph travel documents (passport, ID) for your consultation.",
+        "NSPhotoLibraryUsageDescription": "GodwitCareGlobal accesses your photo library so you can choose a profile photo or upload travel documents from your gallery.",
+        "NSFaceIDUsageDescription": "GodwitCareGlobal uses Face ID to let you quickly and securely unlock the app instead of entering your PIN.",
+        "NSLocationWhenInUseUsageDescription": "GodwitCareGlobal may use your location to help pre-fill your travel details."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,7 +40,12 @@
         "WRITE_EXTERNAL_STORAGE",
         "MANAGE_EXTERNAL_STORAGE",
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "USE_FINGERPRINT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.DOWNLOAD_WITHOUT_NOTIFICATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "intentFilters": [
         {
@@ -72,6 +86,12 @@
         }
       ]
     ],
-    "scheme": "godwitcare"
+    "scheme": "godwitcare",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1e79f731-a71d-40a6-88fc-09f8f15e3908"
+      }
+    }
   }
 }

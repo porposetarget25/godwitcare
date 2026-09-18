@@ -16,6 +16,7 @@
     "@stripe/stripe-react-native": "0.50.3",
     "expo": "~54.0.0",
     "expo-build-properties": "~1.0.10",
+    "expo-dev-client": "~6.0.21",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.22",
     "expo-image-picker": "~17.0.11",
@@ -40,6 +41,7 @@
     "@babel/core": "^7.25.2",
     "@types/react": "~19.1.0",
     "@types/react-dom": "~19.1.0",
+    "eas-cli": "^23.2.0",
     "typescript": "^5.3.3"
   }
 }

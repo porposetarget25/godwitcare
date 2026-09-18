@@ -10,9 +10,9 @@ public class JwtProperties {
     private String secret = "godwitcare-development-jwt-secret-change-me-please-32-bytes-minimum";
 
     /**
-     * Token lifetime in milliseconds. Defaults to 15 minutes.
+     * Token lifetime in milliseconds. Defaults to 7 days.
      */
-    private long expirationMs = 15 * 60 * 1000L;
+    private long expirationMs = 7 * 24 * 60 * 60 * 1000L;
 
     private String issuer = "godwitcare";
 

@@ -1,5 +1,5 @@
 // src/screens/DoctorAvailabilityForm.tsx — new/edit availability block. Mirrors web's .portal card/field styling.
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Platform, ActivityIndicator } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -33,24 +33,82 @@ function countWorkDays(startDate: string, endDate: string, activeDays: number[])
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+function timeStringToDate(v: string): Date {
+  const [h, m] = v.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d;
+}
+function dateToTimeString(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 function TimeSheet({ visible, title, value, onSelect, onClose }: {
   visible: boolean; title: string; value: string; onSelect: (v: string) => void; onClose: () => void;
 }) {
+  // Two modes: a quick-pick list of common half-hour times, or a native time wheel for any
+  // exact minute (e.g. 09:50) that the quick list — being a fixed 30-min cadence — can't offer.
+  const [custom, setCustom] = useState(false);
+  const [customDate, setCustomDate] = useState<Date>(() => timeStringToDate(value));
+
+  useEffect(() => {
+    if (visible) {
+      setCustom(false);
+      setCustomDate(timeStringToDate(value));
+    }
+  }, [visible, value]);
+
+  function onCustomChange(event: any, selected?: Date) {
+    if (Platform.OS === 'android') {
+      // The Android picker is its own native dialog; it's already dismissed by the time
+      // onChange fires, so just apply the result (if confirmed) and stop rendering it.
+      setCustom(false);
+      if (event?.type === 'set' && selected) { onSelect(dateToTimeString(selected)); onClose(); }
+    } else if (selected) {
+      setCustomDate(selected);
+    }
+  }
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={ts.overlay} activeOpacity={1} onPress={onClose} />
       <View style={ts.sheet}>
         <View style={ts.handle} />
         <Text style={ts.title}>{title}</Text>
-        <ScrollView style={{ maxHeight: 340 }}>
-          {TIME_OPTIONS.map(t => (
-            <TouchableOpacity key={t} style={[ts.option, t === value && ts.optionActive]} onPress={() => { onSelect(t); onClose(); }} activeOpacity={0.7}>
-              <Text style={[ts.optLabel, t === value && ts.optLabelActive]}>{t}</Text>
-              {t === value && <Text style={{ color: wc.fillAccent, fontWeight: '700' }}>✓</Text>}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+
+        <View style={ts.modeRow}>
+          <TouchableOpacity style={[ts.modeBtn, !custom && ts.modeBtnOn]} onPress={() => setCustom(false)} activeOpacity={0.75}>
+            <Text style={[ts.modeBtnText, !custom && ts.modeBtnTextOn]}>Quick select</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[ts.modeBtn, custom && ts.modeBtnOn]} onPress={() => setCustom(true)} activeOpacity={0.75}>
+            <Text style={[ts.modeBtnText, custom && ts.modeBtnTextOn]}>Custom time</Text>
+          </TouchableOpacity>
+        </View>
+
+        {custom ? (
+          <View style={ts.customWrap}>
+            <DateTimePicker
+              value={customDate}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onCustomChange}
+            />
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity style={ts.applyBtn} onPress={() => { onSelect(dateToTimeString(customDate)); onClose(); }} activeOpacity={0.85}>
+                <Text style={ts.applyBtnText}>Use {dateToTimeString(customDate)}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <ScrollView style={{ maxHeight: 340 }}>
+            {TIME_OPTIONS.map(t => (
+              <TouchableOpacity key={t} style={[ts.option, t === value && ts.optionActive]} onPress={() => { onSelect(t); onClose(); }} activeOpacity={0.7}>
+                <Text style={[ts.optLabel, t === value && ts.optLabelActive]}>{t}</Text>
+                {t === value && <Text style={{ color: wc.fillAccent, fontWeight: '700' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
     </Modal>
   );
@@ -216,4 +274,14 @@ const ts = StyleSheet.create({
   optionActive: { backgroundColor: wc.bgAccent },
   optLabel: { fontSize: 14, color: wc.textPrimary },
   optLabelActive: { fontWeight: '600', color: wc.textAccent },
+
+  modeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
+  modeBtn: { flex: 1, borderWidth: 1, borderColor: wc.borderStrong, borderRadius: 8, paddingVertical: 9, alignItems: 'center', backgroundColor: wc.surface1 },
+  modeBtnOn: { backgroundColor: wc.fillAccent, borderColor: wc.fillAccent },
+  modeBtnText: { fontSize: 13, fontWeight: '600', color: wc.textSecondary },
+  modeBtnTextOn: { color: '#fff' },
+
+  customWrap: { alignItems: 'center', paddingBottom: 16, gap: 10 },
+  applyBtn: { backgroundColor: wc.fillAccent, borderRadius: 8, paddingHorizontal: 24, paddingVertical: 11 },
+  applyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

@@ -39,7 +39,7 @@ export function PageHeader({ title, subtitle, showBack = true, onBack, right }: 
       <View style={ws.pageHead}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={ws.pageTitle} numberOfLines={1}>{title}</Text>
-          {subtitle ? <Text style={[ws.pageSub, { marginBottom: 0 }]} numberOfLines={1}>{subtitle}</Text> : null}
+          {subtitle ? <Text style={[ws.pageSub, { marginBottom: 0 }]}>{subtitle}</Text> : null}
         </View>
         <View style={ws.pageHeadActions}>{right}</View>
       </View>

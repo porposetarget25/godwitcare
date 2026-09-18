@@ -8,24 +8,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL, authFetch } from '../api';
 import { clinicDateTime, clinicTime } from '../lib/appointmentTime';
 import { ws, wc } from '../webStyle';
+import { colors, radius, spacing, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { openPdf } from '../utils/openPdf';
 
 type Slot = { startTime: string; endTime: string; label: string; available: boolean };
 type AvailabilityDay = { date: string; slots: Slot[] };
 type Appointment = { id: number; consultationId: number; status?: string; startTime: string; endTime: string };
-
-// Mobile-only display restriction (server still returns its full 9:00-17:00 window): only
-// show 9:00-10:45 and 14:00-15:45 slots, hiding the rest — no backend change involved.
-const ALLOWED_WINDOWS = [
-  { startMin: 9 * 60, endMin: 10 * 60 + 45 },
-  { startMin: 14 * 60, endMin: 15 * 60 + 45 },
-];
-function isAllowedSlot(label: string) {
-  const [h, m] = label.split(':').map(Number);
-  const mins = h * 60 + m;
-  return ALLOWED_WINDOWS.some(w => mins >= w.startMin && mins <= w.endMin);
-}
 
 function dayShort(dateKey: string) {
   const d = new Date(`${dateKey}T00:00:00`);
@@ -111,8 +100,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
       const res = await authFetch(`${API_BASE_URL}/appointments/availability`, { cache: 'no-store' });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.');
-      const rawDays: AvailabilityDay[] = Array.isArray(data?.days) ? data.days : [];
-      const nextDays: AvailabilityDay[] = rawDays.map(d => ({ ...d, slots: d.slots.filter(s => isAllowedSlot(s.label)) }));
+      const nextDays: AvailabilityDay[] = Array.isArray(data?.days) ? data.days : [];
       setDays(nextDays);
       const firstWithSlots = nextDays.find(d => d.slots.some(s => s.available));
       setSelectedDate((firstWithSlots ?? nextDays[0])?.date ?? '');
@@ -279,10 +267,10 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
             </>
           )}
 
-          <TouchableOpacity style={[ws.bp, (!selectedSlot || booking || !consultationActive) && ws.btnDisabled]} disabled={!selectedSlot || booking || !consultationActive} onPress={confirmBooking} activeOpacity={0.85}>
+          <TouchableOpacity style={[s.confirmBtn, (!selectedSlot || booking || !consultationActive) && ws.btnDisabled]} disabled={!selectedSlot || booking || !consultationActive} onPress={confirmBooking} activeOpacity={0.85}>
             {booking
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={ws.bpText}>{!consultationActive ? 'Consultation expired' : rescheduling ? 'Confirm Reschedule' : 'Confirm Appointment'}</Text>}
+              ? <ActivityIndicator color={colors.brandDark} size="small" />
+              : <Text style={s.confirmBtnText}>{!consultationActive ? 'Consultation expired' : rescheduling ? 'Confirm Reschedule' : 'Confirm Appointment'}</Text>}
           </TouchableOpacity>
         </>
       )}
@@ -578,6 +566,15 @@ export default function ConsultationTracker() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40 },
+
+  // Confirm Appointment — pill CTA in the amber accent color for contrast against the
+  // teal-dominated screen, signalling this as the primary/high-stakes action.
+  confirmBtn: {
+    backgroundColor: colors.amber, borderRadius: radius.full,
+    paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+    marginTop: spacing.sm, ...shadow.brand,
+  },
+  confirmBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
 
   cardBody: { fontSize: 14, color: wc.textSecondary, lineHeight: 18, marginTop: 2, marginBottom: 4 },
 

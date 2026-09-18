@@ -7,8 +7,10 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL, authFetch } from '../api';
 import { ws, wc } from '../webStyle';
+import { colors, radius, spacing, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { FormScrollView } from '../components/FormScrollView';
+import { ArrowIcon } from '../components/UI';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type YesNo = 'Yes' | 'No';
@@ -577,8 +579,15 @@ export default function PreConsultation() {
             <Text style={[ws.noticeText, ws.nDangerText]}>⚠️ This checklist can't be submitted while an emergency symptom is reported. Please dial 999.</Text>
           </View>
         ) : !isLocked && (
-          <TouchableOpacity style={[ws.bp, submitting && ws.btnDisabled]} onPress={submit} disabled={submitting} activeOpacity={0.85}>
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={ws.bpText}>{isEdit ? 'Update & Continue' : 'Submit & Continue'}</Text>}
+          <TouchableOpacity style={[s.submitBtn, submitting && ws.btnDisabled]} onPress={submit} disabled={submitting} activeOpacity={0.85}>
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={s.submitBtnText}>Continue</Text>
+                <ArrowIcon />
+              </>
+            )}
           </TouchableOpacity>
         )}
 
@@ -622,8 +631,17 @@ const s = StyleSheet.create({
   accordionChevronOpen: { color: wc.fillAccent },
   accordionBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: wc.border },
 
-  detailWrap: { marginTop: -6, marginBottom: 4 },
+  detailWrap: { marginTop: 8, marginBottom: 4 },
   detailInput: { borderWidth: 1, borderColor: wc.borderStrong, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: wc.textPrimary, backgroundColor: wc.surface2 },
+
+  // Submit — matches the pill CTA used across registration (RegisterStep1/2)
+  submitBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    backgroundColor: colors.brand, borderRadius: radius.full,
+    paddingVertical: 14, paddingHorizontal: spacing.xxl, alignSelf: 'flex-end',
+    marginTop: spacing.sm, ...shadow.brand,
+  },
+  submitBtnText: { fontSize: typography.md, fontWeight: '800', color: '#fff' },
 });
 
 const t = StyleSheet.create({

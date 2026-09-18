@@ -185,8 +185,16 @@ public class PdfMaker {
                         float cardPad = 10f;
                         float topPad = 12f;
                         float bottomPad = 12f;
-                        float textW = contentWidth - (cardPad * 2);
                         float lineHt = 14f;
+
+                        // Wrapping must reserve room for the "1. " prefix drawn in front of the
+                        // first line, and must use the SAME font/size the text is actually drawn
+                        // in — mismatching either (as the previous version did, wrapping at 11pt
+                        // regular width but rendering the first line at 12pt bold with no prefix
+                        // allowance) let the first line spill past the card's right edge.
+                        String prefix = idx + ". ";
+                        float prefixW = H_BOLD.getStringWidth(prefix) / 1000f * 12f;
+                        float textW = contentWidth - (cardPad * 2) - prefixW;
 
                         java.util.List<String> lines = wrap(nz(m), H_REG, 11, textW);
                         float titleH = 14f;
@@ -199,14 +207,16 @@ public class PdfMaker {
                         fillRect(cs, margin, y - boxH, contentWidth, boxH, Color.WHITE);
                         strokeRect(cs, margin, y - boxH, contentWidth, boxH, GRAY_200, 0.9f);
 
-                        // title (first line)
-                        text(cs, H_BOLD, 12, TEXT, margin + cardPad, y - topPad, idx + ". " + firstLine(lines));
+                        // title: bold numeric prefix, then the medicine's first line, both on
+                        // the same baseline
+                        text(cs, H_BOLD, 12, TEXT, margin + cardPad, y - topPad, prefix);
+                        text(cs, H_REG, 11, TEXT, margin + cardPad + prefixW, y - topPad, firstLine(lines));
 
-                        // body (remaining lines)
+                        // body (remaining lines) — aligned under the first line's text, not the prefix
                         float ly = y - topPad - 6 - lineHt;
                         if (lines.size() > 1) {
                             for (int i = 1; i < lines.size(); i++) {
-                                text(cs, H_REG, 11, TEXT, margin + cardPad, ly, lines.get(i));
+                                text(cs, H_REG, 11, TEXT, margin + cardPad + prefixW, ly, lines.get(i));
                                 ly -= lineHt;
                             }
                         }
@@ -222,10 +232,9 @@ public class PdfMaker {
                 // 6) Additional notes
                 sectionTitle(cs, margin, y, "Additional Notes");
                 y -= 16;
-                float notesH = 48f;
-                roundedField(cs, doc, H_REG, 11,
+                float notesH = roundedField(cs, doc, H_REG, 11,
                         recommendations,
-                        margin, y, contentWidth, notesH, Color.WHITE, GRAY_200);
+                        margin, y, contentWidth, 48f, Color.WHITE, GRAY_200);
                 y -= (notesH + 18);
 
                 // 7) Signature row
@@ -348,18 +357,25 @@ public class PdfMaker {
         cs.fill();
     }
 
-    private static void roundedField(PDPageContentStream cs, PDDocument doc, PDType1Font font, float size,
-                                     String text, float x, float y, float w, float h, Color bg, Color border) throws Exception {
+    /**
+     * Draws a bordered field sized to fit its wrapped content (at least {@code minH}) and
+     * returns the height actually used, so the caller can advance past it without overlap.
+     */
+    private static float roundedField(PDPageContentStream cs, PDDocument doc, PDType1Font font, float size,
+                                       String text, float x, float y, float w, float minH, Color bg, Color border) throws Exception {
+        float pad = 8;
+        List<String> lines = wrap(text, font, size, w - (pad * 2));
+        float lh = 14f;
+        float h = Math.max(minH, (lines.size() * lh) + (pad * 2) + 4);
         fillRect(cs, x, y - h, w, h, bg);
         strokeRect(cs, x, y - h, w, h, border, 0.8f);
         // text inside
-        float pad = 8;
-        List<String> lines = wrap(text, font, size, w - (pad * 2));
-        float lh = 14f, ty = y - pad - 12;
+        float ty = y - pad - 12;
         for (String line : lines) {
             text(cs, font, size, new Color(31, 41, 55), x + pad, ty, line);
             ty -= lh;
         }
+        return h;
     }
 
     /**
@@ -393,6 +409,24 @@ public class PdfMaker {
         String[] words = t.split("\\s+");
         StringBuilder line = new StringBuilder();
         for (String w : words) {
+            // A single token wider than the box on its own (long medicine name, compound word,
+            // URL, etc.) never fits no matter what — break it character by character instead of
+            // letting it overflow the box edge.
+            if (font.getStringWidth(w) / 1000f * fontSize > maxWidth) {
+                if (line.length() > 0) { lines.add(line.toString()); line.setLength(0); }
+                StringBuilder piece = new StringBuilder();
+                for (int i = 0; i < w.length(); i++) {
+                    char c = w.charAt(i);
+                    float pieceWidth = font.getStringWidth(piece.toString() + c) / 1000f * fontSize;
+                    if (pieceWidth > maxWidth && piece.length() > 0) {
+                        lines.add(piece.toString());
+                        piece.setLength(0);
+                    }
+                    piece.append(c);
+                }
+                line.append(piece);
+                continue;
+            }
             String candidate = (line.length() == 0) ? w : line + " " + w;
             float width = font.getStringWidth(candidate) / 1000f * fontSize;
             if (width > maxWidth) {

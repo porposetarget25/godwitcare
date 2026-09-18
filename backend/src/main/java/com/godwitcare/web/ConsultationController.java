@@ -441,6 +441,30 @@ public class ConsultationController {
         return ResponseEntity.ok(Map.of("id", p.getId()));
     }
 
+    // Persists the doctor's in-progress notes without completing the consultation or creating
+    // a prescription — the first step of the doctor flow (Save -> Create Prescription -> Complete).
+    @PutMapping("/doctor/consultations/{id}/save")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<?> saveConsultation(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body
+    ) {
+        Consultation c = consultations.findById(id).orElse(null);
+        if (c == null) return ResponseEntity.notFound().build();
+        if (c.getStatus() == Consultation.Status.COMPLETED) {
+            return ResponseEntity.status(409).body(Map.of("error", "Completed consultations are read-only"));
+        }
+
+        c.setHistoryOfPresentingComplaint((String) body.getOrDefault("history", c.getHistoryOfPresentingComplaint()));
+        c.setDiagnosis((String) body.getOrDefault("diagnosis", c.getDiagnosis()));
+        c.setRecommendations((String) body.getOrDefault("recommendations", c.getRecommendations()));
+        Object prescriptionRequired = body.get("prescriptionRequired");
+        if (prescriptionRequired instanceof Boolean b) c.setPrescriptionRequired(b);
+
+        consultations.save(c);
+        return ResponseEntity.ok(Map.of("id", c.getId(), "status", c.getStatus().name(), "saved", true));
+    }
+
     @PutMapping("/doctor/consultations/{id}/complete")
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<?> completeConsultation(

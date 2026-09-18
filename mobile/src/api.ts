@@ -91,6 +91,7 @@ export type Registration = {
   'Travel End Date': string;
   'Package Days': number;
   primaryDial?: string;
+  primaryCountry?: string;
   secondaryDial?: string;
   Username?: string;
   'Account Password'?: string;
@@ -294,6 +295,16 @@ export async function doctorLatestPrescriptionMeta(consultationId: number) {
 
 export async function doctorDownloadPrescriptionPdf(prescriptionId: number): Promise<string> {
   return `${API_BASE_URL}/doctor/prescriptions/${prescriptionId}/pdf`;
+}
+
+export async function doctorSaveConsultation(consultationId: number, body: object) {
+  const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${consultationId}/save`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('Failed to save consultation');
+  return res.json();
 }
 
 export async function doctorCreatePrescription(consultationId: number, body: object) {

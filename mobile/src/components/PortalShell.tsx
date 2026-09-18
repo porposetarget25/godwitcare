@@ -140,13 +140,17 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
   // Close the drawer whenever the route changes (mirrors web's route-change effect).
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  if (loading || !user) return <>{children}</>;
-
-  const doctor = isDoctorUser(user);
+  // Whether to show the topbar/drawer chrome. `{children}` (the Stack navigator) below is
+  // ALWAYS rendered at the same position in the same tree shape regardless of this — branching
+  // the surrounding tree structure (e.g. returning a bare `<>{children}</>` here) would make
+  // React unmount/remount the Stack the instant `user` changes (e.g. right after login), tearing
+  // down the navigator mid-navigation and causing "action ... not handled by any navigator".
+  const showChrome = !loading && !!user;
+  const doctor = user ? isDoctorUser(user) : false;
   const navSections = doctor ? DOCTOR_NAV_SECTIONS : PATIENT_NAV_SECTIONS;
   const roleLabel = doctor ? 'Doctor' : 'Primary Member';
   const profileHref = doctor ? '/(app)/doctor/settings' : '/(app)/account';
-  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'Account';
+  const fullName = user ? ([user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'Account') : '';
 
   function isActive(item: NavItem) {
     const routePath = item.to.replace('/(app)', '');
@@ -179,74 +183,82 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
     <PortalHeaderContext.Provider value={{ setHeader }}>
       <View style={{ flex: 1, backgroundColor: wc.surface0 }}>
         {/* ── Persistent topbar: hamburger+logo on root screens, back+title+actions on screens with a PageHeader ── */}
-        <View style={s.topbar}>
-          <TouchableOpacity onPress={header ? handleBack : () => setOpen(true)} style={s.menuBtn} activeOpacity={0.7}>
-            <Text style={s.menuBtnIcon}>{header ? '‹' : '☰'}</Text>
-          </TouchableOpacity>
-          {header ? (
-            <View style={s.topbarTitleWrap}>
-              <Text style={s.topbarTitle} numberOfLines={1}>{header.title}</Text>
-              {header.subtitle ? <Text style={s.topbarSubtitle} numberOfLines={1}>{header.subtitle}</Text> : null}
-            </View>
-          ) : (
-            <BrandMark height={32} maxWidth={180} />
-          )}
-          <View style={s.topbarRight}>{header?.right}</View>
-        </View>
-
-        <Animated.View style={{ flex: 1, transform: contentTransform }}>{children}</Animated.View>
-
-        {/* ── Overlay + drawer ── */}
-        {open && (
-          <Animated.View style={[s.overlay, { opacity: overlayOpacity }]} pointerEvents={open ? 'auto' : 'none'}>
-            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpen(false)} />
-          </Animated.View>
-        )}
-        <Animated.View style={[s.drawer, { transform: [{ translateX }, { scale: drawerScale }] }]} pointerEvents={open ? 'auto' : 'none'}>
-          <View style={s.drawerLogo}>
-            <BrandMark height={44} maxWidth={215} />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            {(() => { let flatIndex = 0; return navSections.map(section => (
-              <React.Fragment key={section.label}>
-                <Text style={s.sectionLabel}>{section.label}</Text>
-                {section.items.map(item => {
-                  const active = isActive(item);
-                  const entrance = itemEntrance(flatIndex++);
-                  return (
-                    <Animated.View key={item.id} style={entrance}>
-                      <TouchableOpacity
-                        style={[s.item, active && s.itemOn]}
-                        onPress={() => navigate(item.to)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={s.itemIcon}>{item.icon}</Text>
-                        <Text style={[s.itemLabel, active && s.itemLabelOn]}>{item.label}</Text>
-                        {!!item.badge && (
-                          <View style={s.badge}><Text style={s.badgeText}>{item.badge}</Text></View>
-                        )}
-                      </TouchableOpacity>
-                    </Animated.View>
-                  );
-                })}
-              </React.Fragment>
-            )); })()}
-          </View>
-
-          <View style={s.drawerFoot}>
-            <TouchableOpacity style={s.profRow} onPress={() => navigate(profileHref)} activeOpacity={0.7}>
-              <View style={s.ava}><Text style={s.avaText}>{initialsOf(fullName)}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.profName} numberOfLines={1}>{fullName}</Text>
-                <Text style={s.profRole}>{roleLabel}</Text>
+        {showChrome && (
+          <View style={s.topbar}>
+            <TouchableOpacity onPress={header ? handleBack : () => setOpen(true)} style={s.menuBtn} activeOpacity={0.7}>
+              <Text style={s.menuBtnIcon}>{header ? '‹' : '☰'}</Text>
+            </TouchableOpacity>
+            {header ? (
+              <View style={s.topbarTitleWrap}>
+                <Text style={s.topbarTitle} numberOfLines={1}>{header.title}</Text>
+                {header.subtitle ? <Text style={s.topbarSubtitle} numberOfLines={1}>{header.subtitle}</Text> : null}
               </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.logoutBtn} onPress={confirmLogout} activeOpacity={0.75}>
-              <Text style={s.logoutBtnText}>⏻ Log out</Text>
-            </TouchableOpacity>
+            ) : (
+              <BrandMark height={32} maxWidth={180} />
+            )}
+            <View style={s.topbarRight}>{header?.right}</View>
           </View>
-        </Animated.View>
+        )}
+
+        {/* `{children}` (the Stack navigator) always renders here, at the same tree position,
+            whether or not the chrome around it is showing — see `showChrome` comment above. */}
+        <Animated.View style={{ flex: 1, transform: showChrome ? contentTransform : undefined }}>{children}</Animated.View>
+
+        {showChrome && (
+          <>
+            {/* ── Overlay + drawer ── */}
+            {open && (
+              <Animated.View style={[s.overlay, { opacity: overlayOpacity }]} pointerEvents={open ? 'auto' : 'none'}>
+                <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpen(false)} />
+              </Animated.View>
+            )}
+            <Animated.View style={[s.drawer, { transform: [{ translateX }, { scale: drawerScale }] }]} pointerEvents={open ? 'auto' : 'none'}>
+              <View style={s.drawerLogo}>
+                <BrandMark height={44} maxWidth={215} />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                {(() => { let flatIndex = 0; return navSections.map(section => (
+                  <React.Fragment key={section.label}>
+                    <Text style={s.sectionLabel}>{section.label}</Text>
+                    {section.items.map(item => {
+                      const active = isActive(item);
+                      const entrance = itemEntrance(flatIndex++);
+                      return (
+                        <Animated.View key={item.id} style={entrance}>
+                          <TouchableOpacity
+                            style={[s.item, active && s.itemOn]}
+                            onPress={() => navigate(item.to)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={s.itemIcon}>{item.icon}</Text>
+                            <Text style={[s.itemLabel, active && s.itemLabelOn]}>{item.label}</Text>
+                            {!!item.badge && (
+                              <View style={s.badge}><Text style={s.badgeText}>{item.badge}</Text></View>
+                            )}
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    })}
+                  </React.Fragment>
+                )); })()}
+              </View>
+
+              <View style={s.drawerFoot}>
+                <TouchableOpacity style={s.profRow} onPress={() => navigate(profileHref)} activeOpacity={0.7}>
+                  <View style={s.ava}><Text style={s.avaText}>{initialsOf(fullName)}</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.profName} numberOfLines={1}>{fullName}</Text>
+                    <Text style={s.profRole}>{roleLabel}</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.logoutBtn} onPress={confirmLogout} activeOpacity={0.75}>
+                  <Text style={s.logoutBtnText}>⏻ Log out</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </>
+        )}
       </View>
     </PortalHeaderContext.Provider>
   );

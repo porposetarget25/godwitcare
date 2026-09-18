@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Alert,
-  TouchableOpacity, Modal, FlatList, TextInput, Platform, Animated,
+  TouchableOpacity, Modal, TextInput, Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -14,6 +14,7 @@ import { Btn, Field } from '../components/UI';
 import { colors, spacing, radius, typography } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { FormScrollView } from '../components/FormScrollView';
+import { SearchPickerModal, PickerOption } from '../components/SearchPickerModal';
 
 type Person = { fullName: string; dateOfBirth: string };
 type Errors = Partial<Record<'from'|'to'|'start'|'end'|'package'|'travelers', string>>;
@@ -301,9 +302,30 @@ const EU_DESTINATIONS = [
   { name: 'Warsaw, Poland', flag: '🇵🇱' }, { name: 'Budapest, Hungary', flag: '🇭🇺' },
   { name: 'Stockholm, Sweden', flag: '🇸🇪' }, { name: 'Oslo, Norway', flag: '🇳🇴' },
   { name: 'Copenhagen, Denmark', flag: '🇩🇰' }, { name: 'Helsinki, Finland', flag: '🇫🇮' },
-  { name: 'Athens, Greece', flag: '🇬🇷' }, { name: 'Zurich, Switzerland', flag: '🇨🇭' },
+  { name: 'Athens, Greece', flag: '🇬🇷' },
   { name: 'Bucharest, Romania', flag: '🇷🇴' }, { name: 'Zagreb, Croatia', flag: '🇭🇷' },
 ].sort((a, b) => a.name.localeCompare(b.name));
+
+// ── Picker options ────────────────────────────────────────────────────────────
+// The stored value stays the full original string (the backend expects "London, UK");
+// the label/sub split is presentation only.
+const COUNTRY_OPTIONS: PickerOption[] = COUNTRIES.map(c => ({
+  value: c.name, label: c.name, flag: c.flag,
+}));
+
+const DESTINATION_OPTIONS: PickerOption[] = EU_DESTINATIONS.map(d => {
+  const [city, ...rest] = d.name.split(',');
+  return {
+    value:    d.name,
+    label:    city.trim(),
+    sub:      rest.join(',').trim() || undefined,
+    flag:     d.flag,
+    keywords: d.name,
+  };
+});
+
+const POPULAR_ORIGINS = ['New Zealand', 'Australia', 'India', 'United States', 'Singapore'];
+const POPULAR_DESTINATIONS = ['London, UK', 'Paris, France', 'Rome, Italy', 'Amsterdam, Netherlands', 'Dublin, Ireland'];
 
 // ── Selector button ───────────────────────────────────────────────────────────
 function SelectorBtn({ value, placeholder, onPress, error, icon }: {
@@ -320,69 +342,26 @@ function SelectorBtn({ value, placeholder, onPress, error, icon }: {
   );
 }
 
-// ── Search picker sheet ───────────────────────────────────────────────────────
-function SearchSheet({ visible, title, items, selected, onSelect, onClose }: {
-  visible: boolean; title: string;
-  items: { name: string; flag: string }[];
-  selected?: string; onSelect: (v: string) => void; onClose: () => void;
+// ── Route card row — full-width tap target for origin / destination ───────────
+function RouteRow({ marker, markerStyle, flag, label, value, placeholder, sub, error, onPress }: {
+  marker: string; markerStyle?: any; flag?: string; label: string;
+  value?: string; placeholder: string; sub?: string;
+  error?: boolean; onPress: () => void;
 }) {
-  const [q, setQ] = useState('');
-  const filtered = q
-    ? items.filter(i => i.name.toLowerCase().includes(q.toLowerCase()))
-    : items;
-
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={sh.overlay}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={sh.sheet}>
-          <View style={sh.handle} />
-          <View style={sh.sheetHeader}>
-            <Text style={sh.sheetTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose} style={sh.closeCircle} activeOpacity={0.7}>
-              <Text style={sh.closeX}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={sh.searchWrap}>
-            <Text style={{ fontSize: 14, opacity: 0.45 }}>🔍</Text>
-            <TextInput
-              style={sh.searchInput}
-              value={q}
-              onChangeText={setQ}
-              placeholder="Search…"
-              placeholderTextColor={colors.mutedLight}
-              autoFocus
-            />
-            {q.length > 0 && (
-              <TouchableOpacity onPress={() => setQ('')}>
-                <Text style={{ color: colors.muted, fontSize: 17, paddingHorizontal: 4 }}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <FlatList
-            data={filtered}
-            keyExtractor={i => i.name}
-            style={{ maxHeight: 340 }}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={sh.sep} />}
-            renderItem={({ item }) => {
-              const active = item.name === selected;
-              return (
-                <TouchableOpacity
-                  style={[sh.radioRow, active && { backgroundColor: colors.brandLight }]}
-                  onPress={() => { onSelect(item.name); onClose(); setQ(''); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 21, marginRight: spacing.md }}>{item.flag}</Text>
-                  <Text style={[sh.radioLabel, active && { color: colors.brand, fontWeight: '700' }]}>{item.name}</Text>
-                  {active && <Text style={{ color: colors.brand, fontWeight: '700', marginLeft: 'auto' }}>✓</Text>}
-                </TouchableOpacity>
-              );
-            }}
-          />
-        </View>
+    <TouchableOpacity style={sh.routeRow} onPress={onPress} activeOpacity={0.6}>
+      <View style={[sh.routeMarker, markerStyle, flag && sh.routeMarkerFilled]}>
+        <Text style={flag ? sh.routeMarkerFlag : sh.routeMarkerText}>{flag || marker}</Text>
       </View>
-    </Modal>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[sh.routeLabel, error && { color: colors.error }]}>{label}</Text>
+        <Text style={[sh.routeValue, !value && sh.routeValueEmpty]} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+        {value && sub ? <Text style={sh.routeSub} numberOfLines={1}>{sub}</Text> : null}
+      </View>
+      <Text style={sh.chevron}>›</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -568,6 +547,10 @@ export default function Step3() {
   const end   = draft['Travel End Date'] ?? '';
   const pkg   = draft['Package Days'];
 
+  // Destination is stored as "City, Country"; the route card shows the two parts separately.
+  const fromOption = COUNTRY_OPTIONS.find(o => o.value === from);
+  const toOption   = DESTINATION_OPTIONS.find(o => o.value === to);
+
   function validate(): boolean {
     const next: Errors = {};
     if (!from)  next.from    = 'Required';
@@ -601,15 +584,42 @@ export default function Step3() {
           <Text style={styles.subtitle}>Tell us about your trip so we can be ready to help.</Text>
         </View>
 
-        {/* From / To */}
-        <View style={styles.row}>
-          <Field label="Travelling From" required error={errors.from} style={{ flex: 1 }}>
-            <SelectorBtn value={from} placeholder="Select country" icon="🌍" error={!!errors.from} onPress={() => setShowFrom(true)} />
-          </Field>
-          <Field label="Destination (UK & Europe)" required error={errors.to} style={{ flex: 1 }}>
-            <SelectorBtn value={to} placeholder="Select city" icon="📍" error={!!errors.to} onPress={() => setShowTo(true)} />
-          </Field>
+        {/* Route — stacked full-width rows so long city names are never truncated */}
+        <View style={[sh.routeCard, (errors.from || errors.to) ? sh.routeCardErr : null]}>
+          <RouteRow
+            marker="●"
+            flag={fromOption?.flag}
+            label="Travelling From"
+            value={from}
+            placeholder="Select country"
+            error={!!errors.from}
+            onPress={() => setShowFrom(true)}
+          />
+          <View style={sh.routeConnector}>
+            <View style={sh.routeDots}>
+              {[0, 1, 2].map(i => <View key={i} style={sh.routeDot} />)}
+            </View>
+            <Text style={sh.routePlane}>✈️</Text>
+          </View>
+          <RouteRow
+            marker="📍"
+            markerStyle={sh.routeMarkerDest}
+            flag={toOption?.flag}
+            label="Destination (UK & Europe)"
+            value={toOption?.label}
+            sub={toOption?.sub}
+            placeholder="Select city"
+            error={!!errors.to}
+            onPress={() => setShowTo(true)}
+          />
         </View>
+        {(errors.from || errors.to) ? (
+          <Text style={styles.routeError}>
+            {errors.from && errors.to ? 'Select where you are travelling from and to.'
+              : errors.from ? 'Select where you are travelling from.'
+              : 'Select your destination.'}
+          </Text>
+        ) : null}
 
         {/* Travel Date Range — airline-style calendar */}
         <Field label="Travel Dates" required error={errors.start || errors.end}>
@@ -714,11 +724,29 @@ export default function Step3() {
       </FormScrollView>
 
       {/* Sheets */}
-      <SearchSheet visible={showFrom} title="Travelling From" items={COUNTRIES}
-        selected={from} onSelect={v => setDraft({ ...draft, 'Travelling From': v })} onClose={() => setShowFrom(false)} />
+      <SearchPickerModal
+        visible={showFrom}
+        title="Travelling From"
+        subtitle="Country you are departing from"
+        options={COUNTRY_OPTIONS}
+        popular={POPULAR_ORIGINS}
+        searchPlaceholder="Search countries"
+        selected={from}
+        onSelect={v => { setDraft({ ...draft, 'Travelling From': v }); setErrors(e => ({ ...e, from: undefined })); }}
+        onClose={() => setShowFrom(false)}
+      />
 
-      <SearchSheet visible={showTo} title="Destination (UK & Europe)" items={EU_DESTINATIONS}
-        selected={to} onSelect={v => setDraft({ ...draft, 'Travelling To (UK & Europe)': v })} onClose={() => setShowTo(false)} />
+      <SearchPickerModal
+        visible={showTo}
+        title="Destination"
+        subtitle="Where you are travelling to in the UK & Europe"
+        options={DESTINATION_OPTIONS}
+        popular={POPULAR_DESTINATIONS}
+        searchPlaceholder="Search cities or countries"
+        selected={to}
+        onSelect={v => { setDraft({ ...draft, 'Travelling To (UK & Europe)': v }); setErrors(e => ({ ...e, to: undefined })); }}
+        onClose={() => setShowTo(false)}
+      />
 
       <DocPickerSheet visible={showDocPick} onClose={() => setShowDocPick(false)} onPick={f => setFile(f)} />
 
@@ -747,7 +775,6 @@ const styles = StyleSheet.create({
   stepBadgeText:   { fontSize: typography.xs, color: 'rgba(255,255,255,0.9)', fontWeight: '700', letterSpacing: 0.5 },
   title:           { fontSize: typography.xl, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
   subtitle:        { fontSize: typography.sm, color: 'rgba(255,255,255,0.75)', lineHeight: 20 },
-  row:             { flexDirection: 'row', gap: spacing.md },
   travHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },
   subhead:         { fontSize: typography.md, fontWeight: '700', color: colors.text },
   addBtn:          { backgroundColor: colors.brandLight, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full },
@@ -758,6 +785,7 @@ const styles = StyleSheet.create({
   travCardTitle:   { fontSize: typography.base, fontWeight: '700', color: colors.text },
   travCardHint:    { fontSize: typography.xs, color: colors.muted, marginTop: 1 },
   travCount:       { color: colors.muted, fontSize: typography.sm, marginBottom: spacing.md },
+  routeError:      { color: colors.error, fontSize: typography.xs, marginTop: -spacing.sm, marginLeft: spacing.xs },
   formatNote:      { color: colors.muted, fontSize: typography.xs, marginTop: spacing.xs },
   saveBtn: { backgroundColor: colors.amber, borderRadius: radius.full, paddingVertical: 15, alignItems: 'center', elevation: 4, shadowColor: colors.brand, shadowOffset: { width:0, height:3 }, shadowOpacity: 0.25, shadowRadius: 8 },
   saveBtnText: { fontSize: typography.md, fontWeight: '800', color: colors.brandDark },
@@ -771,6 +799,24 @@ const styles = StyleSheet.create({
 });
 
 const sh = StyleSheet.create({
+  // Route card (Travelling From → Destination)
+  routeCard:       { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.line, overflow: 'hidden' },
+  routeCardErr:    { borderColor: colors.error },
+  routeRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, minHeight: 64 },
+  routeMarker:     { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' },
+  routeMarkerDest: { backgroundColor: colors.warningBg },
+  routeMarkerText: { fontSize: 14, color: colors.brand },
+  routeMarkerFilled: { backgroundColor: 'transparent' },
+  routeMarkerFlag: { fontSize: 26 },
+  routeLabel:      { fontSize: typography.xs, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  routeValue:      { fontSize: typography.md, fontWeight: '600', color: colors.text },
+  routeValueEmpty: { fontWeight: '400', color: colors.mutedLight },
+  routeSub:        { fontSize: typography.xs, color: colors.muted, marginTop: 1 },
+  routeConnector:  { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.lg + 17 - 1, paddingRight: spacing.lg },
+  routeDots:       { gap: 3, paddingVertical: 2 },
+  routeDot:        { width: 2, height: 4, borderRadius: 1, backgroundColor: colors.lineStrong },
+  routePlane:      { fontSize: 12, opacity: 0.45, marginLeft: spacing.sm },
+
   selectorBtn:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.white, paddingHorizontal: spacing.md, minHeight: 48, gap: spacing.sm },
   selectorBtnErr:  { borderColor: colors.error },
   selectorIcon:    { fontSize: 16, opacity: 0.5 },
@@ -790,11 +836,6 @@ const sh = StyleSheet.create({
   sheetSub:        { fontSize: typography.sm, color: colors.muted, paddingHorizontal: spacing.xl, marginBottom: spacing.md, marginTop: -spacing.sm },
   closeCircle:     { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   closeX:          { fontSize: 14, color: colors.textSec, fontWeight: '700' },
-  searchWrap:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.xl, marginBottom: spacing.sm, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.xl, paddingHorizontal: spacing.md, gap: spacing.sm, backgroundColor: colors.bgGray },
-  searchInput:     { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 10 },
-  sep:             { height: 1, backgroundColor: colors.line, marginHorizontal: spacing.xl },
-  radioRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: 14 },
-  radioLabel:      { fontSize: typography.base, color: colors.text, fontWeight: '400', flex: 1 },
   docBtn:          { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.lg, backgroundColor: colors.white, padding: spacing.md, gap: spacing.md },
   docBtnIcon:      { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' },
   docBtnLabel:     { fontSize: typography.base, fontWeight: '600', color: colors.text },

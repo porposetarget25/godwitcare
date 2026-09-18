@@ -67,6 +67,25 @@ export function Btn({
   );
 }
 
+// ── Arrow icon (drawn, not a font glyph — guarantees a bold, crisp shape that's
+//    always vertically centered with adjacent text, unlike a unicode "→"/"←" glyph). ────
+export function ArrowIcon({
+  color = '#fff', size = 15, direction = 'right',
+}: { color?: string; size?: number; direction?: 'left' | 'right' }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', transform: direction === 'left' ? [{ scaleX: -1 }] : undefined }}>
+      <View style={{ width: size * 0.7, height: size * 0.16, backgroundColor: color, borderRadius: 1 }} />
+      <View
+        style={{
+          width: 0, height: 0, marginLeft: -1,
+          borderTopWidth: size * 0.32, borderBottomWidth: size * 0.32, borderLeftWidth: size * 0.42,
+          borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: color,
+        }}
+      />
+    </View>
+  );
+}
+
 // ── Card (.card) ─────────────────────────────────────────────────────────────
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   return <View style={[ws.card, style]}>{children}</View>;

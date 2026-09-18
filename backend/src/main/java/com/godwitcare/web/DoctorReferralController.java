@@ -66,8 +66,8 @@ public class DoctorReferralController {
 
         Consultation c = consultations.findById(consultationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Consultation not found"));
-        if (c.getStatus() == Consultation.Status.COMPLETED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Completed consultations are read-only");
+        if (c.getStatus() != Consultation.Status.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Complete the consultation before generating a referral letter.");
         }
 
         // ----- Patient info from consultation -----
