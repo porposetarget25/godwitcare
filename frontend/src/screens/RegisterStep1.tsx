@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { checkAuthAvailability } from '../api'
 import { COUNTRY_OPTIONS } from '../lib/countries'
+import { normalizePhoneDigits } from '../lib/phone'
 import { useReg } from '../state/registration'
 
 type Errors = Partial<Record<
@@ -68,9 +69,7 @@ export default function Step1() {
     [draft.secondaryDial]
   )
 
-  function normalizeDigits(s: string): string {
-    return String(s || '').replace(/[^\d]/g, '')
-  }
+  const normalizeDigits = normalizePhoneDigits
 
   function validate(): boolean {
     const next: Errors = {}

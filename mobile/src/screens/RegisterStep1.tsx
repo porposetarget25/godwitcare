@@ -12,6 +12,7 @@ import { colors, spacing, radius, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { FormScrollView } from '../components/FormScrollView';
 import { SearchPickerModal, PickerOption } from '../components/SearchPickerModal';
+import { COUNTRY_CODES, COUNTRY_CODE_OPTIONS, POPULAR_COUNTRY_CODES, normalizePhoneDigits, stripLeadingZero } from '../lib/phone';
 
 type Errors = Partial<Record<'firstName'|'lastName'|'dob'|'gender'|'primary'|'password'|'email', string>>;
 
@@ -40,26 +41,6 @@ function isValidEmail(v: string) {
 }
 
 const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
-
-const COUNTRY_CODES = [
-  { name: 'Australia',      flag: '🇦🇺', dial: '+61'  },
-  { name: 'Canada',         flag: '🇨🇦', dial: '+1'   },
-  { name: 'France',         flag: '🇫🇷', dial: '+33'  },
-  { name: 'Germany',        flag: '🇩🇪', dial: '+49'  },
-  { name: 'India',          flag: '🇮🇳', dial: '+91'  },
-  { name: 'New Zealand',    flag: '🇳🇿', dial: '+64'  },
-  { name: 'South Africa',   flag: '🇿🇦', dial: '+27'  },
-  { name: 'UAE',            flag: '🇦🇪', dial: '+971' },
-  { name: 'United Kingdom', flag: '🇬🇧', dial: '+44'  },
-  { name: 'United States',  flag: '🇺🇸', dial: '+1'   },
-].sort((a, b) => a.name.localeCompare(b.name));
-
-// Picker value is the country name (unique — several countries share a dial code, e.g. +1
-// for both Canada and the US, so the dial code alone can't identify a row).
-const COUNTRY_CODE_OPTIONS: PickerOption[] = COUNTRY_CODES.map(c => ({
-  value: c.name, label: c.name, sub: c.dial, flag: c.flag,
-}));
-const POPULAR_COUNTRY_CODES = ['New Zealand', 'Australia', 'India', 'United Kingdom', 'United States'];
 
 // ── Reusable selector button ──────────────────────────────────────────────────
 function SelectorBtn({
@@ -209,7 +190,7 @@ export default function Step1() {
   function next() {
     if (!validate()) return;
     const primaryDial   = draft.primaryDial || '+64';
-    const primaryDigits = (draft['Primary WhatsApp Number'] || '').replace(/\D/g, '');
+    const primaryDigits = normalizePhoneDigits(draft['Primary WhatsApp Number'] || '');
     const primaryFull   = `${primaryDial}${primaryDigits}`;
     setDraft({ ...draft, primaryDial, 'Primary WhatsApp Number': primaryFull, Username: primaryFull });
     router.push('/(app)/register/step2');
@@ -321,7 +302,7 @@ export default function Step1() {
               <TextInput
                 style={sh.inputInner}
                 value={draft['Primary WhatsApp Number'] || ''}
-                onChangeText={v => setDraft({ ...draft, 'Primary WhatsApp Number': v.replace(/^0+/, '') })}
+                onChangeText={v => setDraft({ ...draft, 'Primary WhatsApp Number': stripLeadingZero(v) })}
                 placeholder="1234567890"
                 placeholderTextColor={colors.mutedLight}
                 keyboardType="phone-pad"

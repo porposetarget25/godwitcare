@@ -3,7 +3,7 @@
     "name": "GodwitCareGlobal",
     "slug": "godwitcare",
     "owner": "shekharchauhan",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
     "userInterfaceStyle": "light",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.godwitcare.mobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "GodwitCareGlobal uses your camera to take a profile photo and to photograph travel documents (passport, ID) for your consultation.",
@@ -31,7 +31,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.godwitcare.mobile",
-      "versionCode": 3,
+      "versionCode": 4,
       "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.INTERNET",

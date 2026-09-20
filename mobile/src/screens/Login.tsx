@@ -9,8 +9,18 @@ import { login, API_BASE_URL } from '../api';
 import { useAuth } from '../state/auth';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { FormScrollView } from '../components/FormScrollView';
+import { SearchPickerModal } from '../components/SearchPickerModal';
+import { COUNTRY_CODES, COUNTRY_CODE_OPTIONS, POPULAR_COUNTRY_CODES, DEFAULT_COUNTRY_DIAL, buildCanonicalPhone } from '../lib/phone';
 
 const LOGO_DARK = require('../../assets/logo_white.png');
+
+// True once the identifier clearly isn't an email — i.e. it's being typed as a phone number,
+// so the country-code selector (needed to reconstruct the same "+<dial><digits>" username
+// Registration stores) should show.
+function looksLikePhone(v: string) {
+  const t = v.trim();
+  return t.length > 0 && !t.includes('@');
+}
 
 export default function Login() {
   const [username, setUsername ] = useState('');
@@ -18,8 +28,22 @@ export default function Login() {
   const [loading,  setLoading  ] = useState(false);
   const [error,    setError    ] = useState<string | null>(null);
   const [showPass, setShowPass ] = useState(false);
+  const [primaryDial, setPrimaryDial] = useState(DEFAULT_COUNTRY_DIAL);
+  const [showCountry, setShowCountry] = useState(false);
   const router = useRouter();
   const { refresh } = useAuth();
+
+  const selectedCountry = COUNTRY_CODES.find(c => c.dial === primaryDial);
+  const phoneMode = looksLikePhone(username);
+
+  // Registration strips leading zeros and prepends the selected dial code to build the stored
+  // username (RegisterStep1.tsx) — login must reconstruct the identical string, or a user who
+  // types their number the way they normally would (e.g. with a leading 0, no dial code) will
+  // silently fail to match and see a generic "Login failed".
+  function resolveIdentifier(): string {
+    const raw = username.trim();
+    return phoneMode ? buildCanonicalPhone(primaryDial, raw) : raw; // email — send as typed
+  }
 
   async function onSubmit() {
     if (!username.trim() || !password.trim()) {
@@ -29,7 +53,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(username.trim(), password);
+      await login(resolveIdentifier(), password);
       await refresh();
       router.replace('/(app)/home');
     } catch (err: any) {
@@ -89,20 +113,32 @@ export default function Login() {
             {/* Username field */}
             <View style={s.fieldWrap}>
               <Text style={s.fieldLabel}>WhatsApp Number / Email</Text>
-              <View style={s.inputRow}>
-                <Text style={s.inputIcon}>📱</Text>
-                <TextInput
-                  style={s.input}
-                  value={username}
-                  onChangeText={setUsername}
-                  placeholder="e.g. +1234567890 or email"
-                  placeholderTextColor={colors.mutedLight}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="username"
-                  returnKeyType="next"
-                />
+              <View style={s.row}>
+                {phoneMode && (
+                  <TouchableOpacity style={s.countryBtn} onPress={() => setShowCountry(true)} activeOpacity={0.75}>
+                    <Text style={s.countryFlag}>{selectedCountry?.flag ?? '🌐'}</Text>
+                    <Text style={s.countryDial}>{selectedCountry?.dial ?? DEFAULT_COUNTRY_DIAL}</Text>
+                    <Text style={s.chevronSm}>›</Text>
+                  </TouchableOpacity>
+                )}
+                <View style={[s.inputRow, { flex: 1 }]}>
+                  <Text style={s.inputIcon}>{phoneMode ? '📱' : '✉️'}</Text>
+                  <TextInput
+                    style={s.input}
+                    value={username}
+                    onChangeText={setUsername}
+                    placeholder={phoneMode ? '1234567890' : 'e.g. +1234567890 or email'}
+                    placeholderTextColor={colors.mutedLight}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="username"
+                    returnKeyType="next"
+                  />
+                </View>
               </View>
+              {phoneMode && (
+                <Text style={s.fieldHint}>Select the country you registered with, then enter your number without the leading 0.</Text>
+              )}
             </View>
 
             {/* Password field */}
@@ -166,6 +202,21 @@ export default function Login() {
           <Text style={s.version}>GodwitCareGlobal · Secure Health Platform</Text>
         </View>
       </FormScrollView>
+
+      <SearchPickerModal
+        visible={showCountry}
+        title="Select Country Code"
+        subtitle="The country you registered with"
+        options={COUNTRY_CODE_OPTIONS}
+        popular={POPULAR_COUNTRY_CODES}
+        searchPlaceholder="Search countries"
+        selected={selectedCountry?.name}
+        onSelect={name => {
+          const c = COUNTRY_CODES.find(c => c.name === name);
+          if (c) setPrimaryDial(c.dial);
+        }}
+        onClose={() => setShowCountry(false)}
+      />
     </View>
   );
 }
@@ -237,6 +288,8 @@ const s = StyleSheet.create({
   // Fields
   fieldWrap:  { gap: 6 },
   fieldLabel: { fontSize: typography.xs, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldHint:  { fontSize: typography.xs, color: colors.muted },
+  row:        { flexDirection: 'row', gap: spacing.sm },
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md,
@@ -247,6 +300,17 @@ const s = StyleSheet.create({
   input:     { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 12 },
   eyeBtn:    { padding: 4 },
   eyeIcon:   { fontSize: 17 },
+
+  // Country selector (phone-login mode only)
+  countryBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md,
+    backgroundColor: colors.bgGray, paddingHorizontal: spacing.sm,
+    minHeight: 50, gap: 4, minWidth: 88,
+  },
+  countryFlag: { fontSize: 21 },
+  countryDial: { fontSize: typography.sm, fontWeight: '600', color: colors.text },
+  chevronSm:   { fontSize: 17, color: colors.muted },
 
   // Sign In button — gold like Home's consult CTA
   signInBtn: {

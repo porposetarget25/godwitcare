@@ -96,20 +96,23 @@ public class AppointmentController {
             Set<LocalTime> candidateTimes = new TreeSet<>();
             for (User doctor : doctors) candidateTimes.addAll(schedules.slotStartsFor(doctor.getId(), day, RESERVED_MINUTES));
 
+            // Only bookable slots are returned — no disabled/filler entries. Any future change
+            // to what counts as "bookable" (lead time, doctor windows, normalization, etc.) is
+            // a backend-only change; the client just renders whatever list comes back.
             List<Map<String, Object>> slots = new ArrayList<>();
             for (LocalTime label : candidateTimes) {
                 Instant start = LocalDateTime.of(day, label).atZone(CLINIC_ZONE).toInstant();
                 Instant reservedEnd = start.plus(Duration.ofMinutes(RESERVED_MINUTES));
+                if (start.isBefore(minBookable)) continue;
                 boolean doctorAvailable = doctors.stream().anyMatch(doctor ->
                         schedules.isAvailable(doctor.getId(), start, reservedEnd)
                                 && bookedByDoctor.get(doctor.getId()).stream().noneMatch(a -> a.getStartTime().isBefore(reservedEnd)
                                 && a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)).isAfter(start)));
-                boolean disabled = start.isBefore(minBookable) || !doctorAvailable;
+                if (!doctorAvailable) continue;
                 slots.add(Map.of(
                         "startTime", start.toString(),
                         "endTime", start.plus(Duration.ofMinutes(SLOT_MINUTES)).toString(),
-                        "label", label.toString(),
-                        "available", !disabled
+                        "label", label.toString()
                 ));
             }
             days.add(Map.of("date", day.toString(), "slots", slots));

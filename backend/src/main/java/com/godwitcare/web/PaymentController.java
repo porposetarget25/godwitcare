@@ -199,6 +199,7 @@ public class PaymentController {
         BigDecimal total = tripFee.add(ONE_TIME_REGISTRATION_FEE).setScale(2);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("activated", user.isActivated());
+        body.put("activatedAt", user.getActivatedAt());
         body.put("packageDays", days);
         body.put("packageLabel", days + " days (£1/day)");
         body.put("registrationFee", user.isActivated() ? BigDecimal.ZERO.setScale(2) : ONE_TIME_REGISTRATION_FEE);

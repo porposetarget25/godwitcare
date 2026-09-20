@@ -4,9 +4,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { authFetch, API_BASE_URL, resolveApiUrl, openAuthenticatedFile } from '../api'
 import { clinicDateTime, clinicTime } from '../lib/appointmentTime'
 import { usePatient } from '../state/patient'
+import { useCoverageStatus } from '../hooks/useCoverageStatus'
 import Modal from '../components/portal/Modal'
 
-type Slot = { startTime: string; endTime: string; label: string; available: boolean }
+// Only bookable slots are ever returned by the backend — no disabled/filler entries — so
+// there's no `available` flag to check here, just render the list.
+type Slot = { startTime: string; endTime: string; label: string }
 type AvailabilityDay = { date: string; slots: Slot[] }
 type AvailabilityResponse = { days?: AvailabilityDay[]; timeZone?: string }
 type Appointment = { id: number; consultationId: number; consultationPatientId?: string; status?: string; startTime: string; endTime: string }
@@ -30,6 +33,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
   const [changing, setChanging] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [confirmedBooking, setConfirmedBooking] = useState<{ startTime: string; endTime: string } | null>(null)
+  const { bookingBlocked } = useCoverageStatus()
 
   const matchesThisConsultation = React.useCallback((item: unknown): item is Appointment => {
     const appointment = item as Partial<Appointment>
@@ -64,7 +68,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
       setDays(nextDays)
       // Default to the first day that actually still has slots left (e.g. today
       // may already be past its 2-hour booking cutoff) instead of always today.
-      const firstWithSlots = nextDays.find(d => d.slots.some(s => s.available))
+      const firstWithSlots = nextDays.find(d => d.slots.length > 0)
       setSelectedDate((firstWithSlots ?? nextDays[0])?.date ?? '')
       setSelectedSlot('')
     } catch (e: any) {
@@ -138,7 +142,10 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
 
   const canChangeAppointment = !!bookedAppointment && bookedAppointment.status === 'SCHEDULED'
     && consultationActive && new Date(bookedAppointment.startTime).getTime() > Date.now()
-  const showBookingFlow = consultationActive && (!bookedAppointment || rescheduling)
+  // Rescheduling still involves picking a new slot, so it's blocked by expired coverage just like
+  // a first-time booking — but an already-booked appointment can always still be cancelled.
+  const canReschedule = canChangeAppointment && !bookingBlocked
+  const showBookingFlow = consultationActive && !bookingBlocked && (!bookedAppointment || rescheduling)
 
   const historicalStatusLabel = (status?: string) => {
     switch (status) {
@@ -165,12 +172,20 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
 
       {bookedAppointment && !rescheduling && canChangeAppointment && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <button type="button" className="bs" onClick={() => { setRescheduling(true); setMessage(null); void loadAvailability() }} disabled={changing}>
-            <i className="ti ti-refresh" aria-hidden="true" /> Reschedule
-          </button>
+          {canReschedule && (
+            <button type="button" className="bs" onClick={() => { setRescheduling(true); setMessage(null); void loadAvailability() }} disabled={changing}>
+              <i className="ti ti-refresh" aria-hidden="true" /> Reschedule
+            </button>
+          )}
           <button type="button" className="bd" onClick={() => setShowCancelModal(true)} disabled={changing}>
             <i className="ti ti-x" aria-hidden="true" /> Cancel Appointment
           </button>
+        </div>
+      )}
+
+      {consultationActive && bookingBlocked && (!bookedAppointment || rescheduling) && (
+        <div className="notice n-warn">
+          <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to book an appointment.
         </div>
       )}
 
@@ -192,7 +207,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
           <div className="date-strip">
             {days.map(day => {
               const { dow, dnum } = dayShort(day.date)
-              const availableCount = day.slots.filter(s => s.available).length
+              const availableCount = day.slots.length
               return (
                 <div
                   key={day.date}
@@ -224,8 +239,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
                       <button
                         key={slot.startTime}
                         type="button"
-                        disabled={!slot.available}
-                        className={`slot-chip${!slot.available ? ' unavailable' : ''}${selectedSlot === slot.startTime ? ' on' : ''}`}
+                        className={`slot-chip${selectedSlot === slot.startTime ? ' on' : ''}`}
                         onClick={() => setSelectedSlot(slot.startTime)}
                       >
                         {slot.label}
@@ -242,8 +256,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
                       <button
                         key={slot.startTime}
                         type="button"
-                        disabled={!slot.available}
-                        className={`slot-chip${!slot.available ? ' unavailable' : ''}${selectedSlot === slot.startTime ? ' on' : ''}`}
+                        className={`slot-chip${selectedSlot === slot.startTime ? ' on' : ''}`}
                         onClick={() => setSelectedSlot(slot.startTime)}
                       >
                         {slot.label}
@@ -252,9 +265,6 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
                   </div>
                 </>
               )}
-              <div className="fi-hint" style={{ marginTop: 10 }}>
-                <span className="legend-dot" />Available &nbsp; <span className="legend-dot unavailable" />No slots
-              </div>
             </>
           )}
 

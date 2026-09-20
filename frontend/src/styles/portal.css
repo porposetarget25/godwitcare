@@ -152,10 +152,6 @@
   padding:8px 4px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;}
 .portal .slot-chip:hover{filter:brightness(0.96);}
 .portal .slot-chip.on{background:var(--fill-accent);color:#fff;border-color:var(--fill-accent);}
-.portal .slot-chip.unavailable{background:var(--surface-1);border-color:var(--border-strong);color:var(--text-muted);cursor:not-allowed;
-  text-decoration:line-through;font-weight:400;}
-.portal .legend-dot{display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bg-success);border:0.5px solid var(--border-success);margin-right:4px;vertical-align:middle;}
-.portal .legend-dot.unavailable{background:var(--surface-1);border-color:var(--border-strong);margin-left:10px;}
 
 /* Step trail */
 .portal .mini-step{width:24px;height:24px;border-radius:50%;background:var(--surface-1);border:1.5px solid var(--border-strong);

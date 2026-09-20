@@ -1,7 +1,7 @@
 // src/api.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE_URL = 'https://godwitcare-1.onrender.com/api'; // ← set your LAN IP here
+export const API_BASE_URL = 'http://10.0.2.2:8080/api'; // ← Android emulator alias for the host machine's localhost:8080
 
 // ── Auth token storage ───────────────────────────────────────────────────────
 // The backend is stateless (no session cookies — see SecurityConfig.STATELESS),
@@ -425,6 +425,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
 // ── Coverage / activation ────────────────────────────────────────────────────
 export type ActivationPaymentSummary = {
   activated: boolean;
+  activatedAt: string | null;
   packageDays: number;
   packageLabel: string;
   registrationFee: number;

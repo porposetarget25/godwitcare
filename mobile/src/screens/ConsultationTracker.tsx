@@ -11,8 +11,11 @@ import { ws, wc } from '../webStyle';
 import { colors, radius, spacing, typography, shadow } from '../theme';
 import { PageHeader } from '../components/PageHeader';
 import { openPdf } from '../utils/openPdf';
+import { useCoverageStatus } from '../hooks/useCoverageStatus';
 
-type Slot = { startTime: string; endTime: string; label: string; available: boolean };
+// Only bookable slots are ever returned by the backend — no disabled/filler entries — so
+// there's no `available` flag to check here, just render the list.
+type Slot = { startTime: string; endTime: string; label: string };
 type AvailabilityDay = { date: string; slots: Slot[] };
 type Appointment = { id: number; consultationId: number; status?: string; startTime: string; endTime: string };
 
@@ -64,6 +67,10 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
   consultationId: number; consultationActive: boolean; patientId: string;
   onBookingChange: (a: Appointment | null) => void;
 }) {
+  // Same source of truth Home.tsx uses to decide whether "New Consultation"/"Book Appointment"
+  // is clickable — booking a slot here must be blocked for the exact same reason, or a patient
+  // could bypass the Home-screen gate entirely by opening an existing consultation directly.
+  const { bookingBlocked } = useCoverageStatus();
   const [days, setDays] = useState<AvailabilityDay[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
@@ -102,7 +109,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
       if (!res.ok) throw new Error(data?.message || 'Unable to load appointment slots.');
       const nextDays: AvailabilityDay[] = Array.isArray(data?.days) ? data.days : [];
       setDays(nextDays);
-      const firstWithSlots = nextDays.find(d => d.slots.some(s => s.available));
+      const firstWithSlots = nextDays.find(d => d.slots.length > 0);
       setSelectedDate((firstWithSlots ?? nextDays[0])?.date ?? '');
       setSelectedSlot('');
     } catch (e: any) {
@@ -169,7 +176,10 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
 
   const canChangeAppointment = !!bookedAppointment && bookedAppointment.status === 'SCHEDULED'
     && consultationActive && new Date(bookedAppointment.startTime).getTime() > Date.now();
-  const showBookingFlow = consultationActive && (!bookedAppointment || rescheduling);
+  // Cancelling is always allowed (it only frees up a slot); rescheduling and fresh booking both
+  // pick a new slot, so both are blocked the same way "New Consultation" is on Home.
+  const canReschedule = canChangeAppointment && !bookingBlocked;
+  const showBookingFlow = consultationActive && !bookingBlocked && (!bookedAppointment || rescheduling);
 
   const historicalStatusLabel = (status?: string) => {
     switch (status) {
@@ -193,9 +203,11 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
 
       {bookedAppointment && !rescheduling && canChangeAppointment && (
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[ws.bs, { flex: 1 }]} onPress={() => { setRescheduling(true); setMessage(null); loadAvailability(); }} disabled={changing} activeOpacity={0.75}>
-            <Text style={ws.bsText}>↻ Reschedule</Text>
-          </TouchableOpacity>
+          {canReschedule && (
+            <TouchableOpacity style={[ws.bs, { flex: 1 }]} onPress={() => { setRescheduling(true); setMessage(null); loadAvailability(); }} disabled={changing} activeOpacity={0.75}>
+              <Text style={ws.bsText}>↻ Reschedule</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[ws.bd, { flex: 1 }]} onPress={() => setShowCancelModal(true)} disabled={changing} activeOpacity={0.75}>
             <Text style={ws.bdText}>✕ Cancel</Text>
           </TouchableOpacity>
@@ -211,6 +223,12 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
         </View>
       )}
 
+      {consultationActive && bookingBlocked && (!bookedAppointment || rescheduling) && (
+        <View style={[ws.notice, ws.nWarn]}>
+          <Text style={[ws.noticeText, ws.nWarnText]}>Your coverage has expired. Renew your package to book an appointment.</Text>
+        </View>
+      )}
+
       {showBookingFlow && (
         <>
           {loading && <Text style={s.hint}>Loading available slots…</Text>}
@@ -222,7 +240,7 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {days.map(day => {
               const { dow, dnum } = dayShort(day.date);
-              const availableCount = day.slots.filter(s => s.available).length;
+              const availableCount = day.slots.length;
               const active = selectedDate === day.date;
               return (
                 <TouchableOpacity key={day.date} style={[s.datePill, active && s.datePillActive]} onPress={() => { setSelectedDate(day.date); setSelectedSlot(''); }} activeOpacity={0.75}>
@@ -245,8 +263,8 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
                   <Text style={ws.fiHint}>Morning</Text>
                   <View style={s.slotGrid}>
                     {morningSlots.map(slot => (
-                      <TouchableOpacity key={slot.startTime} disabled={!slot.available} style={[s.slotChip, !slot.available && s.slotChipDisabled, selectedSlot === slot.startTime && s.slotChipActive]} onPress={() => setSelectedSlot(slot.startTime)} activeOpacity={0.75}>
-                        <Text style={[s.slotChipText, !slot.available && s.slotChipTextDisabled, selectedSlot === slot.startTime && s.slotChipTextActive]}>{slot.label}</Text>
+                      <TouchableOpacity key={slot.startTime} style={[s.slotChip, selectedSlot === slot.startTime && s.slotChipActive]} onPress={() => setSelectedSlot(slot.startTime)} activeOpacity={0.75}>
+                        <Text style={[s.slotChipText, selectedSlot === slot.startTime && s.slotChipTextActive]}>{slot.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -257,8 +275,8 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
                   <Text style={ws.fiHint}>Afternoon</Text>
                   <View style={s.slotGrid}>
                     {afternoonSlots.map(slot => (
-                      <TouchableOpacity key={slot.startTime} disabled={!slot.available} style={[s.slotChip, !slot.available && s.slotChipDisabled, selectedSlot === slot.startTime && s.slotChipActive]} onPress={() => setSelectedSlot(slot.startTime)} activeOpacity={0.75}>
-                        <Text style={[s.slotChipText, !slot.available && s.slotChipTextDisabled, selectedSlot === slot.startTime && s.slotChipTextActive]}>{slot.label}</Text>
+                      <TouchableOpacity key={slot.startTime} style={[s.slotChip, selectedSlot === slot.startTime && s.slotChipActive]} onPress={() => setSelectedSlot(slot.startTime)} activeOpacity={0.75}>
+                        <Text style={[s.slotChipText, selectedSlot === slot.startTime && s.slotChipTextActive]}>{slot.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -600,10 +618,8 @@ const s = StyleSheet.create({
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slotChip: { borderWidth: 1, borderColor: wc.borderStrong, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   slotChipActive: { backgroundColor: wc.fillAccent, borderColor: wc.fillAccent },
-  slotChipDisabled: { opacity: 0.4 },
   slotChipText: { fontSize: 14, fontWeight: '500', color: wc.textPrimary },
   slotChipTextActive: { color: '#fff' },
-  slotChipTextDisabled: { color: wc.textMuted },
 });
 
 const cx = StyleSheet.create({

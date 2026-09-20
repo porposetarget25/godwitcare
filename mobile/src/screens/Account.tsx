@@ -18,6 +18,7 @@ import {
 } from '../api';
 import { PageHeader } from '../components/PageHeader';
 import { ws, wc } from '../webStyle';
+import { stripLeadingZero } from '../lib/phone';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PIN_ENABLED_KEY = 'gc_pin_enabled';
@@ -477,7 +478,7 @@ export default function Account() {
 
               <Text style={[ws.fl2, { marginTop: 10 }]}>Secondary WhatsApp Number</Text>
               {editing
-                ? <TextInput style={ws.input} value={secondaryWA} onChangeText={v => setSecondaryWA(v.replace(/^0+/, ''))} placeholder="Optional" placeholderTextColor={wc.textMuted} keyboardType="phone-pad" />
+                ? <TextInput style={ws.input} value={secondaryWA} onChangeText={v => setSecondaryWA(stripLeadingZero(v))} placeholder="Optional" placeholderTextColor={wc.textMuted} keyboardType="phone-pad" />
                 : <Text style={s.fieldValue}>{secondaryWA || '—'}</Text>}
             </>
           )}

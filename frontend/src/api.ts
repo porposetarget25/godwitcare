@@ -275,6 +275,7 @@ export type PaymentHistoryResponse = PaymentTransactionResponse & {
 
 export type ActivationPaymentSummary = {
   activated: boolean
+  activatedAt: string | null
   packageDays: number
   packageLabel: string
   registrationFee: number

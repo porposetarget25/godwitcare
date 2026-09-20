@@ -201,8 +201,13 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* `{children}` (the Stack navigator) always renders here, at the same tree position,
-            whether or not the chrome around it is showing — see `showChrome` comment above. */}
-        <Animated.View style={{ flex: 1, transform: showChrome ? contentTransform : undefined }}>{children}</Animated.View>
+            whether or not the chrome around it is showing — see `showChrome` comment above.
+            `contentTransform` is always applied (never swapped for `undefined`) because toggling
+            an Animated.View's `transform` between an array and undefined breaks RN's native
+            transform diffing ("Cannot read property 'forEach' of null"); it's a visual no-op
+            here anyway since `translateX` is always at its closed rest position when the drawer
+            can't be open (i.e. whenever `showChrome` is false). */}
+        <Animated.View style={{ flex: 1, transform: contentTransform }}>{children}</Animated.View>
 
         {showChrome && (
           <>

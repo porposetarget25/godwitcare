@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../state/auth';
 import { useReg } from '../state/registration';
 import { colors, spacing, radius, typography, shadow } from '../theme';
+import { FormScrollView } from '../components/FormScrollView';
 
 const LOGO = require('../../assets/logo_dark.png');
 const OTP_LENGTH = 6;
@@ -194,6 +195,12 @@ export default function OtpVerification() {
 
   return (
     <View style={s.root}>
+      <FormScrollView
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
       {/* Teal hero header */}
       <View style={s.hero}>
         <View style={s.decor1} />
@@ -297,12 +304,14 @@ export default function OtpVerification() {
           <Text style={s.backText}>← Back</Text>
         </TouchableOpacity>
       </View>
+      </FormScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: colors.brand },
+  scroll: { flexGrow: 1 },
 
   hero: {
     backgroundColor: colors.brand,

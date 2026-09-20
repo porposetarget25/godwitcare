@@ -16,6 +16,7 @@ import { ws, wc } from '../webStyle';
 import { PageHeader } from '../components/PageHeader';
 import { FormScrollView } from '../components/FormScrollView';
 import { openPdf } from '../utils/openPdf';
+import { stripLeadingZero } from '../lib/phone';
 
 function statusStyle(isNoShow: boolean, readOnly: boolean) {
   if (isNoShow) return { box: ws.twarn, text: ws.twarnText, label: 'No-show' };
@@ -115,7 +116,7 @@ export default function DoctorConsultationDetails() {
   if (!data) return <LoadingView />;
 
   const phoneDigits = (data.contactPhone || '').replace(/[^\d+]/g, '');
-  const waUrl = phoneDigits ? `https://wa.me/${phoneDigits.replace(/^0+/, '')}` : '';
+  const waUrl = phoneDigits ? `https://wa.me/${stripLeadingZero(phoneDigits)}` : '';
   const readOnly = data.status === 'COMPLETED';
   const appointmentStatus: string | undefined = data.appointmentStatus;
   const isNoShow = appointmentStatus === 'NO_SHOW';

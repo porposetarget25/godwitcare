@@ -2,39 +2,27 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePatient, type PatientContextOption } from '../state/patient'
-import { authFetch, API_BASE_URL, getActivationPaymentSummary, type ActivationPaymentSummary } from '../api'
+import { authFetch, API_BASE_URL } from '../api'
 import { useAuth } from '../state/auth'
 import Modal from '../components/portal/Modal'
 import MiniStepTrail from '../components/portal/MiniStepTrail'
 import { clinicDateTime12, clinicDateKey } from '../lib/appointmentTime'
-
-type Traveler = { id?: number; fullName: string; dateOfBirth?: string }
-
-type RegApi = {
-  id: number
-  travellingFrom?: string
-  travellingTo?: string
-  travelStartDate?: string
-  travelEndDate?: string
-  packageDays?: number
-  travelers?: Traveler[]
-  ['Travelling From']?: string
-  ['Travelling To (UK & Europe)']?: string
-  ['Travel Start Date']?: string
-  ['Travel End Date']?: string
-}
-
-function normalizeReg(r: RegApi | null | undefined) {
-  if (!r) return null
-  const from = r['Travelling From'] ?? r.travellingFrom ?? ''
-  const to = r['Travelling To (UK & Europe)'] ?? r.travellingTo ?? ''
-  const start = r['Travel Start Date'] ?? r.travelStartDate ?? ''
-  const end = r['Travel End Date'] ?? r.travelEndDate ?? ''
-  return { id: r.id, from, to, start, end, packageDays: r.packageDays || 0 }
-}
+import { useCoverageStatus } from '../hooks/useCoverageStatus'
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function fmtDate(v?: string | null): string {
+  if (!v) return '—'
+  const d = new Date(v.length <= 10 ? `${v}T00:00:00` : v)
+  if (isNaN(d.getTime())) return v
+  return fmtDateObj(d)
+}
+function fmtDateObj(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mmm = d.toLocaleDateString('en-GB', { month: 'short' })
+  return `${dd}-${mmm}-${d.getFullYear()}`
 }
 
 function queryForPatient(p: PatientContextOption) {
@@ -52,6 +40,7 @@ type ActiveConsultation = {
   stage: number
   detail: string
   expired: boolean
+  cancelled: boolean
   appointment: { startTime: string; endTime: string } | null
 }
 
@@ -76,8 +65,11 @@ function PatientHome() {
   const { user } = useAuth()
   const { patients, loading: patientsLoading } = usePatient()
   const navigate = useNavigate()
-  const [reg, setReg] = useState<ReturnType<typeof normalizeReg> | null>(null)
-  const [activation, setActivation] = useState<ActivationPaymentSummary | null>(null)
+  const {
+    reg, activation, packageDaysPurchased,
+    coverageStart, coverageEnd, coverageDaysLeft, coverageDaysElapsed, coverageProgress,
+    coverageState, bookingBlocked,
+  } = useCoverageStatus()
   const [active, setActive] = useState<ActiveConsultation[]>([])
   const [loadingActive, setLoadingActive] = useState(true)
   const [showNewConsultModal, setShowNewConsultModal] = useState(false)
@@ -88,33 +80,6 @@ function PatientHome() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
-
-  useEffect(() => {
-    if (!user?.email) return
-    let alive = true
-    ;(async () => {
-      try {
-        const res = await authFetch(`${API_BASE_URL}/registrations?email=${encodeURIComponent(user.email)}`, {})
-        let latest: RegApi | null = null
-        if (res.status === 200) {
-          const data = await res.json()
-          if (Array.isArray(data)) latest = data.length ? data[data.length - 1] : null
-          else if (data && typeof data === 'object') latest = data as RegApi
-        }
-        if (alive) setReg(normalizeReg(latest))
-      } catch {
-        if (alive) setReg(null)
-      }
-    })()
-    return () => { alive = false }
-  }, [user?.email])
-
-  useEffect(() => {
-    if (!user?.email) return
-    let alive = true
-    getActivationPaymentSummary().then(s => { if (alive) setActivation(s) }).catch(() => { if (alive) setActivation(null) })
-    return () => { alive = false }
-  }, [user?.email])
 
   useEffect(() => {
     if (patientsLoading) return
@@ -135,12 +100,17 @@ function PatientHome() {
         // Consultations completed today should still surface here, not just while the 48h window is open.
         const completedToday = c.status === 'COMPLETED' && c.createdAt && clinicDateKey(c.createdAt) === clinicDateKey(new Date())
 
-        const matchedAppointment = appointmentList.find(a => a.consultationId === c.id && a.consultationPatientId === p.patientId && a.status === 'SCHEDULED')
+        const consultAppts = appointmentList.filter(a => a.consultationId === c.id && a.consultationPatientId === p.patientId)
+        const matchedAppointment = consultAppts.find(a => a.status === 'SCHEDULED')
         const hasAppointment = !!matchedAppointment
+        // A cancelled appointment also has no SCHEDULED match, but it's a different situation from
+        // never having booked one — surface it distinctly instead of silently reverting to a
+        // "book your first appointment" state as if nothing had happened.
+        const cancelled = !hasAppointment && consultAppts.some(a => a.status === 'CANCELLED')
         // Never got an appointment booked before the window closed — surface it as Expired instead of
         // silently disappearing, so the patient understands why it's gone rather than being left to wonder.
-        const expiredPending = !c.active && !hasAppointment && c.status !== 'COMPLETED'
-        if (!c.active && !completedToday && !expiredPending) return null
+        const expiredPending = !c.active && !hasAppointment && c.status !== 'COMPLETED' && !cancelled
+        if (!c.active && !completedToday && !expiredPending && !cancelled) return null
 
         let stage = hasAppointment ? 2 : 1
 
@@ -154,8 +124,12 @@ function PatientHome() {
         }
         if (c.status === 'COMPLETED') stage = 4
 
+        // The pre-consultation checklist is already submitted by the time a consultation record
+        // exists at all (it's required to create one) — "stage 1" really means "booking still
+        // needed", not "checklist still needed".
         const detail = expiredPending ? 'Expired'
-          : stage === 1 ? 'Checklist Pending'
+          : cancelled ? 'Appointment Cancelled'
+          : stage === 1 ? 'Book Appointment'
           : stage === 2 ? 'Appointment Booked'
           : stage === 3 ? 'Prescription Ready'
           : 'Consultation Completed'
@@ -166,6 +140,7 @@ function PatientHome() {
           stage,
           detail,
           expired: expiredPending,
+          cancelled,
           appointment: matchedAppointment ? { startTime: matchedAppointment.startTime, endTime: matchedAppointment.endTime } : null,
         }
       }))
@@ -190,10 +165,15 @@ function PatientHome() {
   const hero = active[0]
   const rest = active.slice(1)
 
-  const todayKey = clinicDateKey(new Date())
-  const isExpired = !!reg?.end && todayKey > reg.end
-  const daysLeft = reg?.end ? Math.max(0, Math.ceil((new Date(`${reg.end}T23:59:59`).getTime() - now) / 86400000)) : null
-  const packageDaysPurchased = activation?.packageDays || reg?.packageDays || 0
+  // The card's own badge/colors/messaging are driven entirely by `coverageState` (purchase-
+  // anchored), not `isExpired` (trip-anchored) — otherwise the badge could say "Activated"
+  // while the numbers right below it show 0 days left.
+  const coverageTheme = {
+    unactivated: { tint: 'var(--surface-1)', border: 'var(--border-strong)', fg: 'var(--text-muted)', bar: 'var(--border-strong)', label: 'Not Activated', icon: '○' },
+    active:      { tint: 'var(--bg-success)', border: 'var(--border-success)', fg: 'var(--text-success)', bar: 'var(--text-success)', label: 'Active', icon: '●' },
+    expiring:    { tint: 'var(--bg-warning)', border: 'var(--border-warning)', fg: 'var(--text-warning)', bar: 'var(--text-warning)', label: 'Expiring Soon', icon: '◐' },
+    expired:     { tint: 'var(--bg-danger)', border: 'var(--border-danger)', fg: 'var(--text-danger)', bar: 'var(--text-danger)', label: 'Expired', icon: '○' },
+  }[coverageState]
 
   return (
     <>
@@ -216,13 +196,13 @@ function PatientHome() {
               className="bp"
               style={{ padding: '12px 22px', fontSize: 14 }}
               onClick={() => setShowNewConsultModal(true)}
-              disabled={isExpired}
-              title={isExpired ? 'Your coverage has expired — renew your package to start a new consultation.' : undefined}
+              disabled={bookingBlocked}
+              title={bookingBlocked ? 'Your coverage has expired — renew your package to start a new consultation.' : undefined}
             >
               <i className="ti ti-stethoscope" aria-hidden="true" /> I Need a Consultation
             </button>
           </div>
-          {isExpired && (
+          {bookingBlocked && (
             <div className="notice n-warn" style={{ marginTop: 12 }}>
               <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to start a new consultation.
             </div>
@@ -237,67 +217,98 @@ function PatientHome() {
               className="bp"
               style={{ boxShadow: '0 0 0 3px var(--bg-accent)' }}
               onClick={() => setShowNewConsultModal(true)}
-              disabled={isExpired}
-              title={isExpired ? 'Your coverage has expired — renew your package to start a new consultation.' : undefined}
+              disabled={bookingBlocked}
+              title={bookingBlocked ? 'Your coverage has expired — renew your package to start a new consultation.' : undefined}
             >
               <i className="ti ti-plus" aria-hidden="true" /> New Consultation
             </button>
           </div>
-          {isExpired && (
+          {bookingBlocked && (
             <div className="notice n-warn" style={{ marginBottom: 10 }}>
               <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to start a new consultation.
             </div>
           )}
 
-          {hero && (
-            <div className={`hero-consult-card${hero.expired ? '' : ' pulse'}`} onClick={() => goToConsultation(hero.patient, hero.consultationId)}>
-              <div className="hero-consult-top">
-                <span className="hero-eyebrow">{hero.patient.name}</span>
-                <span className={`tag ${hero.expired ? 'twarn' : 'tinfo'}`}>{hero.expired ? 'Expired' : STAGE_LABELS[hero.stage - 1]}</span>
-              </div>
-              <div className="hero-consult-time urgent">
-                <i className="ti ti-stethoscope" aria-hidden="true" />{hero.detail}
-              </div>
-              <div className="hero-consult-trail">
-                <MiniStepTrail steps={STAGE_LABELS} activeStage={hero.stage} />
-              </div>
-              {hero.expired && (
-                <div className="notice n-warn">
-                  <i className="ti ti-alert-triangle" aria-hidden="true" />No appointment was booked within the consultation window, so it has expired. Start a new consultation to continue.
+          {hero && (() => {
+            // Booking a new/replacement slot for THIS consultation is just as blocked by expired
+            // coverage as starting a brand-new one — only stage 1 (never booked) and "cancelled"
+            // actually involve booking; stage 2+ is already past that point.
+            const needsBooking = hero.stage === 1 || hero.cancelled
+            const bookingBlockedHere = !hero.expired && needsBooking && bookingBlocked
+            const tagLabel = hero.expired ? 'Expired'
+              : hero.cancelled ? 'Cancelled'
+              : bookingBlockedHere ? 'Coverage Expired'
+              : STAGE_LABELS[hero.stage - 1]
+            const tagWarn = hero.expired || hero.cancelled || bookingBlockedHere
+            const ctaLabel = hero.expired ? 'View Details'
+              : hero.cancelled ? (bookingBlockedHere ? 'View Details' : 'Rebook Appointment')
+              : hero.stage === 1 ? (bookingBlockedHere ? 'View Details' : 'Book Appointment')
+              : 'View Details'
+            return (
+              <div className={`hero-consult-card${tagWarn ? '' : ' pulse'}`} onClick={() => goToConsultation(hero.patient, hero.consultationId)}>
+                <div className="hero-consult-top">
+                  <span className="hero-eyebrow">{hero.patient.name}</span>
+                  <span className={`tag ${tagWarn ? 'twarn' : 'tinfo'}`}>{tagLabel}</span>
                 </div>
-              )}
-              {hero.appointment && hero.stage === 2 && (
-                <div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <i className="ti ti-calendar" aria-hidden="true" /> {clinicDateTime12(hero.appointment.startTime)}
+                <div className="hero-consult-time urgent">
+                  <i className="ti ti-stethoscope" aria-hidden="true" />{hero.detail}
+                </div>
+                <div className="hero-consult-trail">
+                  <MiniStepTrail steps={STAGE_LABELS} activeStage={hero.stage} />
+                </div>
+                {hero.expired && (
+                  <div className="notice n-warn">
+                    <i className="ti ti-alert-triangle" aria-hidden="true" />No appointment was booked within the consultation window, so it has expired. Start a new consultation to continue.
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fill-accent)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    <i className="ti ti-brand-whatsapp" aria-hidden="true" /> {formatCountdown(hero.appointment.startTime, now)}
+                )}
+                {hero.cancelled && !bookingBlockedHere && (
+                  <div className="notice n-warn">
+                    <i className="ti ti-alert-triangle" aria-hidden="true" />Your appointment was cancelled. Book a new appointment to continue this consultation.
+                  </div>
+                )}
+                {bookingBlockedHere && (
+                  <div className="notice n-warn">
+                    <i className="ti ti-alert-triangle" aria-hidden="true" />
+                    {hero.cancelled
+                      ? 'Your appointment was cancelled, and your coverage has since expired. Renew your package to book a new appointment.'
+                      : 'Your coverage has expired. Renew your package to book an appointment for this consultation.'}
+                  </div>
+                )}
+                {hero.appointment && hero.stage === 2 && (
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="ti ti-calendar" aria-hidden="true" /> {clinicDateTime12(hero.appointment.startTime)}
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fill-accent)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <i className="ti ti-brand-whatsapp" aria-hidden="true" /> {formatCountdown(hero.appointment.startTime, now)}
+                    </div>
+                  </div>
+                )}
+                <div className="hero-consult-patient">
+                  <div className="ava hero-ava">{initials(hero.patient.name)}</div>
+                  <div>
+                    <div className="hero-patient-name">{hero.patient.name}</div>
+                    <div className="hero-patient-sub">
+                      {hero.expired ? 'This consultation window has closed'
+                        : bookingBlockedHere ? 'Your coverage has expired'
+                        : hero.cancelled ? 'Book a new appointment to proceed'
+                        : hero.stage === 1 ? 'Book an appointment to proceed'
+                        : hero.stage === 2 ? "We'll remind you over WhatsApp before your appointment"
+                        : hero.stage === 3 ? 'Your prescription is ready to view'
+                        : 'Connected with the next available doctor'}
+                    </div>
                   </div>
                 </div>
-              )}
-              <div className="hero-consult-patient">
-                <div className="ava hero-ava">{initials(hero.patient.name)}</div>
-                <div>
-                  <div className="hero-patient-name">{hero.patient.name}</div>
-                  <div className="hero-patient-sub">
-                    {hero.expired ? 'This consultation window has closed'
-                      : hero.stage === 1 ? 'Complete your pre-consultation checklist to proceed'
-                      : hero.stage === 2 ? "We'll remind you over WhatsApp before your appointment"
-                      : hero.stage === 3 ? 'Your prescription is ready to view'
-                      : 'Connected with the next available doctor'}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  className="bp btn-block hero-consult-btn"
+                  onClick={e => { e.stopPropagation(); goToConsultation(hero.patient, hero.consultationId) }}
+                >
+                  {ctaLabel}
+                </button>
               </div>
-              <button
-                type="button"
-                className="bp btn-block hero-consult-btn"
-                onClick={e => { e.stopPropagation(); goToConsultation(hero.patient, hero.consultationId) }}
-              >
-                {hero.expired ? 'View Details' : hero.stage === 1 ? 'Continue Checklist' : 'View Details'}
-              </button>
-            </div>
-          )}
+            )
+          })()}
 
           {rest.length > 0 && (
             <div className="card">
@@ -308,7 +319,7 @@ function PatientHome() {
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{item.patient.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.detail}</div>
                   </div>
-                  <span className={`tag ${item.expired ? 'twarn' : 'tinfo'}`}>{item.expired ? 'Expired' : STAGE_LABELS[item.stage - 1]}</span>
+                  <span className={`tag ${item.expired || item.cancelled ? 'twarn' : 'tinfo'}`}>{item.expired ? 'Expired' : item.cancelled ? 'Cancelled' : STAGE_LABELS[item.stage - 1]}</span>
                   <i className="ti ti-chevron-right" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
                 </div>
               ))}
@@ -333,38 +344,74 @@ function PatientHome() {
       </div>
 
       {reg && (
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div className="card" style={{ borderWidth: 1.5, borderColor: coverageTheme.border, overflow: 'hidden', paddingTop: 0 }}>
+          <div style={{ height: 4, margin: '0 -16px 14px', background: coverageTheme.fg }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
             <div className="ct" style={{ marginBottom: 0 }}>Coverage Status</div>
-            <span className={`tag ${isExpired ? 'twarn' : activation?.activated ? 'tok' : 'tmute'}`}>
-              {isExpired ? 'Expired' : activation?.activated ? 'Activated' : 'Not Activated'}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: coverageTheme.tint, border: `1px solid ${coverageTheme.border}`, color: coverageTheme.fg,
+              borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 700,
+            }}>
+              <span style={{ fontSize: 9 }}>{coverageTheme.icon}</span>{coverageTheme.label}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <i className="ti ti-map-pin" style={{ color: 'var(--text-accent)' }} aria-hidden="true" />
             <span style={{ fontSize: 14, fontWeight: 600 }}>{reg.to || '—'}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <i className="ti ti-calendar" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{reg.start || '—'} – {reg.end || '—'}</span>
-          </div>
-          <div className="g2" style={{ marginBottom: 12 }}>
-            <div>
-              <div className="fi-hint">Days Purchased</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{packageDaysPurchased ? `${packageDaysPurchased} days` : '—'}</div>
-            </div>
-            <div>
-              <div className="fi-hint">Days Left</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: isExpired ? 'var(--text-danger)' : 'var(--text-primary)' }}>
-                {daysLeft === null ? '—' : isExpired ? 'Expired' : `${daysLeft} day${daysLeft === 1 ? '' : 's'}`}
+
+          {coverageStart ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+                <div style={{
+                  width: 88, height: 88, borderRadius: 44, flexShrink: 0,
+                  background: coverageTheme.fg, color: '#fff',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1 }}>{coverageDaysLeft}</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.5 }}>{coverageDaysLeft === 1 ? 'DAY LEFT' : 'DAYS LEFT'}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ height: 7, borderRadius: 4, background: 'var(--surface-1)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 4,
+                      width: `${Math.round(Math.min(1, coverageProgress) * 100)}%`,
+                      background: coverageTheme.bar,
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Day {coverageDaysElapsed} of {packageDaysPurchased} used
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Start</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{fmtDate(activation?.activatedAt)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Ends</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{coverageEnd ? fmtDateObj(coverageEnd) : '—'}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          {isExpired && (
-            <div className="notice n-warn" style={{ marginBottom: 12 }}>
-              <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage has expired. Renew your package to book new consultations.
-            </div>
+              {coverageState === 'expired' && (
+                <div className="notice n-warn" style={{ marginBottom: 12, background: 'var(--bg-danger)', borderColor: 'var(--border-danger)', color: 'var(--text-danger)' }}>
+                  <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage window has ended. Renew your package to book new consultations.
+                </div>
+              )}
+              {coverageState === 'expiring' && (
+                <div className="notice n-warn" style={{ marginBottom: 12 }}>
+                  <i className="ti ti-alert-triangle" aria-hidden="true" />Your coverage ends in {coverageDaysLeft} day{coverageDaysLeft === 1 ? '' : 's'} — renew soon to stay covered.
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="fi-hint" style={{ marginBottom: 12 }}>Activate your package to start your coverage countdown.</div>
           )}
+
           <div className="fi-hint" style={{ marginBottom: 8 }}>Members Covered</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {patients.map(p => (
