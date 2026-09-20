@@ -94,7 +94,7 @@ public class AppointmentController {
             // correctly yields a 09:50 slot instead of being silently dropped by a :00/:15/:30/:45
             // cadence it doesn't align to.
             Set<LocalTime> candidateTimes = new TreeSet<>();
-            for (User doctor : doctors) candidateTimes.addAll(schedules.slotStartsFor(doctor.getId(), day, RESERVED_MINUTES));
+            for (User doctor : doctors) candidateTimes.addAll(schedules.slotStartsFor(doctor.getId(), day, SLOT_MINUTES));
 
             // Only bookable slots are returned — no disabled/filler entries. Any future change
             // to what counts as "bookable" (lead time, doctor windows, normalization, etc.) is
@@ -102,10 +102,15 @@ public class AppointmentController {
             List<Map<String, Object>> slots = new ArrayList<>();
             for (LocalTime label : candidateTimes) {
                 Instant start = LocalDateTime.of(day, label).atZone(CLINIC_ZONE).toInstant();
+                // The doctor's declared availability window only needs to fit the patient-facing
+                // slot itself (SLOT_MINUTES) — the documentation buffer afterwards is enforced
+                // against actual bookings below, not against the declared window, since a window
+                // like 09:50-10:00 is a valid single 10-minute slot on its own.
+                Instant slotEnd = start.plus(Duration.ofMinutes(SLOT_MINUTES));
                 Instant reservedEnd = start.plus(Duration.ofMinutes(RESERVED_MINUTES));
                 if (start.isBefore(minBookable)) continue;
                 boolean doctorAvailable = doctors.stream().anyMatch(doctor ->
-                        schedules.isAvailable(doctor.getId(), start, reservedEnd)
+                        schedules.isAvailable(doctor.getId(), start, slotEnd)
                                 && bookedByDoctor.get(doctor.getId()).stream().noneMatch(a -> a.getStartTime().isBefore(reservedEnd)
                                 && a.getEndTime().plus(Duration.ofMinutes(DOCUMENTATION_MINUTES)).isAfter(start)));
                 if (!doctorAvailable) continue;
@@ -298,14 +303,14 @@ public class AppointmentController {
                 .orElse(null);
     }
     private boolean isDoctorAvailable(User doctor, Instant start, Instant reservedEnd) {
-        return schedules.isAvailable(doctor.getId(), start, reservedEnd)
+        return schedules.isAvailable(doctor.getId(), start, start.plus(Duration.ofMinutes(SLOT_MINUTES)))
                 && !appointments.existsByDoctorIdAndStatusNotAndStartTimeLessThanAndEndTimeGreaterThan(
                 doctor.getId(), Appointment.Status.CANCELLED, reservedEnd, start.minus(Duration.ofMinutes(DOCUMENTATION_MINUTES)));
     }
     private User resolveAvailableDoctorForReschedule(Appointment current, Instant start, Instant reservedEnd) {
         return users.findByRoleOrderByIdDesc(Role.DOCTOR).stream()
                 .sorted(Comparator.comparing(User::getId))
-                .filter(doctor -> schedules.isAvailable(doctor.getId(), start, reservedEnd))
+                .filter(doctor -> schedules.isAvailable(doctor.getId(), start, start.plus(Duration.ofMinutes(SLOT_MINUTES))))
                 .filter(doctor -> appointments.findByDoctorIdAndStartTimeBetweenOrderByStartTimeAsc(
                                 doctor.getId(), start.minus(Duration.ofMinutes(RESERVED_MINUTES)), reservedEnd)
                         .stream().filter(a -> !Objects.equals(a.getId(), current.getId()))
@@ -359,7 +364,7 @@ public class AppointmentController {
         if (t.getSecond() != 0 || t.getNano() != 0) return false;
         LocalDate date = z.toLocalDate();
         return users.findByRoleOrderByIdDesc(Role.DOCTOR).stream()
-                .anyMatch(doctor -> schedules.slotStartsFor(doctor.getId(), date, RESERVED_MINUTES).contains(t));
+                .anyMatch(doctor -> schedules.slotStartsFor(doctor.getId(), date, SLOT_MINUTES).contains(t));
     }
     private static LocalDate parseDate(String s, LocalDate fallback) { try { return s == null || s.isBlank() ? fallback : LocalDate.parse(s); } catch (Exception e) { return fallback; } }
     private static Long toLong(Object o) { try { return o == null ? null : Long.valueOf(String.valueOf(o)); } catch (Exception e) { return null; } }
