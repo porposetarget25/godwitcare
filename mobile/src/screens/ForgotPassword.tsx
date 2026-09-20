@@ -13,6 +13,8 @@ import { useRouter } from 'expo-router';
 import { forgotPassword, verifyForgotPasswordOtp } from '../api';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { FormScrollView } from '../components/FormScrollView';
+import { SearchPickerModal } from '../components/SearchPickerModal';
+import { COUNTRY_CODES, COUNTRY_CODE_OPTIONS, POPULAR_COUNTRY_CODES, DEFAULT_COUNTRY_DIAL, looksLikePhone, needsCountryPicker, resolveIdentifier } from '../lib/phone';
 
 const LOGO      = require('../../assets/logo_dark.png');
 const OTP_LEN   = 6;
@@ -22,6 +24,8 @@ export default function ForgotPassword() {
   const router = useRouter();
 
   const [identifier, setIdentifier] = useState('');
+  const [primaryDial, setPrimaryDial] = useState(DEFAULT_COUNTRY_DIAL);
+  const [showCountry, setShowCountry] = useState(false);
   const [otpSent,    setOtpSent   ] = useState(false);
   const [digits,     setDigits    ] = useState<string[]>(Array(OTP_LEN).fill(''));
   const [sending,    setSending   ] = useState(false);
@@ -29,6 +33,10 @@ export default function ForgotPassword() {
   const [error,      setError     ] = useState<string | null>(null);
   const [info,       setInfo      ] = useState<string | null>(null);
   const [countdown,  setCountdown ] = useState(0);
+
+  const selectedCountry = COUNTRY_CODES.find(c => c.dial === primaryDial);
+  const phoneMode = looksLikePhone(identifier);
+  const showCountryPicker = needsCountryPicker(identifier);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -56,7 +64,7 @@ export default function ForgotPassword() {
     if (!identifier.trim()) { setError('Please enter your WhatsApp number or email.'); return; }
     setSending(true); setError(null); setInfo(null);
     try {
-      const res = await forgotPassword(identifier.trim());
+      const res = await forgotPassword(resolveIdentifier(identifier, primaryDial));
       setOtpSent(true);
       setDigits(Array(OTP_LEN).fill(''));
       setInfo(res.message || 'OTP sent to your registered WhatsApp number.');
@@ -92,7 +100,7 @@ export default function ForgotPassword() {
     if (otp.length < OTP_LEN) { setError(`Please enter all ${OTP_LEN} digits.`); return; }
     setVerifying(true); setError(null);
     try {
-      const res = await verifyForgotPasswordOtp(identifier.trim(), otp);
+      const res = await verifyForgotPasswordOtp(resolveIdentifier(identifier, primaryDial), otp);
       router.replace({ pathname: '/reset-password', params: { token: res.resetToken } } as any);
     } catch (e: any) {
       shake();
@@ -152,22 +160,34 @@ export default function ForgotPassword() {
             {/* ── Identifier field — always visible ── */}
             <View style={s.fieldWrap}>
               <Text style={s.fieldLabel}>WhatsApp Number / Email</Text>
-              <View style={[s.inputRow, otpSent && s.inputRowDone]}>
-                <Text style={s.inputIcon}>📱</Text>
-                <TextInput
-                  style={s.input}
-                  value={identifier}
-                  onChangeText={t => { setIdentifier(t); setError(null); }}
-                  placeholder="e.g. +1234567890 or email"
-                  placeholderTextColor={colors.mutedLight}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  editable={!otpSent}
-                  returnKeyType="go"
-                  onSubmitEditing={otpSent ? undefined : sendOtp}
-                />
-                {otpSent && <Text style={s.doneCheck}>✓</Text>}
+              <View style={s.row}>
+                {showCountryPicker && !otpSent && (
+                  <TouchableOpacity style={s.countryBtn} onPress={() => setShowCountry(true)} activeOpacity={0.75}>
+                    <Text style={s.countryFlag}>{selectedCountry?.flag ?? '🌐'}</Text>
+                    <Text style={s.countryDial}>{selectedCountry?.dial ?? DEFAULT_COUNTRY_DIAL}</Text>
+                    <Text style={s.chevronSm}>›</Text>
+                  </TouchableOpacity>
+                )}
+                <View style={[s.inputRow, otpSent && s.inputRowDone, { flex: 1 }]}>
+                  <Text style={s.inputIcon}>{phoneMode ? '📱' : '✉️'}</Text>
+                  <TextInput
+                    style={s.input}
+                    value={identifier}
+                    onChangeText={t => { setIdentifier(t); setError(null); }}
+                    placeholder={phoneMode ? '1234567890 or +<code>1234567890' : 'e.g. +1234567890 or email'}
+                    placeholderTextColor={colors.mutedLight}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    editable={!otpSent}
+                    returnKeyType="go"
+                    onSubmitEditing={otpSent ? undefined : sendOtp}
+                  />
+                  {otpSent && <Text style={s.doneCheck}>✓</Text>}
+                </View>
               </View>
+              {showCountryPicker && !otpSent && (
+                <Text style={s.otpHint}>Select the country you registered with, then enter your number without the leading 0.</Text>
+              )}
             </View>
 
             {/* ── Continue button (pre-OTP) ── */}
@@ -254,6 +274,21 @@ export default function ForgotPassword() {
           </TouchableOpacity>
         </View>
       </FormScrollView>
+
+      <SearchPickerModal
+        visible={showCountry}
+        title="Select Country Code"
+        subtitle="The country you registered with"
+        options={COUNTRY_CODE_OPTIONS}
+        popular={POPULAR_COUNTRY_CODES}
+        searchPlaceholder="Search countries"
+        selected={selectedCountry?.name}
+        onSelect={name => {
+          const c = COUNTRY_CODES.find(c => c.name === name);
+          if (c) setPrimaryDial(c.dial);
+        }}
+        onClose={() => setShowCountry(false)}
+      />
     </View>
   );
 }
@@ -290,10 +325,17 @@ const s = StyleSheet.create({
   fieldWrap:   { gap: 4 },
   fieldLabel:  { fontSize: typography.xs, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   otpHint:     { fontSize: typography.xs, color: colors.muted },
+  row:         { flexDirection: 'row', gap: spacing.sm },
   inputRow:    { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.bgGray, paddingHorizontal: spacing.md, minHeight: 50, gap: spacing.sm },
   inputRowDone:{ borderColor: colors.brand + '60', backgroundColor: colors.brandLight },
   inputIcon:   { fontSize: 16, opacity: 0.5 },
   input:       { flex: 1, fontSize: typography.base, color: colors.text, paddingVertical: 12 },
+
+  // Country selector (phone mode only)
+  countryBtn:  { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.bgGray, paddingHorizontal: spacing.sm, minHeight: 50, gap: 4, minWidth: 88 },
+  countryFlag: { fontSize: 21 },
+  countryDial: { fontSize: typography.sm, fontWeight: '600', color: colors.text },
+  chevronSm:   { fontSize: 17, color: colors.muted },
   doneCheck:   { fontSize: 17, color: colors.brand, fontWeight: '700' },
 
   divider:     { height: 1, backgroundColor: colors.line, marginVertical: spacing.xs },

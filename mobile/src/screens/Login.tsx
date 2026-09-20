@@ -10,17 +10,9 @@ import { useAuth } from '../state/auth';
 import { colors, spacing, radius, typography, shadow } from '../theme';
 import { FormScrollView } from '../components/FormScrollView';
 import { SearchPickerModal } from '../components/SearchPickerModal';
-import { COUNTRY_CODES, COUNTRY_CODE_OPTIONS, POPULAR_COUNTRY_CODES, DEFAULT_COUNTRY_DIAL, buildCanonicalPhone } from '../lib/phone';
+import { COUNTRY_CODES, COUNTRY_CODE_OPTIONS, POPULAR_COUNTRY_CODES, DEFAULT_COUNTRY_DIAL, looksLikePhone, needsCountryPicker, resolveIdentifier } from '../lib/phone';
 
 const LOGO_DARK = require('../../assets/logo_white.png');
-
-// True once the identifier clearly isn't an email — i.e. it's being typed as a phone number,
-// so the country-code selector (needed to reconstruct the same "+<dial><digits>" username
-// Registration stores) should show.
-function looksLikePhone(v: string) {
-  const t = v.trim();
-  return t.length > 0 && !t.includes('@');
-}
 
 export default function Login() {
   const [username, setUsername ] = useState('');
@@ -35,15 +27,7 @@ export default function Login() {
 
   const selectedCountry = COUNTRY_CODES.find(c => c.dial === primaryDial);
   const phoneMode = looksLikePhone(username);
-
-  // Registration strips leading zeros and prepends the selected dial code to build the stored
-  // username (RegisterStep1.tsx) — login must reconstruct the identical string, or a user who
-  // types their number the way they normally would (e.g. with a leading 0, no dial code) will
-  // silently fail to match and see a generic "Login failed".
-  function resolveIdentifier(): string {
-    const raw = username.trim();
-    return phoneMode ? buildCanonicalPhone(primaryDial, raw) : raw; // email — send as typed
-  }
+  const showCountryPicker = needsCountryPicker(username);
 
   async function onSubmit() {
     if (!username.trim() || !password.trim()) {
@@ -53,7 +37,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(resolveIdentifier(), password);
+      await login(resolveIdentifier(username, primaryDial), password);
       await refresh();
       router.replace('/(app)/home');
     } catch (err: any) {
@@ -114,7 +98,7 @@ export default function Login() {
             <View style={s.fieldWrap}>
               <Text style={s.fieldLabel}>WhatsApp Number / Email</Text>
               <View style={s.row}>
-                {phoneMode && (
+                {showCountryPicker && (
                   <TouchableOpacity style={s.countryBtn} onPress={() => setShowCountry(true)} activeOpacity={0.75}>
                     <Text style={s.countryFlag}>{selectedCountry?.flag ?? '🌐'}</Text>
                     <Text style={s.countryDial}>{selectedCountry?.dial ?? DEFAULT_COUNTRY_DIAL}</Text>
@@ -127,7 +111,7 @@ export default function Login() {
                     style={s.input}
                     value={username}
                     onChangeText={setUsername}
-                    placeholder={phoneMode ? '1234567890' : 'e.g. +1234567890 or email'}
+                    placeholder={phoneMode ? '1234567890 or +<code>1234567890' : 'e.g. +1234567890 or email'}
                     placeholderTextColor={colors.mutedLight}
                     autoCapitalize="none"
                     keyboardType="email-address"
@@ -136,7 +120,7 @@ export default function Login() {
                   />
                 </View>
               </View>
-              {phoneMode && (
+              {showCountryPicker && (
                 <Text style={s.fieldHint}>Select the country you registered with, then enter your number without the leading 0.</Text>
               )}
             </View>

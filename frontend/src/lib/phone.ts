@@ -25,3 +25,27 @@ export function buildCanonicalPhone(dial: string, raw: string): string {
   if (t.startsWith('+')) return t.replace(/\s+/g, '')
   return `${dial}${normalizePhoneDigits(t)}`
 }
+
+/** True once the identifier clearly isn't an email — i.e. it's being typed as a phone number,
+ *  so the country-code selector (needed to reconstruct the same "+<dial><digits>" username
+ *  Registration stores) should show. Switches to email mode on the first letter typed, not
+ *  only once "@" appears, since every valid email contains letters before the "@" too. */
+export function looksLikePhone(v: string): boolean {
+  const t = v.trim()
+  return t.length > 0 && !/[a-zA-Z]/.test(t)
+}
+
+/** Resolves whatever a login/forgot-password identifier field holds into what the backend
+ *  expects: the canonical phone string when it looks like a phone number, or the raw trimmed
+ *  value (untouched) when it looks like an email. Shared by every screen that accepts either. */
+export function resolveIdentifier(raw: string, dial: string): string {
+  return looksLikePhone(raw) ? buildCanonicalPhone(dial, raw) : raw.trim()
+}
+
+/** True only when the country-code selector is actually needed — i.e. it's a phone number that
+ *  doesn't already start with "+". Once the user has typed a full international number
+ *  themselves, showing a separate dial-code picker next to it is a redundant duplicate of what's
+ *  already in the field, so the selector hides itself. */
+export function needsCountryPicker(raw: string): boolean {
+  return looksLikePhone(raw) && !raw.trim().startsWith('+')
+}
