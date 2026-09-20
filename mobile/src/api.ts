@@ -1,7 +1,13 @@
 // src/api.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE_URL = 'http://10.0.2.2:8080/api'; // ← Android emulator alias for the host machine's localhost:8080
+// __DEV__ is true only for JS bundled by Metro in dev mode (local dev-client) — every release
+// bundle (EAS build or local `gradlew bundleRelease`/`assembleRelease`, for any profile) has it
+// stripped to false, so a Play Store/App Store build always resolves to the deployed backend
+// instead of accidentally shipping with the developer's own machine hardcoded in.
+const RENDER_BASE = 'https://godwitcare-1.onrender.com/api'; // update if Render URL changes
+const LOCAL_DEV_BASE = 'http://10.0.2.2:8080/api'; // Android emulator alias for the host machine's localhost:8080
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE?.trim() || (__DEV__ ? LOCAL_DEV_BASE : RENDER_BASE);
 
 // ── Auth token storage ───────────────────────────────────────────────────────
 // The backend is stateless (no session cookies — see SecurityConfig.STATELESS),
