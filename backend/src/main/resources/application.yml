@@ -40,7 +40,7 @@ twilio:
   auth:
     token: ${TWILIO_AUTH_TOKEN}
   whatsapp:
-    from: +14155238886
+    from: +447517270516
 
 otp:
   expiry-seconds: 300
