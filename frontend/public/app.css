@@ -61,7 +61,7 @@ header {
 
 /* Keep nav content aligned and spaced */
 .nav {
-  padding: 26px 24px;
+  padding: 5px 24px;
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
@@ -76,7 +76,7 @@ header {
   flex-shrink: 0;
 }
 header img.logo {
-  height: 48px;
+  height: 112px;
   width: auto;
   display: block;
 }
@@ -239,7 +239,7 @@ header img.logo {
   flex-shrink: 0;
 }
 .mobile-menu-logo {
-  height: 32px;
+  height: 75px;
   width: auto;
 }
 .mobile-menu-topbar-actions {
@@ -655,7 +655,7 @@ footer { border-top: 1px solid var(--line); padding: 20px; color: #64748b }
   }
 
   header img.logo {
-    height: 34px;
+    height: 80px;
   }
 
   .envBadge {

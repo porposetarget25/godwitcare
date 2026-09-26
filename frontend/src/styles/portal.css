@@ -28,7 +28,7 @@
 
 .portal .sb{width:196px;flex-shrink:0;background:var(--surface-2);border-right:0.5px solid var(--border);display:flex;flex-direction:column;overflow:hidden;position:sticky;top:0;align-self:flex-start;height:100vh;}
 .portal .sb-logo{padding:14px 16px 11px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:9px;}
-.portal .sb-logo-img{height:30px;width:auto;object-fit:contain;}
+.portal .sb-logo-img{height:70px;width:auto;object-fit:contain;}
 .portal .sb-sec{font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:.07em;text-transform:uppercase;padding:11px 16px 3px;}
 .portal .si{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer;border-left:2px solid transparent;transition:background .1s;text-decoration:none;}
 .portal .si:hover{background:var(--surface-1);}
@@ -296,7 +296,7 @@
       border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:20;}
   .portal .mobile-topbar button{background:transparent;border:none;font-size:23px;color:var(--text-primary);cursor:pointer;padding:2px;}
   .portal .mobile-topbar .mt-title{font-size:15px;font-weight:600;color:var(--text-primary);}
-  .portal .mobile-topbar .mt-logo-img{height:22px;width:auto;object-fit:contain;}
+  .portal .mobile-topbar .mt-logo-img{height:51px;width:auto;object-fit:contain;}
   .portal .body{padding:14px;}
 }
 /* Timeline row (Care History): fixed date column beside a card */

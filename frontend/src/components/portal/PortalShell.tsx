@@ -72,7 +72,7 @@ export default function PortalShell({
   const sidebar = (
     <div className={`sb${drawerOpen ? ' open' : ''}`} id="portal-sidebar">
       <div className="sb-logo">
-        <img className="sb-logo-img" src={`${import.meta.env.BASE_URL}assets/logo-header-color.png`} alt="GodwitCare" />
+        <img className="sb-logo-img" src={`${import.meta.env.BASE_URL}assets/logo-stacked-transparent.png`} alt="GodwitCare Global" />
       </div>
 
       {navSections.map(section => (
@@ -129,7 +129,7 @@ export default function PortalShell({
             <button type="button" aria-label="Open menu" onClick={() => setDrawerOpen(true)}>
               <i className="ti ti-menu-2" aria-hidden="true" />
             </button>
-            <img className="mt-logo-img" src={`${import.meta.env.BASE_URL}assets/logo-header-color.png`} alt="GodwitCare" />
+            <img className="mt-logo-img" src={`${import.meta.env.BASE_URL}assets/logo-stacked-transparent.png`} alt="GodwitCare Global" />
           </div>
 
           <div className={`body${wide ? ' wide' : ''}`}>{children}</div>

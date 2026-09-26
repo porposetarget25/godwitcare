@@ -57,7 +57,7 @@ import AuthedAvatar from './components/AuthedAvatar';
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
-  const logoColorSrc = `${import.meta.env.BASE_URL}assets/logo-header-color.png`;
+  const logoColorSrc = `${import.meta.env.BASE_URL}assets/logo-stacked-transparent.png`;
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -98,7 +98,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <header>
         <div className="nav">
           <div className="nav-left">
-            <img className="logo" src={logoColorSrc} alt="GodwitCare" />
+            <img className="logo" src={logoColorSrc} alt="GodwitCare Global" />
             <span className="envBadge">Test Environment</span>
           </div>
 
@@ -178,7 +178,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       {!user && mobileMenuOpen ? (
         <div className="mobile-menu-overlay">
           <div className="mobile-menu-topbar">
-            <img className="mobile-menu-logo" src={logoColorSrc} alt="GodwitCare" />
+            <img className="mobile-menu-logo" src={logoColorSrc} alt="GodwitCare Global" />
             <div className="mobile-menu-topbar-actions">
               {!user ? (
                 <Link to="/login" className="nav-mobile-login-btn" onClick={() => setMobileMenuOpen(false)}>Log in</Link>
