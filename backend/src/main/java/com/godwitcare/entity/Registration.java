@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
@@ -47,6 +48,20 @@ public class Registration {
 
     @Column(name = "documents_complete", nullable = false)
     private boolean documentsComplete;
+
+    @Column(name = "virtual_consultation_consent", nullable = false)
+    private Boolean virtualConsultationConsent = false;
+
+    @Column(name = "virtual_consultation_consent_at")
+    private OffsetDateTime virtualConsultationConsentAt;
+
+    @PrePersist
+    @PreUpdate
+    private void recordVirtualConsultationConsent() {
+        if (Boolean.TRUE.equals(virtualConsultationConsent) && virtualConsultationConsentAt == null) {
+            virtualConsultationConsentAt = OffsetDateTime.now();
+        }
+    }
 
     @OneToMany(mappedBy = "registration", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -217,6 +232,10 @@ public class Registration {
     public void setPrimaryPatientId(String primaryPatientId) { this.primaryPatientId = primaryPatientId; }
     public boolean isDocumentsComplete() { return documentsComplete; }
     public void setDocumentsComplete(boolean documentsComplete) { this.documentsComplete = documentsComplete; }
+    public Boolean getVirtualConsultationConsent() { return virtualConsultationConsent; }
+    public void setVirtualConsultationConsent(Boolean virtualConsultationConsent) { this.virtualConsultationConsent = virtualConsultationConsent; }
+    public OffsetDateTime getVirtualConsultationConsentAt() { return virtualConsultationConsentAt; }
+    public void setVirtualConsultationConsentAt(OffsetDateTime virtualConsultationConsentAt) { this.virtualConsultationConsentAt = virtualConsultationConsentAt; }
 
     public void setTravelers(java.util.List<Traveler> travelers) {
         this.travelers = travelers;

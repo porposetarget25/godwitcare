@@ -10,9 +10,10 @@ import {
   registerAuthUser,
   login,
 } from '../api'
+import RegistrationTermsModal from '../components/RegistrationTermsModal'
 
 type Errors = Partial<Record<
-  'from' | 'to' | 'start' | 'end' | 'dates' | 'package' | 'travelers' | 'documents',
+  'from' | 'to' | 'start' | 'end' | 'dates' | 'package' | 'travelers' | 'documents' | 'consent',
   string
 >>
 
@@ -122,6 +123,7 @@ export default function Step3() {
   const [primaryTravelDocument, setPrimaryTravelDocument] = useState<File | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
+  const [termsOpen, setTermsOpen] = useState(false)
 
   // Per-row DOB error maps (inline messages)
   const [adultDobErrors, setAdultDobErrors] = useState<Record<number, string>>({})
@@ -199,6 +201,7 @@ export default function Step3() {
     }
 
     if (!pkg) next.package = 'Please select a package'
+    if (!draft.virtualConsultationConsent) next.consent = 'Please check the Terms and Conditions to proceed.'
     if (!primaryPassport || !primaryTravelDocument) next.documents = 'Upload both required documents for every traveller.'
 
     // Travelers: per-row DOB checks; blank rows allowed (dropped on submit)
@@ -531,6 +534,30 @@ export default function Step3() {
             {errors.package && <div className="help" style={{ color: '#e11d48' }}>{errors.package}</div>}
           </div>
 
+          <section className="consent-card" aria-labelledby="consent-title">
+            <h3 id="consent-title">Terms &amp; Conditions and Virtual Consultation Consent</h3>
+            <p>Please review our Terms &amp; Conditions before completing your registration.</p>
+            <button type="button" className="btn secondary" onClick={() => setTermsOpen(true)}>
+              View Terms &amp; Conditions
+            </button>
+            <label className="consent-check" htmlFor="virtual-consultation-consent">
+              <input
+                id="virtual-consultation-consent"
+                type="checkbox"
+                checked={draft.virtualConsultationConsent === true}
+                aria-invalid={!!errors.consent}
+                aria-describedby={errors.consent ? 'consent-error' : undefined}
+                onChange={(event) => {
+                  const checked = event.target.checked
+                  setDraft({ ...draft, virtualConsultationConsent: checked })
+                  if (checked) setErrors(current => ({ ...current, consent: undefined }))
+                }}
+              />
+              <span>I consent for virtual consultations</span>
+            </label>
+            {errors.consent && <div id="consent-error" className="help consent-error">{errors.consent}</div>}
+          </section>
+
           <div className="actions">
             <button className="btn block" disabled={submitting}>
               {submitting ? 'Saving…' : 'Save & Finish'}
@@ -538,6 +565,7 @@ export default function Step3() {
           </div>
         </form>
       </div>
+      {termsOpen && <RegistrationTermsModal onClose={() => setTermsOpen(false)} />}
     </section>
   )
 }
