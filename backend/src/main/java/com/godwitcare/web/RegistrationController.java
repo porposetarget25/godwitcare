@@ -42,6 +42,11 @@ public class RegistrationController {
 
     @PostMapping("/registrations")
     public ResponseEntity<?> create(@Valid @RequestBody Registration r) {
+        if (!Boolean.TRUE.equals(r.getVirtualConsultationConsent())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "field", "virtualConsultationConsent",
+                    "message", "Please check the Terms and Conditions to proceed."));
+        }
         if (r.getTravelers() == null) r.setTravelers(new java.util.ArrayList<>());
 
         // Drop empty rows to avoid @NotBlank/@NotNull violations
@@ -117,6 +122,11 @@ public class RegistrationController {
         target.setTravelEndDate(source.getTravelEndDate());
         target.setPackageDays(source.getPackageDays());
         target.setDocumentFileName(source.getDocumentFileName());
+        // Consent may be granted later, but an existing consent and its audit time
+        // must never be cleared by a profile edit.
+        if (Boolean.TRUE.equals(source.getVirtualConsultationConsent())) {
+            target.setVirtualConsultationConsent(true);
+        }
     }
 
     private void syncTravelers(Registration registration, List<Traveler> requestedTravelers) {

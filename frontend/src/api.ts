@@ -92,6 +92,7 @@ export type Registration = {
   'Travel Start Date': string
   'Travel End Date': string
   'Package Days': number
+  virtualConsultationConsent?: boolean
   'Document File Name'?: string
 
   // NEW
@@ -184,6 +185,8 @@ export type RegistrationApi = {
   travelers?: Traveler[]
   primaryPatientId?: string
   documentsComplete?: boolean
+  virtualConsultationConsent?: boolean
+  virtualConsultationConsentAt?: string | null
   hasAllergies?: boolean | null
   allergyDetails?: string | null
 }
@@ -319,6 +322,7 @@ function toBackend(r: Registration | any) {
     travelEndDate: r['Travel End Date'],
     packageDays: r['Package Days'],
     documentFileName: r['Document File Name'],
+    virtualConsultationConsent: r.virtualConsultationConsent,
   }
 
   // Accept either draft['Travelers'] or draft.travelers
