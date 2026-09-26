@@ -70,9 +70,10 @@ public class DoctorReferralController {
 
         Consultation c = consultations.findById(consultationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Consultation not found"));
-        if (c.getStatus() != Consultation.Status.COMPLETED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Complete the consultation before generating a referral letter.");
-        }
+        // Referral creation is part of the in-progress doctor workflow, just like
+        // prescription creation.  The consultation screen deliberately links to this
+        // endpoint before the consultation is completed (completed consultations are
+        // read-only), so requiring COMPLETED here made every valid UI request fail.
 
         // ----- Patient info from consultation -----
         String patientName = (c.getContactName() != null && !c.getContactName().isBlank())
