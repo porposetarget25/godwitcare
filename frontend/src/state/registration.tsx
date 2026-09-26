@@ -9,7 +9,8 @@ const defaults: Registration = {
   'Do you have any allergies that can affect your trip?': false,
   'Have you been advised to produce a fit-to-fly certificate?': false,
   'Travelling From':'', 'Travelling To (UK & Europe)':'', 'Travel Start Date':'', 'Travel End Date':'',
-  'Package Days': 7
+  'Package Days': 7,
+  virtualConsultationConsent: false
 }
 
 type Ctx = { draft: Registration; setDraft: React.Dispatch<React.SetStateAction<Registration>> }
