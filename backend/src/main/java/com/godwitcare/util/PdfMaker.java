@@ -112,6 +112,9 @@ public class PdfMaker {
                                 ? java.util.List.of()
                                 : wrap(patientAddress, H_REG, 10, rightW - (panelPad * 2));
 
+                java.util.List<String> allergyLines =
+                        wrap(nz(allergies), H_REG, 10, rightW - (panelPad * 2) - 56f);
+
                 float addressBlockH = addrLines.size() * lineH + (addrLines.isEmpty() ? 0 : 6);
 
                 float computedH = panelPad         // top padding
@@ -123,7 +126,7 @@ public class PdfMaker {
                         + addressBlockH           // wrapped address
                         + lineH                   // Contact
                         + lineH                   // Patient ID
-                        + lineH                   // Allergies
+                        + (allergyLines.size() * lineH) // wrapped allergies
                         + panelPad;               // bottom padding
 
                 float panelH = Math.max(88f, computedH);
@@ -160,7 +163,11 @@ public class PdfMaker {
                 ty -= lineH;
                 smallPair(cs, panelX + panelPad, ty, "Patient ID:", nz(patientId));
                 ty -= lineH;
-                smallPair(cs, panelX + panelPad, ty, "Allergies:", nz(allergies));
+                smallPair(cs, panelX + panelPad, ty, "Allergies:", allergyLines.get(0));
+                for (int i = 1; i < allergyLines.size(); i++) {
+                    ty -= lineH;
+                    text(cs, H_REG, 10, TEXT, panelX + panelPad + 56f, ty, allergyLines.get(i));
+                }
 
                 // Move below tallest column
                 float tallest = Math.max(brandBoxH, panelH);
@@ -547,7 +554,10 @@ public class PdfMaker {
                 // Patient panel (reuse pattern)
                 float panelPad = 10f;
                 float rightW = contentWidth;
-                float panelH = 108f;
+                float valueWidth = rightW - (panelPad * 2) - 56f;
+                List<String> addressLines = wrap(nz(patientAddress), H_REG, 10, valueWidth);
+                List<String> allergyLines = wrap(nz(allergies), H_REG, 10, valueWidth);
+                float panelH = 84f + (addressLines.size() + allergyLines.size()) * 12f;
 
                 strokeRect(cs, margin, y - panelH, rightW, panelH, GRAY_200, 0.8f);
                 text(cs, H_BOLD, 11, TEXT, margin + panelPad, y - 16, "Patient Information");
@@ -560,9 +570,17 @@ public class PdfMaker {
                 ty -= 12;
                 smallPair(cs, margin + panelPad, ty, "Contact:", nz(patientPhone));
                 ty -= 12;
-                smallPair(cs, margin + panelPad, ty, "Address:", nz(patientAddress));
+                smallPair(cs, margin + panelPad, ty, "Address:", addressLines.get(0));
+                for (int i = 1; i < addressLines.size(); i++) {
+                    ty -= 12;
+                    text(cs, H_REG, 10, TEXT, margin + panelPad + 56f, ty, addressLines.get(i));
+                }
                 ty -= 12;
-                smallPair(cs, margin + panelPad, ty, "Allergies:", nz(allergies));
+                smallPair(cs, margin + panelPad, ty, "Allergies:", allergyLines.get(0));
+                for (int i = 1; i < allergyLines.size(); i++) {
+                    ty -= 12;
+                    text(cs, H_REG, 10, TEXT, margin + panelPad + 56f, ty, allergyLines.get(i));
+                }
                 y -= (panelH + 16);
 
                 // Referral From panel (LEFT column with wider value offset = +80)

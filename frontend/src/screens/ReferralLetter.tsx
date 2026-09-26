@@ -147,8 +147,8 @@ Referring Practitioner`
       );
 
       if (!createRes.ok) {
-        const t = await createRes.text().catch(() => '');
-        throw new Error(t || `Failed (${createRes.status})`);
+        const payload = await createRes.json().catch(() => null);
+        throw new Error(payload?.message || payload?.error || `Failed to generate referral (HTTP ${createRes.status}).`);
       }
 
       const meta = await createRes.json().catch(() => ({} as any));
