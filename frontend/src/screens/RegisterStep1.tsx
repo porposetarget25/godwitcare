@@ -61,11 +61,11 @@ export default function Step1() {
 
   // sensible defaults
   const defaultPrimaryDial = useMemo(
-    () => draft.primaryDial || '+91',
+    () => draft.primaryDial || '+44',
     [draft.primaryDial]
   )
   const defaultSecondaryDial = useMemo(
-    () => draft.secondaryDial || '+91',
+    () => draft.secondaryDial || '+44',
     [draft.secondaryDial]
   )
 
