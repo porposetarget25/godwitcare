@@ -9,6 +9,7 @@ import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.repo.UserRepository;
+import com.godwitcare.service.PatientAllergyService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
@@ -23,15 +24,18 @@ public class CareHistoryController {
     private final ConsultationRepository consultations;
     private final PrescriptionRepository prescriptions;
     private final ReferralLetterRepo referrals;
+    private final PatientAllergyService patientAllergies;
 
     public CareHistoryController(UserRepository users,
                                  ConsultationRepository consultations,
                                  PrescriptionRepository prescriptions,
-                                 ReferralLetterRepo referrals) {
+                                 ReferralLetterRepo referrals,
+                                 PatientAllergyService patientAllergies) {
         this.users = users;
         this.consultations = consultations;
         this.prescriptions = prescriptions;
         this.referrals = referrals;
+        this.patientAllergies = patientAllergies;
     }
 
     @GetMapping("/care-history/mine")
@@ -63,6 +67,7 @@ public class CareHistoryController {
         patient.put("name", Optional.ofNullable(latest.getContactName()).orElse(""));
         patient.put("patientId", Optional.ofNullable(latest.getPatientId()).orElse(""));
         patient.put("dob", latest.getDob() != null ? latest.getDob().toString() : "");
+        patient.put("allergies", patientAllergies.forConsultation(latest).display());
 
         // Build timeline items where a Prescription exists OR a consultation was completed with no prescription
         List<Map<String, Object>> items = new ArrayList<>();
@@ -140,6 +145,7 @@ public class CareHistoryController {
         patient.put("name", Optional.ofNullable(latest.getContactName()).orElse(""));
         patient.put("patientId", Optional.ofNullable(latest.getPatientId()).orElse(""));
         patient.put("dob", latest.getDob() != null ? latest.getDob().toString() : "");
+        patient.put("allergies", patientAllergies.forConsultation(latest).display());
         body.put("patient", patient);
 
         List<Map<String, Object>> items = new ArrayList<>();

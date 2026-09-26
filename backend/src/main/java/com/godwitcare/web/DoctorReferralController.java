@@ -6,6 +6,7 @@ import com.godwitcare.entity.ReferralLetter;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.util.PdfMaker;
+import com.godwitcare.service.PatientAllergyService;
 import org.springframework.http.*;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,7 @@ public class DoctorReferralController {
 
     private final ConsultationRepository consultations;
     private final ReferralLetterRepo referrals;
+    private final PatientAllergyService patientAllergies;
     @Value("classpath:/static/branding/logo.jpg")
     private Resource logoRes;
 
@@ -37,9 +39,11 @@ public class DoctorReferralController {
 
 
     public DoctorReferralController(ConsultationRepository consultations,
-                                    ReferralLetterRepo referrals) {
+                                    ReferralLetterRepo referrals,
+                                    PatientAllergyService patientAllergies) {
         this.consultations = consultations;
         this.referrals = referrals;
+        this.patientAllergies = patientAllergies;
     }
 
     // Quick safety for PDFBox Latin-1: strip diacritics (optional if you embed a Unicode font)
@@ -104,6 +108,7 @@ public class DoctorReferralController {
                 ascii(patientPhone),
                 ascii(patientId),
                 ascii(patientAddr),
+                ascii(patientAllergies.forConsultation(c).display()),
                 ascii(narrative.isBlank() ? "—" : narrative), // main referral text
                 ascii(doctorName),
                 ascii(doctorReg),

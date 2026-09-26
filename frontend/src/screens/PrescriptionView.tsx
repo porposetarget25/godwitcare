@@ -12,6 +12,7 @@ type PrescriptionState = {
   medicines?: string
   recommendations?: string
   rxUrl?: string | null
+  allergies?: string
 }
 
 export default function PrescriptionView() {
@@ -56,6 +57,11 @@ export default function PrescriptionView() {
           <div className="page-sub">{[dateStr, state.patientName].filter(Boolean).join(' · ')}</div>
         </div>
         <button type="button" className="bs" onClick={() => navigate(-1)}>‹ Back</button>
+      </div>
+
+      <div className="card">
+        <div className="ct">Patient Information</div>
+        <div className="dr"><div className="dk">Allergies</div><div className="dv">{state.allergies || 'Not provided'}</div></div>
       </div>
 
       <div className="card">

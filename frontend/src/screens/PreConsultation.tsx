@@ -155,6 +155,8 @@ export default function PreConsultation() {
   const [answers, setAnswers] = useState<Record<string, Ans>>(defaultAnswers)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [detailsByQ, setDetailsByQ] = useState<Record<string, string>>({})
+  const [hasAllergies, setHasAllergies] = useState<boolean | null>(null)
+  const [allergyDetails, setAllergyDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
   // Sections are walked through one at a time; only this index is expanded.
   const [openSectionIndex, setOpenSectionIndex] = useState(0)
@@ -188,6 +190,13 @@ export default function PreConsultation() {
               const nameOnly = sel.label.replace(/\s*\(Primary\)\s*$/, '')
               setContactName(nameOnly)
               if (sel.dob) setDob(sel.dob)
+            }
+            const allergyPatient = travelerId
+              ? reg.travelers?.find((t: any) => String(t.id) === String(travelerId))
+              : reg
+            if (typeof allergyPatient?.hasAllergies === 'boolean') {
+              setHasAllergies(allergyPatient.hasAllergies)
+              setAllergyDetails(allergyPatient.allergyDetails || '')
             }
           }
         }
@@ -237,6 +246,8 @@ export default function PreConsultation() {
           setContactPhone(j.contactPhone || '')
           setContactAddress(j.contactAddress || '')
           setDob(toYMD(j.dob || ''))
+          setHasAllergies(typeof j.hasAllergies === 'boolean' ? j.hasAllergies : null)
+          setAllergyDetails(j.allergyDetails || '')
 
           const r2 = await authFetch(`${API_BASE_URL}/registrations/mine/latest`, {})
           if (!ignore && r2.ok) {
@@ -308,6 +319,15 @@ export default function PreConsultation() {
       alert('Please answer all questions (Yes/No) before submitting.')
       return
     }
+    if (hasAllergies === null) {
+      alert('Please answer the allergy question before submitting.')
+      return
+    }
+    const trimmedAllergies = allergyDetails.trim()
+    if (hasAllergies && !trimmedAllergies) {
+      alert('Please enter your allergy details.')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -334,6 +354,8 @@ export default function PreConsultation() {
         dob: dob || null,
         travelerId: Number.isFinite(travelerId) ? travelerId : null,
         patientId: resolvedPatientId,
+        hasAllergies,
+        allergyDetails: hasAllergies ? trimmedAllergies : null,
       }
 
       const url = isEdit
@@ -386,8 +408,8 @@ export default function PreConsultation() {
   }, [hasEmergencyAnswer])
 
 
-  const totalQuestions = useMemo(() => FORM.reduce((n, s) => n + s.questions.length, 0), [])
-  const reviewedCount = useMemo(() => Object.values(touched).filter(Boolean).length, [touched])
+  const totalQuestions = useMemo(() => FORM.reduce((n, s) => n + s.questions.length, 0) + 1, [])
+  const reviewedCount = useMemo(() => Object.values(touched).filter(Boolean).length + (hasAllergies === null ? 0 : 1), [touched, hasAllergies])
 
   function isSectionComplete(section: QuestionnaireSection, snapshot: Record<string, boolean>) {
     return section.questions.every(q => snapshot[q.id])
@@ -465,6 +487,34 @@ export default function PreConsultation() {
             <label className="fl2">Address</label>
             <textarea value={contactAddress} onChange={(e) => setContactAddress(e.target.value)} placeholder="Street, City, Postal Code, Country" rows={3} disabled={locked || hasEmergencyAnswer} />
           </div>
+        </div>
+
+        <div className="card">
+          <div className="ct">Allergies</div>
+          <Toggle
+            label="Please share any existing Allergies you have been identified with"
+            value={hasAllergies === null ? undefined : hasAllergies ? 'Yes' : 'No'}
+            onChange={(value) => {
+              const next = value === 'Yes'
+              setHasAllergies(next)
+              if (!next) setAllergyDetails('')
+            }}
+            disabled={locked || hasEmergencyAnswer}
+          />
+          {hasAllergies && (
+            <div className="fi" style={{ marginTop: 8 }}>
+              <label className="fl2" htmlFor="allergy-details">Allergy details</label>
+              <textarea
+                id="allergy-details"
+                value={allergyDetails}
+                onChange={(event) => setAllergyDetails(event.target.value)}
+                placeholder="For example: Penicillin, peanuts, ibuprofen"
+                rows={3}
+                required
+                disabled={locked || hasEmergencyAnswer}
+              />
+            </div>
+          )}
         </div>
 
         {hasEmergencyAnswer && (

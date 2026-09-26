@@ -28,7 +28,7 @@ public class PdfMaker {
         // For backward compatibility, call the V2 method with no images and minimal doctor block.
         return makePrescriptionPdfV2(
                 null, null,
-                patientName, patientDob, patientPhone, patientId, patientAddress,
+                patientName, patientDob, patientPhone, patientId, patientAddress, "Not provided",
                 diagnosis, history, meds, recommendations,
                 "Attending Clinician", "", "", "", ""
         );
@@ -41,7 +41,7 @@ public class PdfMaker {
     public static byte[] makePrescriptionPdfV2(
             byte[] logoPng,
             byte[] doctorSignaturePng,
-            String patientName, String patientDob, String patientPhone, String patientId, String patientAddress,
+            String patientName, String patientDob, String patientPhone, String patientId, String patientAddress, String allergies,
             String diagnosis, String history, java.util.List<String> meds, String recommendations,
             String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
@@ -123,6 +123,7 @@ public class PdfMaker {
                         + addressBlockH           // wrapped address
                         + lineH                   // Contact
                         + lineH                   // Patient ID
+                        + lineH                   // Allergies
                         + panelPad;               // bottom padding
 
                 float panelH = Math.max(88f, computedH);
@@ -158,6 +159,8 @@ public class PdfMaker {
                 smallPair(cs, panelX + panelPad, ty, "Contact:", nz(patientPhone));
                 ty -= lineH;
                 smallPair(cs, panelX + panelPad, ty, "Patient ID:", nz(patientId));
+                ty -= lineH;
+                smallPair(cs, panelX + panelPad, ty, "Allergies:", nz(allergies));
 
                 // Move below tallest column
                 float tallest = Math.max(brandBoxH, panelH);
@@ -489,7 +492,7 @@ public class PdfMaker {
     public static byte[] makeReferralPdfV2(
             byte[] logoPng,
             byte[] doctorSignaturePng,
-            String patientName, String patientDob, String patientPhone, String patientId, String patientAddress,
+            String patientName, String patientDob, String patientPhone, String patientId, String patientAddress, String allergies,
             String body,
             String doctorName, String doctorReg, String doctorAddress, String doctorPhone, String doctorEmail
     ) throws Exception {
@@ -544,7 +547,7 @@ public class PdfMaker {
                 // Patient panel (reuse pattern)
                 float panelPad = 10f;
                 float rightW = contentWidth;
-                float panelH = 96f;
+                float panelH = 108f;
 
                 strokeRect(cs, margin, y - panelH, rightW, panelH, GRAY_200, 0.8f);
                 text(cs, H_BOLD, 11, TEXT, margin + panelPad, y - 16, "Patient Information");
@@ -558,6 +561,8 @@ public class PdfMaker {
                 smallPair(cs, margin + panelPad, ty, "Contact:", nz(patientPhone));
                 ty -= 12;
                 smallPair(cs, margin + panelPad, ty, "Address:", nz(patientAddress));
+                ty -= 12;
+                smallPair(cs, margin + panelPad, ty, "Allergies:", nz(allergies));
                 y -= (panelH + 16);
 
                 // Referral From panel (LEFT column with wider value offset = +80)

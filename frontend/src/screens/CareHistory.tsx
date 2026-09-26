@@ -23,6 +23,7 @@ type Payload = {
     patientId?: string | number;
     dob?: string;                  // yyyy-MM-dd
     gender?: string;
+    allergies?: string;
   };
   items: Item[];
 };
@@ -130,6 +131,10 @@ export default function CareHistory() {
               <div style={{ fontSize: 14, fontWeight: 600 }}>{[patient.gender, patient.dob].filter(Boolean).join(', ') || '—'}</div>
             </div>
           </div>
+          <div className="dr" style={{ marginTop: 12 }}>
+            <div className="dk">Allergies</div>
+            <div className="dv">{patient.allergies || 'Not provided'}</div>
+          </div>
         </div>
 
         <div className="ct" style={{ margin: '12px 0 8px' }}>Patient Care History</div>
@@ -174,7 +179,7 @@ export default function CareHistory() {
                       <button
                         type="button"
                         className="bs"
-                        onClick={() => navigate(queryString ? `/prescription?${queryString}` : '/prescription', { state: { ...it, patientName: patient.name, rxUrl: resolveApiUrl(API_BASE_URL, it.pdfUrl!) } })}
+                        onClick={() => navigate(queryString ? `/prescription?${queryString}` : '/prescription', { state: { ...it, patientName: patient.name, allergies: patient.allergies, rxUrl: resolveApiUrl(API_BASE_URL, it.pdfUrl!) } })}
                       >
                         View Prescription
                       </button>

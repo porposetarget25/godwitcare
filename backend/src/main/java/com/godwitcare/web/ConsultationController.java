@@ -12,6 +12,7 @@ import com.godwitcare.repo.PrescriptionRepository;
 import com.godwitcare.repo.RegistrationRepository;
 import com.godwitcare.repo.UserRepository;
 import com.godwitcare.service.PrescriptionPdfService;
+import com.godwitcare.service.PatientAllergyService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,7 @@ public class ConsultationController {
     private RegistrationRepository registrations;
     private final PrescriptionPdfService pdfs;
     private final AppointmentRepository appointments;
+    private final PatientAllergyService patientAllergies;
     @Value("${app.consultation.active-hours:48}")
     private long consultationActiveHours;
 
@@ -48,13 +50,15 @@ public class ConsultationController {
                                   RegistrationRepository registrations,
                                   PrescriptionRepository prescriptions,
                                   PrescriptionPdfService pdfs,
-                                  AppointmentRepository appointments) {
+                                  AppointmentRepository appointments,
+                                  PatientAllergyService patientAllergies) {
         this.users = users;
         this.consultations = consultations;
         this.registrations = registrations;
         this.prescriptions = prescriptions;
         this.pdfs = pdfs;
         this.appointments = appointments;
+        this.patientAllergies = patientAllergies;
     }
 
     @PostMapping("/consultations")
@@ -124,6 +128,11 @@ public class ConsultationController {
         c.setDetailsByQuestionJson(mapper.writeValueAsString(
                 body.getOrDefault("detailsByQuestion", java.util.Map.of())
         ));
+        try {
+            patientAllergies.update(c, body.get("hasAllergies"), body.get("allergyDetails"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
         Object dobVal = body.get("dob");
         if (dobVal instanceof String dobStr && !dobStr.isBlank()) {
             try {
@@ -256,6 +265,7 @@ public class ConsultationController {
         res.put("currentLocation", c.getCurrentLocation());
         res.put("dob", c.getDob() != null ? c.getDob().toString() : null);
         res.put("patientId", c.getPatientId());
+        putAllergies(res, c);
         return ResponseEntity.ok(res);
     }
 
@@ -336,7 +346,9 @@ public class ConsultationController {
                     patient.put("email", u != null ? u.getEmail() : null);
                     patient.put("firstName", nz(c.getContactName()));
                     patient.put("dob", c.getDob() != null ? c.getDob().toString() : "");
+                    putAllergies(patient, c);
                     d.put("patient", patient);
+                    putAllergies(d, c);
 
                     d.put("currentLocation", nz(c.getCurrentLocation()));
                     d.put("contactName", nz(c.getContactName()));
@@ -408,6 +420,7 @@ public class ConsultationController {
                 patientPhone,
                 patientId,
                 c.getContactAddress(),
+                patientAllergies.forConsultation(c).display(),
                 /* consult */ diagnosis,
                 history,
                 meds, recommendations,
@@ -627,6 +640,7 @@ public class ConsultationController {
         d.put("contactAddress", c.getContactAddress());
         d.put("patientId", c.getPatientId());
         d.put("dob", c.getDob() != null ? c.getDob().toString() : "");
+        putAllergies(d, c);
 
         try {
             var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -683,12 +697,25 @@ public class ConsultationController {
                 body.getOrDefault("detailsByQuestion", Map.of())
         ));
 
+        try {
+            patientAllergies.update(c, body.get("hasAllergies"), body.get("allergyDetails"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+
         consultations.save(c);
         return ResponseEntity.ok(Map.of("id", c.getId(), "updated", true));
     }
 
     private static String nz(String s) {
         return s == null ? "" : s;
+    }
+
+    private void putAllergies(Map<String, Object> target, Consultation consultation) {
+        PatientAllergyService.AllergyInfo info = patientAllergies.forConsultation(consultation);
+        target.put("hasAllergies", info.hasAllergies());
+        target.put("allergyDetails", info.details());
+        target.put("allergiesDisplay", info.display());
     }
 
 }

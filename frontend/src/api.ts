@@ -63,6 +63,8 @@ export type Traveler = {
   patientId?: string
   fullName: string
   dateOfBirth: string
+  hasAllergies?: boolean | null
+  allergyDetails?: string | null
 }
 
 export type Registration = {
@@ -182,6 +184,8 @@ export type RegistrationApi = {
   travelers?: Traveler[]
   primaryPatientId?: string
   documentsComplete?: boolean
+  hasAllergies?: boolean | null
+  allergyDetails?: string | null
 }
 
 // --- Consultations (shared types) ---
@@ -191,6 +195,8 @@ export type ConsultationCreate = {
   contactPhone: string
   contactAddress: string
   answers: Record<string, 'Yes' | 'No'>
+  hasAllergies: boolean
+  allergyDetails?: string | null
 }
 
 export type PatientContact = {
@@ -226,6 +232,9 @@ export type ConsultationDetails = ConsultationSummary & {
   prescriptionRequired?: boolean
   answers?: Record<string, 'Yes' | 'No'>
   detailsByQuestion?: Record<string, string>
+  hasAllergies?: boolean | null
+  allergyDetails?: string | null
+  allergiesDisplay?: string
   appointmentStatus?: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
   appointmentNoShowNote?: string | null
   patientContact?: PatientContact
