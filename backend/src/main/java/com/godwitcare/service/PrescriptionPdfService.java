@@ -35,7 +35,7 @@ public class PrescriptionPdfService {
     // Call this from controller after you load your domain objects.
     public byte[] buildPrescriptionPdf(
             // patient
-            String patientName, LocalDate dob, String phone, String patientId,String patientAddress,
+            String patientName, LocalDate dob, String phone, String patientId,String patientAddress, String allergies,
             // consultation/prescription
             String diagnosis, String history, List<String> meds,String recommendations,
             // doctor block
@@ -44,7 +44,7 @@ public class PrescriptionPdfService {
         String dobStr = (dob != null) ? dob.format(DateTimeFormatter.ISO_LOCAL_DATE) : "—";
         return PdfMaker.makePrescriptionPdfV2(
                 logoBytes, signatureBytes,
-                patientName, dobStr, phone, patientId,patientAddress,
+                patientName, dobStr, phone, patientId,patientAddress, allergies,
                 diagnosis, history, meds,recommendations,
                 doctorName, doctorReg, doctorAddress, doctorPhone, doctorEmail
         );

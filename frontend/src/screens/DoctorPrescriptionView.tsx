@@ -16,7 +16,7 @@ export default function DoctorPrescriptionView() {
   const { id } = useParams()
   const location = useLocation()
   const state = (location.state || {}) as LocationState
-  const [fallback, setFallback] = useState<{ diagnosis: string; recommendations: string; patientName: string } | null>(null)
+  const [fallback, setFallback] = useState<{ diagnosis: string; recommendations: string; patientName: string; allergies: string } | null>(null)
   const [rxPdfUrl, setRxPdfUrl] = useState<string | null | undefined>(state.rxPdfUrl)
   const [loading, setLoading] = useState(!state.diagnosis)
 
@@ -34,6 +34,7 @@ export default function DoctorPrescriptionView() {
           diagnosis: consultation?.diagnosis || '',
           recommendations: consultation?.recommendations || '',
           patientName: [consultation?.patient?.firstName].filter(Boolean).join(' ') || 'Patient',
+          allergies: consultation?.allergiesDisplay || 'Not provided',
         })
         if (meta?.pdfUrl) setRxPdfUrl(resolveApiUrl(API_BASE_URL, meta.pdfUrl))
       } finally {
@@ -62,6 +63,11 @@ export default function DoctorPrescriptionView() {
         <div className="card">Loading…</div>
       ) : (
         <>
+          <div className="card">
+            <div className="ct">Patient Information</div>
+            <div className="dr"><div className="dk">Allergies</div><div className="dv">{fallback?.allergies || 'Not provided'}</div></div>
+          </div>
+
           <div className="card">
             <div className="ct">Diagnosis</div>
             <p style={{ fontSize: 13 }}>{diagnosis || '—'}</p>

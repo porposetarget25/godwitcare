@@ -32,6 +32,12 @@ public class Traveler {
     @Column(name = "patient_id", nullable = false, unique = true, updatable = false)
     private String patientId = UUID.randomUUID().toString();
 
+    @Column(name = "has_allergies")
+    private Boolean hasAllergies;
+
+    @Column(name = "allergy_details", length = 4000)
+    private String allergyDetails;
+
     // getters/setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -46,4 +52,8 @@ public class Traveler {
     public void setRegistration(Registration registration) { this.registration = registration; }
     public String getPatientId() { return patientId; }
     public void setPatientId(String patientId) { this.patientId = patientId; }
+    public Boolean getHasAllergies() { return hasAllergies; }
+    public void setHasAllergies(Boolean hasAllergies) { this.hasAllergies = hasAllergies; }
+    public String getAllergyDetails() { return allergyDetails; }
+    public void setAllergyDetails(String allergyDetails) { this.allergyDetails = allergyDetails; }
 }

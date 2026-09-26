@@ -1,0 +1,4 @@
+ALTER TABLE registration ADD COLUMN IF NOT EXISTS has_allergies BOOLEAN;
+ALTER TABLE registration ADD COLUMN IF NOT EXISTS allergy_details VARCHAR(4000);
+ALTER TABLE travelers ADD COLUMN IF NOT EXISTS has_allergies BOOLEAN;
+ALTER TABLE travelers ADD COLUMN IF NOT EXISTS allergy_details VARCHAR(4000);

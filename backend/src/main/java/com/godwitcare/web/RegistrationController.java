@@ -395,11 +395,15 @@ public class RegistrationController {
                             m.put("id", t.getId());
                             m.put("fullName", t.getFullName());
                             m.put("dateOfBirth", t.getDateOfBirth() != null ? t.getDateOfBirth().toString() : "");
+                            m.put("hasAllergies", t.getHasAllergies());
+                            m.put("allergyDetails", t.getAllergyDetails());
                             travellers.add(m);
                         }
                     }
                     body.put("travelers", travellers);
                     body.put("primaryPatientId", reg.getPrimaryPatientId());
+                    body.put("hasAllergies", reg.getHasAllergies());
+                    body.put("allergyDetails", reg.getAllergyDetails());
 
                     return ResponseEntity.ok(body);
                 })

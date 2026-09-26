@@ -219,6 +219,7 @@ export default function DoctorConsultationDetails() {
             </div>
             <div className="dr"><div className="dk">DOB</div><div className="dv">{dobStr}</div></div>
             <div className="dr"><div className="dk">Patient ID</div><div className="dv">{data.patientId ?? '—'}</div></div>
+            <div className="dr"><div className="dk">Allergies</div><div className="dv" style={{ fontWeight: data.hasAllergies ? 700 : undefined }}>{data.allergiesDisplay || 'Not provided'}</div></div>
           </div>
 
           <details className="card" open={Boolean(data.contactPhone || data.contactAddress || data.patient.email)}>

@@ -33,6 +33,7 @@ type ConsultationDTO = {
   patient: Patient;
   currentLocation?: string;
   createdAt?: string;
+  allergiesDisplay?: string;
 };
 
 export default function DoctorReferral() {
@@ -189,11 +190,12 @@ Referring Practitioner`
               <div><div className="fi-hint">Patient ID</div><div style={{ fontSize: 13, fontWeight: 600 }}>{patientId}</div></div>
               <div><div className="fi-hint">Date of Birth</div><div style={{ fontSize: 13, fontWeight: 600 }}>{patientDob}</div></div>
             </div>
+            <div className="dr" style={{ marginTop: 12 }}><div className="dk">Allergies</div><div className="dv">{c?.allergiesDisplay || 'Not provided'}</div></div>
           </div>
 
           <div className="card">
             <div className="ct">Referral From</div>
-            <div className="g2">
+      <div className="g2">
               <div>
                 <div className="dr"><div className="dk">GP Name</div><div className="dv">{doctorName}</div></div>
                 <div className="dr"><div className="dk">GMS Number</div><div className="dv">{doctorReg}</div></div>
