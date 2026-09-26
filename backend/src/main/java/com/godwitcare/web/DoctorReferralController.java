@@ -6,6 +6,7 @@ import com.godwitcare.entity.ReferralLetter;
 import com.godwitcare.repo.ConsultationRepository;
 import com.godwitcare.repo.ReferralLetterRepo;
 import com.godwitcare.util.PdfMaker;
+import com.godwitcare.service.PatientAllergyService;
 import org.springframework.http.*;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,7 @@ public class DoctorReferralController {
 
     private final ConsultationRepository consultations;
     private final ReferralLetterRepo referrals;
+    private final PatientAllergyService patientAllergies;
     @Value("classpath:/static/branding/logo.jpg")
     private Resource logoRes;
 
@@ -37,9 +39,11 @@ public class DoctorReferralController {
 
 
     public DoctorReferralController(ConsultationRepository consultations,
-                                    ReferralLetterRepo referrals) {
+                                    ReferralLetterRepo referrals,
+                                    PatientAllergyService patientAllergies) {
         this.consultations = consultations;
         this.referrals = referrals;
+        this.patientAllergies = patientAllergies;
     }
 
     // Quick safety for PDFBox Latin-1: strip diacritics (optional if you embed a Unicode font)
@@ -66,9 +70,10 @@ public class DoctorReferralController {
 
         Consultation c = consultations.findById(consultationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Consultation not found"));
-        if (c.getStatus() != Consultation.Status.COMPLETED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Complete the consultation before generating a referral letter.");
-        }
+        // Referral creation is part of the in-progress doctor workflow, just like
+        // prescription creation.  The consultation screen deliberately links to this
+        // endpoint before the consultation is completed (completed consultations are
+        // read-only), so requiring COMPLETED here made every valid UI request fail.
 
         // ----- Patient info from consultation -----
         String patientName = (c.getContactName() != null && !c.getContactName().isBlank())
@@ -104,6 +109,7 @@ public class DoctorReferralController {
                 ascii(patientPhone),
                 ascii(patientId),
                 ascii(patientAddr),
+                ascii(patientAllergies.forConsultation(c).display()),
                 ascii(narrative.isBlank() ? "—" : narrative), // main referral text
                 ascii(doctorName),
                 ascii(doctorReg),

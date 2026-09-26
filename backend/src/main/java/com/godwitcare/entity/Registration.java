@@ -29,6 +29,10 @@ public class Registration {
     private Boolean longTermMedication;
     private Boolean healthCondition;
     private Boolean allergies;
+    @Column(name = "has_allergies")
+    private Boolean hasAllergies;
+    @Column(name = "allergy_details", length = 4000)
+    private String allergyDetails;
     private Boolean fitToFlyCertificate;
 
     private String travellingFrom;
@@ -143,6 +147,11 @@ public class Registration {
     public void setAllergies(Boolean v) {
         this.allergies = v;
     }
+
+    public Boolean getHasAllergies() { return hasAllergies; }
+    public void setHasAllergies(Boolean hasAllergies) { this.hasAllergies = hasAllergies; }
+    public String getAllergyDetails() { return allergyDetails; }
+    public void setAllergyDetails(String allergyDetails) { this.allergyDetails = allergyDetails; }
 
     public Boolean getFitToFlyCertificate() {
         return fitToFlyCertificate;

@@ -3,6 +3,7 @@ import React from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { authFetch, API_BASE_URL, resolveApiUrl, openAuthenticatedFile } from '../api';
 import { usePatient } from '../state/patient';
+import Modal from '../components/portal/Modal';
 
 type Item = {
   consultationId: number;
@@ -23,6 +24,7 @@ type Payload = {
     patientId?: string | number;
     dob?: string;                  // yyyy-MM-dd
     gender?: string;
+    allergies?: string;
   };
   items: Item[];
 };
@@ -47,6 +49,7 @@ export default function CareHistory() {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
   const [openingReferral, setOpeningReferral] = React.useState<number | null>(null);
+  const [showAllergies, setShowAllergies] = React.useState(false);
 
   async function onViewReferral(consultationId: number, url: string) {
     setOpeningReferral(consultationId);
@@ -130,6 +133,14 @@ export default function CareHistory() {
               <div style={{ fontSize: 14, fontWeight: 600 }}>{[patient.gender, patient.dob].filter(Boolean).join(', ') || '—'}</div>
             </div>
           </div>
+          <div className="dr" style={{ marginTop: 12 }}>
+            <div className="dk">Allergies</div>
+            <div className="dv">
+              {patient.allergies && !['None reported', 'Not provided'].includes(patient.allergies) ? (
+                <button type="button" className="bs" onClick={() => setShowAllergies(true)}>View Allergies</button>
+              ) : (patient.allergies || 'Not provided')}
+            </div>
+          </div>
         </div>
 
         <div className="ct" style={{ margin: '12px 0 8px' }}>Patient Care History</div>
@@ -174,7 +185,7 @@ export default function CareHistory() {
                       <button
                         type="button"
                         className="bs"
-                        onClick={() => navigate(queryString ? `/prescription?${queryString}` : '/prescription', { state: { ...it, patientName: patient.name, rxUrl: resolveApiUrl(API_BASE_URL, it.pdfUrl!) } })}
+                        onClick={() => navigate(queryString ? `/prescription?${queryString}` : '/prescription', { state: { ...it, patientName: patient.name, allergies: patient.allergies, rxUrl: resolveApiUrl(API_BASE_URL, it.pdfUrl!) } })}
                       >
                         View Prescription
                       </button>
@@ -241,6 +252,18 @@ export default function CareHistory() {
       )}
 
       {body}
+
+      {showAllergies && data && (
+        <Modal
+          title="Allergies"
+          onClose={() => setShowAllergies(false)}
+          footer={<button type="button" className="bs" onClick={() => setShowAllergies(false)}>Close</button>}
+        >
+          <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '60vh', overflowY: 'auto' }}>
+            {data.patient.allergies}
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
