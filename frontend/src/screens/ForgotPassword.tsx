@@ -4,7 +4,7 @@ import { forgotPassword, verifyForgotPasswordOtp } from '../api';
 import { COUNTRY_OPTIONS } from '../lib/countries';
 import { looksLikePhone, needsCountryPicker, resolveIdentifier } from '../lib/phone';
 
-const DEFAULT_DIAL = '+91';
+const DEFAULT_DIAL = '+44';
 
 export default function ForgotPassword() {
   const [identifier, setIdentifier] = useState('');

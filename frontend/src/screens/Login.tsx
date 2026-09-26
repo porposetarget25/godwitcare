@@ -6,7 +6,7 @@ import { useAuth } from '../state/auth';
 import { COUNTRY_OPTIONS } from '../lib/countries';
 import { looksLikePhone, needsCountryPicker, resolveIdentifier } from '../lib/phone';
 
-const DEFAULT_DIAL = '+91';
+const DEFAULT_DIAL = '+44';
 
 export default function Login() {
   const [username, setUsername] = useState('');

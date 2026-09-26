@@ -28,11 +28,12 @@ export function buildCanonicalPhone(dial: string, raw: string): string {
 
 /** True once the identifier clearly isn't an email — i.e. it's being typed as a phone number,
  *  so the country-code selector (needed to reconstruct the same "+<dial><digits>" username
- *  Registration stores) should show. Switches to email mode on the first letter typed, not
- *  only once "@" appears, since every valid email contains letters before the "@" too. */
+ *  Registration stores) should show. Decided by the first character typed, not by scanning for
+ *  "@" (which only appears once the user is partway through an email): a letter first means
+ *  email, a digit or "+" first means phone. */
 export function looksLikePhone(v: string): boolean {
   const t = v.trim()
-  return t.length > 0 && !/[a-zA-Z]/.test(t)
+  return t.length > 0 && !/^[a-zA-Z]/.test(t)
 }
 
 /** Resolves whatever a login/forgot-password identifier field holds into what the backend
