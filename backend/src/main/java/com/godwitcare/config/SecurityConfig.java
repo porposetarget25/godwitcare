@@ -122,7 +122,8 @@ public class SecurityConfig {
                 "http://localhost:5173",                      // local dev
                 "http://localhost:5174",                      // local dev (fallback port when 5173 is busy)
                 "https://porposetarget25.github.io",          // GitHub Pages root
-                "https://porposetarget25.github.io/godwitcare"// project subpath (safe to keep)
+                "https://porposetarget25.github.io/godwitcare",// project subpath (safe to keep)
+                "https://godwitcare-2.onrender.com"           // Render-hosted frontend
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
