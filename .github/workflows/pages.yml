@@ -30,6 +30,8 @@ jobs:
       - name: Build (sets base=/godwitcare/)
         working-directory: frontend
         run: npm run build
+        env:
+          GH_PAGES: 'true'
       - name: Add 404 for BrowserRouter (optional)
         if: ${{ hashFiles('frontend/dist/index.html') != '' }}
         run: cp frontend/dist/index.html frontend/dist/404.html
