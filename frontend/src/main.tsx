@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 
-import Dashboard from './screens/Dashboard';
+import Dashboard, { SHOW_TESTIMONIALS } from './screens/Dashboard';
 import PrivacyPolicy from './screens/PrivacyPolicy';
 import TermsOfUse from './screens/TermsOfUse';
 import CookiePolicy from './screens/CookiePolicy';
@@ -107,7 +107,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#top')}>Home</button>
               <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#how')}>How It Works</button>
               <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#features')}>Features</button>
-              <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#testimonials')}>Testimonials</button>
+              {SHOW_TESTIMONIALS && <button type="button" className="nav-link-btn" onClick={() => handleTopNavClick('#testimonials')}>Testimonials</button>}
             </nav>
           ) : null}
 
@@ -198,7 +198,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <button type="button" onClick={() => handleTopNavClick('#top')}>Home</button>
             <button type="button" onClick={() => handleTopNavClick('#how')}>How It Works</button>
             <button type="button" onClick={() => handleTopNavClick('#features')}>Features</button>
-            <button type="button" onClick={() => handleTopNavClick('#testimonials')}>Testimonials</button>
+            {SHOW_TESTIMONIALS && <button type="button" onClick={() => handleTopNavClick('#testimonials')}>Testimonials</button>}
           </nav>
 
           <div className="mobile-menu-cta">

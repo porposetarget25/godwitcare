@@ -46,6 +46,8 @@ const FEATURES: Feature[] = [
   { icon: 'ti-clipboard-heart', title: 'Pre-Existing Conditions Welcome', desc: 'Coverage thoughtfully designed for pre-existing conditions.' },
 ];
 
+export const SHOW_TESTIMONIALS = false; // TODO: re-enable when ready
+
 const TESTIMONIALS = [
   { initials: 'SJ', name: 'Sarah J.', place: 'London, UK', quote: 'As a frequent traveler, GodwitCare has been a lifesaver. Quick, reliable advice when I needed it most!' },
   { initials: 'MP', name: 'Michael P.', place: 'Sydney, AU', quote: 'I had an urgent question while abroad, and their WhatsApp consultation was incredibly convenient and reassuring.' },
@@ -371,25 +373,27 @@ export default function Dashboard() {
         </section>
 
         {/* TESTIMONIALS */}
-        <section id="testimonials" className="section">
-          <h2 className="h2">What Our Travelers Say</h2>
-          <p className="h2-sub">Join thousands of travelers who trust GodwitCare for their medical needs abroad</p>
-          <div className="cards">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="card">
-                <i className="ti ti-quote quote-icon" aria-hidden="true" />
-                <p className="muted" style={{ fontStyle: 'italic' }}>&ldquo;{t.quote}&rdquo;</p>
-                <div className="testimonial-foot">
-                  <div className="ava">{t.initials}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.place}</div>
+        {SHOW_TESTIMONIALS && (
+          <section id="testimonials" className="section">
+            <h2 className="h2">What Our Travelers Say</h2>
+            <p className="h2-sub">Join thousands of travelers who trust GodwitCare for their medical needs abroad</p>
+            <div className="cards">
+              {TESTIMONIALS.map((t) => (
+                <div key={t.name} className="card">
+                  <i className="ti ti-quote quote-icon" aria-hidden="true" />
+                  <p className="muted" style={{ fontStyle: 'italic' }}>&ldquo;{t.quote}&rdquo;</p>
+                  <div className="testimonial-foot">
+                    <div className="ava">{t.initials}</div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.place}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* FINAL CTA */}
         <section className="cta section">
@@ -437,7 +441,7 @@ export default function Dashboard() {
               <Link to="/dashboard#top">Home</Link>
               <Link to="/dashboard#how">How it Works</Link>
               <Link to="/dashboard#features">Features</Link>
-              <Link to="/dashboard#testimonials">Testimonials</Link>
+              {SHOW_TESTIMONIALS && <Link to="/dashboard#testimonials">Testimonials</Link>}
             </div>
 
             <div className="footer-col">
