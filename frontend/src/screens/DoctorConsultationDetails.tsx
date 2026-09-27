@@ -116,6 +116,26 @@ export default function DoctorConsultationDetails() {
     return () => { ignore = true }
   }, [id])
 
+  // Save-on-navigate-away: catches both in-app route changes (component unmount)
+  // and the doctor closing/reloading the tab (beforeunload), so notes typed but
+  // never explicitly saved aren't silently lost. Registered unconditionally (before
+  // the loading-state early return below) so hook order stays stable across renders;
+  // it's a no-op via the refs until a consultation has actually loaded.
+  useEffect(() => {
+    function handleBeforeUnload() {
+      if (dirtyRef.current && !readOnlyRef.current && idRef.current) {
+        persistDraft({ keepalive: true }).catch(() => {})
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      if (dirtyRef.current && !readOnlyRef.current && idRef.current) {
+        persistDraft({ keepalive: true }).catch(() => {})
+      }
+    }
+  }, [])
+
   if (!data) return <div className="card">Loading…</div>
 
   const phoneDigits = (data.contactPhone || '').replace(/[^\d+]/g, '')
@@ -166,24 +186,6 @@ export default function DoctorConsultationDetails() {
       setSavingDraft(false)
     }
   }
-
-  // Save-on-navigate-away: catches both in-app route changes (component unmount)
-  // and the doctor closing/reloading the tab (beforeunload), so notes typed but
-  // never explicitly saved aren't silently lost.
-  useEffect(() => {
-    function handleBeforeUnload() {
-      if (dirtyRef.current && !readOnlyRef.current && idRef.current) {
-        persistDraft({ keepalive: true }).catch(() => {})
-      }
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      if (dirtyRef.current && !readOnlyRef.current && idRef.current) {
-        persistDraft({ keepalive: true }).catch(() => {})
-      }
-    }
-  }, [])
 
   async function completeConsultation() {
     if (!data?.id || savingConsultation) return
