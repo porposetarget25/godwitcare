@@ -18,6 +18,16 @@ export default function DoctorConsultationDetails() {
   const [diagnosis, setDiagnosis] = useState('')
   const [medicines, setMedicines] = useState<string[]>([''])
   const [recommendations, setRecommendations] = useState('')
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [draftSaveErr, setDraftSaveErr] = useState<string | null>(null)
+  const [draftSaved, setDraftSaved] = useState(false)
+
+  // Refs mirror the latest editable fields/status so the unmount and
+  // beforeunload handlers below can save without depending on stale closures.
+  const draftRef = useRef({ history: '', diagnosis: '', recommendations: '', prescriptionRequired: true })
+  const dirtyRef = useRef(false)
+  const idRef = useRef<number | null>(null)
+  const readOnlyRef = useRef(false)
   const [creatingRx, setCreatingRx] = useState(false)
   const [rxErr, setRxErr] = useState<string | null>(null)
   const [rxId, setRxId] = useState<number | null>(null)
@@ -114,9 +124,66 @@ export default function DoctorConsultationDetails() {
   const appointmentStatus: string | undefined = data.appointmentStatus
   const isNoShow = appointmentStatus === 'NO_SHOW'
 
+  // Keep the "latest values" refs current on every render so the unmount/beforeunload
+  // save handlers (registered once, below) never act on stale closures.
+  draftRef.current = { history, diagnosis, recommendations, prescriptionRequired }
+  idRef.current = data.id ?? null
+  readOnlyRef.current = readOnly
+
   function setMed(idx: number, val: string) { setMedicines(list => list.map((m, i) => i === idx ? val : m)) }
   function addMed() { setMedicines(list => [...list, '']) }
   function removeMed(idx: number) { setMedicines(list => list.filter((_, i) => i !== idx)) }
+
+  function markDirty() {
+    dirtyRef.current = true
+    setDraftSaved(false)
+  }
+
+  async function persistDraft(opts: { keepalive?: boolean } = {}) {
+    const cid = idRef.current
+    if (!cid || readOnlyRef.current) return
+    const { history: h, diagnosis: d, recommendations: r, prescriptionRequired: pr } = draftRef.current
+    const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${cid}/save`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: h.trim(), diagnosis: d.trim(), recommendations: r.trim(), prescriptionRequired: pr }),
+      keepalive: opts.keepalive,
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    dirtyRef.current = false
+  }
+
+  async function saveDraft() {
+    if (!data?.id || savingDraft || readOnly) return
+    setDraftSaveErr(null)
+    setSavingDraft(true)
+    try {
+      await persistDraft()
+      setDraftSaved(true)
+    } catch (err: any) {
+      setDraftSaveErr(err?.message || 'Failed to save progress')
+    } finally {
+      setSavingDraft(false)
+    }
+  }
+
+  // Save-on-navigate-away: catches both in-app route changes (component unmount)
+  // and the doctor closing/reloading the tab (beforeunload), so notes typed but
+  // never explicitly saved aren't silently lost.
+  useEffect(() => {
+    function handleBeforeUnload() {
+      if (dirtyRef.current && !readOnlyRef.current && idRef.current) {
+        persistDraft({ keepalive: true }).catch(() => {})
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      if (dirtyRef.current && !readOnlyRef.current && idRef.current) {
+        persistDraft({ keepalive: true }).catch(() => {})
+      }
+    }
+  }, [])
 
   async function completeConsultation() {
     if (!data?.id || savingConsultation) return
@@ -129,6 +196,7 @@ export default function DoctorConsultationDetails() {
         body: JSON.stringify({ history: history.trim(), diagnosis: diagnosis.trim(), recommendations: recommendations.trim(), prescriptionRequired }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      dirtyRef.current = false
       setData((prev: any) => ({ ...prev, status: 'COMPLETED' }))
     } catch (err: any) {
       setConsultationSaveErr(err?.message || 'Failed to complete consultation')
@@ -291,21 +359,21 @@ export default function DoctorConsultationDetails() {
             <div className="ct">Prescription Requirement</div>
             <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-                <input type="radio" checked={!prescriptionRequired} disabled={readOnly} onChange={() => setPrescriptionRequired(false)} /> No Prescription
+                <input type="radio" checked={!prescriptionRequired} disabled={readOnly} onChange={() => { setPrescriptionRequired(false); markDirty() }} /> No Prescription
               </label>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-                <input type="radio" checked={prescriptionRequired} disabled={readOnly} onChange={() => setPrescriptionRequired(true)} /> Prescription Required
+                <input type="radio" checked={prescriptionRequired} disabled={readOnly} onChange={() => { setPrescriptionRequired(true); markDirty() }} /> Prescription Required
               </label>
             </div>
             <div className="fi">
               <label className="fl2">History of Presenting Complaint</label>
-              <textarea value={history} disabled={readOnly} onChange={(e) => setHistory(e.target.value)} placeholder="Detail patient's complaint history here..." rows={4} />
+              <textarea value={history} disabled={readOnly} onChange={(e) => { setHistory(e.target.value); markDirty() }} placeholder="Detail patient's complaint history here..." rows={4} />
             </div>
           </div>
 
           <div className="card" style={{ opacity: prescriptionRequired ? 1 : 0.5 }}>
             <div className="ct">Diagnosis</div>
-            <textarea value={diagnosis} disabled={readOnly} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Enter patient diagnosis…" rows={3} />
+            <textarea value={diagnosis} disabled={readOnly} onChange={(e) => { setDiagnosis(e.target.value); markDirty() }} placeholder="Enter patient diagnosis…" rows={3} />
           </div>
 
           <div className="card">
@@ -323,7 +391,7 @@ export default function DoctorConsultationDetails() {
 
           <div className="card">
             <div className="ct">Recommendations</div>
-            <textarea value={recommendations} disabled={readOnly} onChange={(e) => setRecommendations(e.target.value)} placeholder="Provide recommendations…" rows={3} />
+            <textarea value={recommendations} disabled={readOnly} onChange={(e) => { setRecommendations(e.target.value); markDirty() }} placeholder="Provide recommendations…" rows={3} />
           </div>
 
           <div className="card">
@@ -339,6 +407,14 @@ export default function DoctorConsultationDetails() {
             </div>
             {data?.status !== 'COMPLETED' && (
               <>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button type="button" className="bs" onClick={saveDraft} disabled={savingDraft}>
+                    {savingDraft ? 'Saving…' : 'Save Progress'}
+                  </button>
+                  {draftSaved && !savingDraft && <span className="fi-hint" style={{ color: 'var(--text-success, #16a34a)' }}>Saved</span>}
+                  {draftSaveErr && <span className="fi-hint" style={{ color: 'var(--text-danger)' }}>{draftSaveErr}</span>}
+                </div>
+                <div className="fi-hint" style={{ margin: '6px 0 10px' }}>Notes are also saved automatically if you navigate away before completing.</div>
                 <button type="button" className="bp" onClick={completeConsultation} disabled={savingConsultation || (prescriptionRequired && !rxId)} title={prescriptionRequired && !rxId ? 'Create a prescription first, or select No Prescription.' : undefined}>
                   {savingConsultation ? 'Completing…' : 'Complete Consultation'}
                 </button>

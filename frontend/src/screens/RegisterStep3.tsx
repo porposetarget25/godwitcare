@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useReg } from '../state/registration'
+import { useAuth } from '../state/auth'
 import {
   addTravelerWithDocuments,
   saveRegistration,
@@ -118,6 +119,7 @@ const EUROPE_COUNTRIES = [
 export default function Step3() {
   const { draft, setDraft } = useReg()
   const nav = useNavigate()
+  const { refresh } = useAuth()
 
   const [primaryPassport, setPrimaryPassport] = useState<File | null>(null)
   const [primaryTravelDocument, setPrimaryTravelDocument] = useState<File | null>(null)
@@ -288,6 +290,7 @@ export default function Step3() {
         const identifier = email ?? username
         try {
           await login(identifier, password)
+          await refresh()
         } catch (err) {
           console.warn('auto-login failed:', err)
         }
