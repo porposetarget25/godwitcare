@@ -29,7 +29,10 @@ public class Traveler {
     @JsonBackReference
     private Registration registration;
 
-    @Column(name = "patient_id", nullable = false, unique = true, updatable = false)
+    // Temporary placeholder until the row has a generated id; the controller
+    // overwrites this with a human-readable "PV-<regId>-T<id>" value right
+    // after the first save (see RegistrationController.formatPatientId).
+    @Column(name = "patient_id", nullable = false, unique = true)
     private String patientId = UUID.randomUUID().toString();
 
     @Column(name = "has_allergies")

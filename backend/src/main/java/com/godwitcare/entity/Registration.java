@@ -43,7 +43,10 @@ public class Registration {
     private Integer packageDays;
     private String documentFileName;
 
-    @Column(name = "primary_patient_id", nullable = false, unique = true, updatable = false)
+    // Temporary placeholder until the row has a generated id; the controller
+    // overwrites this with a human-readable "PV-<id>" value right after the
+    // first save (see RegistrationController.formatPatientId).
+    @Column(name = "primary_patient_id", nullable = false, unique = true)
     private String primaryPatientId = UUID.randomUUID().toString();
 
     @Column(name = "documents_complete", nullable = false)

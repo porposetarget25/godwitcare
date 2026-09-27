@@ -61,7 +61,16 @@ public class RegistrationController {
         }
 
         Registration saved = repo.save(r);
+        // The human-readable PV- id needs the row's generated id, so it can only
+        // be assigned after this first insert; persist it with a second save.
+        saved.setPrimaryPatientId(formatPatientId(saved.getId()));
+        saved = repo.save(saved);
         return ResponseEntity.ok(saved);
+    }
+
+    /** Builds the human-readable patient id shown to doctors/patients, e.g. "PV-000000042". */
+    private static String formatPatientId(Long id) {
+        return "PV-" + String.format("%09d", id == null ? 0L : id);
     }
 
     @PutMapping("/registrations/{id}")
@@ -223,6 +232,11 @@ public class RegistrationController {
             traveler.setFullName(fullName.trim());
             traveler.setDateOfBirth(dob);
             registration.getTravelers().add(traveler);
+            repo.saveAndFlush(registration);
+
+            // Same two-step assignment as the primary registration: the traveller
+            // row needs its own generated id before we can build its PV- suffix.
+            traveler.setPatientId(formatPatientId(registration.getId()) + "-T" + traveler.getId());
             repo.saveAndFlush(registration);
 
             saveDocument(registration, traveler.getPatientId(), RegistrationDocument.DocumentType.PASSPORT, passport);
