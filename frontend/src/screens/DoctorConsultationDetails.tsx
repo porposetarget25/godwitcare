@@ -397,6 +397,18 @@ export default function DoctorConsultationDetails() {
           </div>
 
           <div className="card">
+            {data?.status !== 'COMPLETED' && (
+              <>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button type="button" className="bs" onClick={saveDraft} disabled={savingDraft}>
+                    {savingDraft ? 'Saving…' : 'Save Progress'}
+                  </button>
+                  {draftSaved && !savingDraft && <span className="fi-hint" style={{ color: 'var(--text-success, #16a34a)' }}>Saved</span>}
+                  {draftSaveErr && <span className="fi-hint" style={{ color: 'var(--text-danger)' }}>{draftSaveErr}</span>}
+                </div>
+                <div className="fi-hint" style={{ margin: '6px 0 10px' }}>Notes are also saved automatically if you navigate away before completing.</div>
+              </>
+            )}
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: data?.status !== 'COMPLETED' ? 10 : 0 }}>
               {prescriptionRequired && !readOnly && (
                 <button type="button" className="bp" onClick={createPrescription} disabled={creatingRx}>{creatingRx ? 'Creating…' : 'Create Prescription'}</button>
@@ -409,14 +421,6 @@ export default function DoctorConsultationDetails() {
             </div>
             {data?.status !== 'COMPLETED' && (
               <>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button type="button" className="bs" onClick={saveDraft} disabled={savingDraft}>
-                    {savingDraft ? 'Saving…' : 'Save Progress'}
-                  </button>
-                  {draftSaved && !savingDraft && <span className="fi-hint" style={{ color: 'var(--text-success, #16a34a)' }}>Saved</span>}
-                  {draftSaveErr && <span className="fi-hint" style={{ color: 'var(--text-danger)' }}>{draftSaveErr}</span>}
-                </div>
-                <div className="fi-hint" style={{ margin: '6px 0 10px' }}>Notes are also saved automatically if you navigate away before completing.</div>
                 <button type="button" className="bp" onClick={completeConsultation} disabled={savingConsultation || (prescriptionRequired && !rxId)} title={prescriptionRequired && !rxId ? 'Create a prescription first, or select No Prescription.' : undefined}>
                   {savingConsultation ? 'Completing…' : 'Complete Consultation'}
                 </button>
