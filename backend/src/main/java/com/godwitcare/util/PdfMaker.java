@@ -85,14 +85,13 @@ public class PdfMaker {
                     centeredText(cs, H_BOLD, 22, new Color(6, 95, 70), page, "Prescription", titleBaselineY);
                     y = headerTopY - logoH - 16f;
                     strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
-                    y -= 16;
                 }
 
                 // 1) Success banner
                 float bannerH = 20f;
                 fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(209, 250, 229));
                 text(cs, H_REG, 10, TEXT, margin + 10, y - bannerH + 6, "Signed and all signatures are valid.");
-                y -= (bannerH + 20); // breathing room
+                y -= (bannerH + 10); // breathing room (half of what it was below; none above)
 
                 // 2) Brand wordmark + Patient panel (no-overlap)
                 float leftW = contentWidth * 0.44f;
@@ -120,7 +119,6 @@ public class PdfMaker {
                 float panelX = margin + leftW + 10;
                 float panelPad = 10f;
                 float lineH = 12f;
-                float panelTitleH = 16f;
 
                 java.util.List<String> addrLines =
                         (patientAddress == null || patientAddress.isBlank())
@@ -130,19 +128,14 @@ public class PdfMaker {
                 java.util.List<String> allergyLines =
                         wrap(nz(allergies), H_REG, 10, rightW - (panelPad * 2) - 56f);
 
-                float addressBlockH = addrLines.size() * lineH + (addrLines.isEmpty() ? 0 : 6);
-
-                float computedH = panelPad         // top padding
-                        + panelTitleH             // "Patient Information"
-                        + 6
-                        + 14f                     // patient name (bold)
-                        + 6
-                        + lineH                   // DOB
-                        + addressBlockH           // wrapped address
-                        + lineH                   // Contact
-                        + lineH                   // Patient ID
-                        + (allergyLines.size() * lineH) // wrapped allergies
-                        + panelPad;               // bottom padding
+                // Mirrors the actual row-by-row draw positions below (title at rowTop-16,
+                // name at rowTop-32, each subsequent row lineH apart) instead of a separate
+                // estimate, so the box height matches what's actually drawn instead of
+                // leaving a large gap under the last line. "Address" always draws at least
+                // one row even when blank (falls back to "—"), same as here.
+                int addressRows = Math.max(addrLines.size(), 1);
+                float lastBaselineOffset = 74f + lineH * (addressRows + allergyLines.size());
+                float computedH = lastBaselineOffset + 14f; // clears the last line's descender
 
                 float panelH = Math.max(88f, computedH);
 
