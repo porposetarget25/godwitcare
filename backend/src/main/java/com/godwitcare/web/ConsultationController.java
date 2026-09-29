@@ -265,6 +265,11 @@ public class ConsultationController {
         res.put("currentLocation", c.getCurrentLocation());
         res.put("dob", c.getDob() != null ? c.getDob().toString() : null);
         res.put("patientId", c.getPatientId());
+        // True once the doctor has saved any notes (draft or otherwise) or created a
+        // prescription - Create Prescription requires a saved diagnosis first, so this
+        // single check covers both. Drives hiding cancel/reschedule and the "In
+        // Preparation" status once the doctor has actually started working the case.
+        res.put("doctorInProgress", hasDoctorProgress(c));
         putAllergies(res, c);
         return ResponseEntity.ok(res);
     }
@@ -279,6 +284,17 @@ public class ConsultationController {
         return consultation.getStatus() != Consultation.Status.COMPLETED
                 && consultation.getCreatedAt() != null
                 && consultation.getCreatedAt().plus(Duration.ofHours(consultationActiveHours)).isAfter(Instant.now());
+    }
+
+    private boolean hasDoctorProgress(Consultation c) {
+        return notBlank(c.getHistoryOfPresentingComplaint())
+                || notBlank(c.getDiagnosis())
+                || notBlank(c.getRecommendations())
+                || notBlank(c.getMedicines());
+    }
+
+    private boolean notBlank(String s) {
+        return s != null && !s.isBlank();
     }
 
     // ---------- Doctor: list (with optional status filter) ----------

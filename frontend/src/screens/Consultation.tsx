@@ -19,7 +19,7 @@ function dayShort(dateKey: string) {
   return { dow: d.toLocaleDateString('en-GB', { weekday: 'short' }), dnum: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) }
 }
 
-function AppointmentBooking({ consultationId, consultationActive, patientId, onBookingChange }: { consultationId: number; consultationActive: boolean; patientId: string; onBookingChange?: (appointment: Appointment | null) => void }) {
+function AppointmentBooking({ consultationId, consultationActive, patientId, doctorInProgress, onBookingChange }: { consultationId: number; consultationActive: boolean; patientId: string; doctorInProgress: boolean; onBookingChange?: (appointment: Appointment | null) => void }) {
   const [days, setDays] = useState<AvailabilityDay[]>([])
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedSlot, setSelectedSlot] = useState('')
@@ -140,8 +140,11 @@ function AppointmentBooking({ consultationId, consultationActive, patientId, onB
     }
   }
 
+  // Once the doctor has started working the case (saved notes or issued a
+  // prescription), the patient can no longer cancel or reschedule out from under them.
   const canChangeAppointment = !!bookedAppointment && bookedAppointment.status === 'SCHEDULED'
     && consultationActive && new Date(bookedAppointment.startTime).getTime() > Date.now()
+    && !doctorInProgress
   // Rescheduling still involves picking a new slot, so it's blocked by expired coverage just like
   // a first-time booking — but an already-booked appointment can always still be cancelled.
   const canReschedule = canChangeAppointment && !bookingBlocked
@@ -338,6 +341,9 @@ export default function Consultation() {
   const [latestStatus, setLatestStatus] = useState<'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null>(null)
   const [latestActive, setLatestActive] = useState(false)
   const [completedAt, setCompletedAt] = useState<string | null>(null)
+  // True once the doctor has saved notes or created a prescription for this consultation,
+  // even though it isn't marked COMPLETED yet.
+  const [doctorInProgress, setDoctorInProgress] = useState(false)
   const [loadingConsultation, setLoadingConsultation] = useState(true)
   const [appointmentBooked, setAppointmentBooked] = useState(false)
 
@@ -383,6 +389,7 @@ export default function Consultation() {
           setLatestStatus(null)
           setLatestActive(false)
           setCompletedAt(null)
+          setDoctorInProgress(false)
           return
         }
         const j = await res.json()
@@ -390,6 +397,7 @@ export default function Consultation() {
         setLatestStatus(typeof j?.status === 'string' ? j.status : null)
         setLatestActive(j?.active === true)
         setCompletedAt(typeof j?.completedAt === 'string' ? j.completedAt : null)
+        setDoctorInProgress(j?.doctorInProgress === true)
       } finally {
         if (alive) setLoadingConsultation(false)
       }
@@ -568,7 +576,7 @@ export default function Consultation() {
                       Choose a future 10-minute appointment slot with an available doctor.
                     </p>
                     {latestCid ? (
-                      <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} patientId={patientId || ''} onBookingChange={appt => setAppointmentBooked(!!appt)} />
+                      <AppointmentBooking consultationId={latestCid} consultationActive={latestActive} patientId={patientId || ''} doctorInProgress={doctorInProgress} onBookingChange={appt => setAppointmentBooked(!!appt)} />
                     ) : null}
                   </div>
                 </div>
@@ -583,7 +591,7 @@ export default function Consultation() {
                     <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>
                       Your digital prescription with dosage instructions and medication details.
                     </p>
-                    <button type="button" className="bs" disabled>Upcoming</button>
+                    <button type="button" className={doctorInProgress ? 'bp' : 'bs'} disabled>{doctorInProgress ? 'In Preparation' : 'Upcoming'}</button>
                   </div>
                 </div>
               </div>
