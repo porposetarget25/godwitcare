@@ -70,35 +70,50 @@ public class PdfMaker {
                 cs.setStrokingColor(Color.BLACK);
                 cs.setNonStrokingColor(Color.WHITE);
 
-                // 0) Success banner
+                // 0) Brand header: logo left, title centered on the same row (matches
+                // the referral letter's header layout).
+                {
+                    float headerTopY = y;
+                    float logoH = 64f;
+                    if (logoPng != null) {
+                        PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
+                        float logoAspect = (float) logo.getWidth() / (float) logo.getHeight();
+                        float logoW = logoH * logoAspect;
+                        cs.drawImage(logo, margin, headerTopY - logoH, logoW, logoH);
+                    }
+                    float titleBaselineY = headerTopY - (logoH / 2f) - 8f;
+                    centeredText(cs, H_BOLD, 22, new Color(6, 95, 70), page, "Prescription", titleBaselineY);
+                    y = headerTopY - logoH - 16f;
+                    strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
+                    y -= 16;
+                }
+
+                // 1) Success banner
                 float bannerH = 20f;
                 fillRect(cs, margin, y - bannerH, contentWidth, bannerH, new Color(209, 250, 229));
                 text(cs, H_REG, 10, TEXT, margin + 10, y - bannerH + 6, "Signed and all signatures are valid.");
                 y -= (bannerH + 20); // breathing room
 
-                // 1) Title
-                centeredText(cs, H_BOLD, 22, new Color(6, 95, 70), page, "Prescription", y);
-                y -= 28;
-
-                // Separator
-                strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
-                y -= 16;
-
-                // 2) Brand + Patient panel (no-overlap)
+                // 2) Brand wordmark + Patient panel (no-overlap)
                 float leftW = contentWidth * 0.44f;
                 float rightW = contentWidth - leftW - 10;
                 float rowTop = y;
 
-                // Left: brand logo anchored to rowTop. The asset already carries the
-                // "GodwitCareGlobal" wordmark and tagline baked in, so no separate text
-                // is drawn next to it here.
-                float logoH = 64f;
-                float brandBoxH = logoH;
-                if (logoPng != null) {
-                    PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
-                    float logoAspect = (float) logo.getWidth() / (float) logo.getHeight();
-                    float logoW = logoH * logoAspect;
-                    cs.drawImage(logo, margin, rowTop - logoH, logoW, logoH);
+                // Left: brand wordmark, centered within its column - the logo itself now
+                // lives in the page header above, so this is just the two text lines
+                // that used to be baked into the image, laid out as real text instead.
+                float brandBoxH = 50f;
+                {
+                    float colCenterX = margin + leftW / 2f;
+                    String big = "GodwitCareGlobal";
+                    float bigSize = 18f;
+                    float bigW = H_BOLD.getStringWidth(big) / 1000f * bigSize;
+                    text(cs, H_BOLD, bigSize, TEXT, colCenterX - bigW / 2f, rowTop - 18, big);
+
+                    String tag = "Care Beyond Borders";
+                    float tagSize = 11f;
+                    float tagW = H_REG.getStringWidth(tag) / 1000f * tagSize;
+                    text(cs, H_REG, tagSize, GRAY_500, colCenterX - tagW / 2f, rowTop - 36, tag);
                 }
 
                 // Right: patient info panel (dynamic height incl. address)
