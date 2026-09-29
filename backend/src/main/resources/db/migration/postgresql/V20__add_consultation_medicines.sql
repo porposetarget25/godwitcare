@@ -1,0 +1,1 @@
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS medicines VARCHAR(8000);

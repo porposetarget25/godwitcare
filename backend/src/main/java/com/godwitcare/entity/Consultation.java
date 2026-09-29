@@ -75,6 +75,11 @@ public class Consultation {
     private String diagnosis;
     @Column(length = 4000)
     private String recommendations;
+    // Newline-separated draft medicines, saved/restored alongside the other
+    // in-progress notes so they survive navigating away before a prescription
+    // is actually created (mirrors Prescription.medicines' format).
+    @Column(length = 8000)
+    private String medicines;
     private Boolean prescriptionRequired = true;
 
     // ----- getters/setters (existing) -----
@@ -163,6 +168,14 @@ public class Consultation {
 
     public void setRecommendations(String recommendations) {
         this.recommendations = recommendations;
+    }
+
+    public String getMedicines() {
+        return medicines;
+    }
+
+    public void setMedicines(String medicines) {
+        this.medicines = medicines;
     }
 
     public Boolean getPrescriptionRequired() {

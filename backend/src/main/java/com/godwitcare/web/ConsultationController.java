@@ -357,6 +357,9 @@ public class ConsultationController {
                     d.put("historyOfPresentingComplaint", nz(c.getHistoryOfPresentingComplaint()));
                     d.put("diagnosis", nz(c.getDiagnosis()));
                     d.put("recommendations", nz(c.getRecommendations()));
+                    d.put("medicines", c.getMedicines() == null || c.getMedicines().isBlank()
+                            ? Collections.emptyList()
+                            : Arrays.asList(c.getMedicines().split("\n", -1)));
                     d.put("prescriptionRequired", c.getPrescriptionRequired() == null || c.getPrescriptionRequired());
 
                     appointments.findTopByConsultationIdOrderByIdDesc(c.getId()).ifPresent(appt -> {
@@ -471,11 +474,21 @@ public class ConsultationController {
         c.setHistoryOfPresentingComplaint((String) body.getOrDefault("history", c.getHistoryOfPresentingComplaint()));
         c.setDiagnosis((String) body.getOrDefault("diagnosis", c.getDiagnosis()));
         c.setRecommendations((String) body.getOrDefault("recommendations", c.getRecommendations()));
+        if (body.containsKey("medicines")) c.setMedicines(joinMedicines(body.get("medicines")));
         Object prescriptionRequired = body.get("prescriptionRequired");
         if (prescriptionRequired instanceof Boolean b) c.setPrescriptionRequired(b);
 
         consultations.save(c);
         return ResponseEntity.ok(Map.of("id", c.getId(), "status", c.getStatus().name(), "saved", true));
+    }
+
+    // Draft medicines arrive the same way createPrescription's "medicines" field does
+    // (a JSON array of strings) - joined into the same newline-separated format
+    // Prescription.medicines already uses, so both stay consistent.
+    @SuppressWarnings("unchecked")
+    private static String joinMedicines(Object raw) {
+        if (!(raw instanceof List<?> list)) return null;
+        return String.join("\n", (List<String>) list);
     }
 
     @PutMapping("/doctor/consultations/{id}/complete")
@@ -495,6 +508,7 @@ public class ConsultationController {
         c.setHistoryOfPresentingComplaint((String) body.getOrDefault("history", c.getHistoryOfPresentingComplaint()));
         c.setDiagnosis((String) body.getOrDefault("diagnosis", c.getDiagnosis()));
         c.setRecommendations((String) body.getOrDefault("recommendations", c.getRecommendations()));
+        if (body.containsKey("medicines")) c.setMedicines(joinMedicines(body.get("medicines")));
         Object prescriptionRequired = body.get("prescriptionRequired");
         if (prescriptionRequired instanceof Boolean b) c.setPrescriptionRequired(b);
 

@@ -89,17 +89,22 @@ public class PdfMaker {
                 float rightW = contentWidth - leftW - 10;
                 float rowTop = y;
 
-                // Left: brand (logo + tagline) anchored to rowTop
-                float brandBoxH = 64f;
+                // Left: brand (logo + tagline) anchored to rowTop. The logo asset is
+                // icon-only (no baked-in wordmark) - "GodwitCareGlobal" and the tagline
+                // are drawn as real text below, sized off the logo's own width so they
+                // never overlap regardless of its aspect ratio.
+                float brandBoxH = 48f;
+                float logoH = 40f;
+                float logoW = 0f;
                 if (logoPng != null) {
                     PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
-                    float logoH = 36f;
                     float logoAspect = (float) logo.getWidth() / (float) logo.getHeight();
-                    float logoW = logoH * logoAspect;
+                    logoW = logoH * logoAspect;
                     cs.drawImage(logo, margin, rowTop - logoH, logoW, logoH);
                 }
-                text(cs, H_BOLD, 16, TEXT, margin + 56, rowTop - 8, "GodwitCare");
-                text(cs, H_REG, 10, GRAY_500, margin + 56, rowTop - 26, "Care Beyond Borders");
+                float brandTextX = margin + (logoW > 0 ? logoW + 12f : 0f);
+                text(cs, H_BOLD, 16, TEXT, brandTextX, rowTop - 16, "GodwitCareGlobal");
+                text(cs, H_REG, 10, GRAY_500, brandTextX, rowTop - 32, "Care Beyond Borders");
 
                 // Right: patient info panel (dynamic height incl. address)
                 float panelX = margin + leftW + 10;
@@ -525,7 +530,7 @@ public class PdfMaker {
                 // === Brand + title header (logo + wordmark + centered title) ===
                 {
                     float headerTopY = y;                  // start at current top
-                    float logoH = 28f;                     // visual size of the logo
+                    float logoH = 36f;                     // visual size of the logo (icon-only asset)
                     float brandGap = 12f;                  // gap between logo and wordmark
 
                     float logoW = 0f;
@@ -536,10 +541,10 @@ public class PdfMaker {
                         cs.drawImage(logo, margin, headerTopY - logoH, logoW, logoH);
                     }
 
-                    // Wordmark (left side)
+                    // Wordmark (left side), vertically centered against the icon
                     float wordX = margin + (logoW > 0 ? logoW + brandGap : 0f);
-                    text(cs, H_BOLD, 18, new Color(13, 148, 136), wordX, headerTopY - 6, "GodwitCare");
-                    text(cs, H_REG,  8,  GRAY_500,                 wordX, headerTopY - 22, "Care Beyond Borders");
+                    text(cs, H_BOLD, 18, new Color(13, 148, 136), wordX, headerTopY - 14, "GodwitCareGlobal");
+                    text(cs, H_REG,  8,  GRAY_500,                 wordX, headerTopY - 30, "Care Beyond Borders");
 
                     // Centered page title
                     centeredText(cs, H_BOLD, 22, new Color(17, 24, 39), page, "Referral Letter", headerTopY - 4);

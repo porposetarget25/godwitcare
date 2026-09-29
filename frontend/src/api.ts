@@ -232,6 +232,7 @@ export type ConsultationDetails = ConsultationSummary & {
   historyOfPresentingComplaint?: string
   diagnosis?: string
   recommendations?: string
+  medicines?: string[]
   prescriptionRequired?: boolean
   answers?: Record<string, 'Yes' | 'No'>
   detailsByQuestion?: Record<string, string>

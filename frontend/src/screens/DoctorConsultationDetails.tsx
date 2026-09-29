@@ -21,10 +21,16 @@ export default function DoctorConsultationDetails() {
   const [savingDraft, setSavingDraft] = useState(false)
   const [draftSaveErr, setDraftSaveErr] = useState<string | null>(null)
   const [draftSaved, setDraftSaved] = useState(false)
+  // Drives the Save -> Create Prescription -> Complete Consultation gating below:
+  // `dirty` is true whenever the form has unsaved edits (disables the other two
+  // buttons until Save is pressed); `rxCurrent` is true only while the existing
+  // prescription still reflects the last-saved form state (any edit invalidates it).
+  const [dirty, setDirty] = useState(false)
+  const [rxCurrent, setRxCurrent] = useState(false)
 
   // Refs mirror the latest editable fields/status so the unmount and
   // beforeunload handlers below can save without depending on stale closures.
-  const draftRef = useRef({ history: '', diagnosis: '', recommendations: '', prescriptionRequired: true })
+  const draftRef = useRef({ history: '', diagnosis: '', recommendations: '', medicines: [''] as string[], prescriptionRequired: true })
   const dirtyRef = useRef(false)
   const idRef = useRef<number | null>(null)
   const readOnlyRef = useRef(false)
@@ -32,9 +38,23 @@ export default function DoctorConsultationDetails() {
   const [rxErr, setRxErr] = useState<string | null>(null)
   const [rxId, setRxId] = useState<number | null>(null)
   const [rxPdfUrl, setRxPdfUrl] = useState<string | null>(null)
+  const [openingRx, setOpeningRx] = useState(false)
+  const [rxOpenErr, setRxOpenErr] = useState<string | null>(null)
 
   const rxUrlRef = useRef<string | null>(null)
   useEffect(() => () => { if (rxUrlRef.current) URL.revokeObjectURL(rxUrlRef.current) }, [])
+
+  async function openPrescriptionPdf(url: string) {
+    setOpeningRx(true)
+    setRxOpenErr(null)
+    try {
+      await openAuthenticatedFile(url)
+    } catch (e: any) {
+      setRxOpenErr(e?.message || 'Unable to open the prescription.')
+    } finally {
+      setOpeningRx(false)
+    }
+  }
 
   const [referralId, setReferralId] = useState<number | null>(null)
   const [referralPdfUrl, setReferralPdfUrl] = useState<string | null>(null)
@@ -77,6 +97,8 @@ export default function DoctorConsultationDetails() {
         setHistory(d?.historyOfPresentingComplaint || '')
         setDiagnosis(d?.diagnosis || '')
         setRecommendations(d?.recommendations || '')
+        const loadedMedicines = Array.isArray(d?.medicines) ? d.medicines.filter((m: unknown) => typeof m === 'string') : []
+        setMedicines(loadedMedicines.length ? loadedMedicines : [''])
         setPrescriptionRequired(d?.prescriptionRequired !== false)
 
         try {
@@ -84,11 +106,12 @@ export default function DoctorConsultationDetails() {
           if (meta && meta.id) {
             setRxId(meta.id)
             setRxPdfUrl(meta.pdfUrl ? resolveApiUrl(API_BASE_URL, meta.pdfUrl) : null)
+            setRxCurrent(true)
           } else {
-            setRxId(null); setRxPdfUrl(null)
+            setRxId(null); setRxPdfUrl(null); setRxCurrent(false)
           }
         } catch {
-          setRxId(null); setRxPdfUrl(null)
+          setRxId(null); setRxPdfUrl(null); setRxCurrent(false)
         }
       } catch { /* handled */ }
     })()
@@ -146,27 +169,30 @@ export default function DoctorConsultationDetails() {
 
   // Keep the "latest values" refs current on every render so the unmount/beforeunload
   // save handlers (registered once, below) never act on stale closures.
-  draftRef.current = { history, diagnosis, recommendations, prescriptionRequired }
+  draftRef.current = { history, diagnosis, recommendations, medicines, prescriptionRequired }
   idRef.current = data.id ?? null
   readOnlyRef.current = readOnly
 
-  function setMed(idx: number, val: string) { setMedicines(list => list.map((m, i) => i === idx ? val : m)) }
-  function addMed() { setMedicines(list => [...list, '']) }
-  function removeMed(idx: number) { setMedicines(list => list.filter((_, i) => i !== idx)) }
+  function setMed(idx: number, val: string) { setMedicines(list => list.map((m, i) => i === idx ? val : m)); markDirty() }
+  function addMed() { setMedicines(list => [...list, '']); markDirty() }
+  function removeMed(idx: number) { setMedicines(list => list.filter((_, i) => i !== idx)); markDirty() }
 
   function markDirty() {
     dirtyRef.current = true
+    setDirty(true)
     setDraftSaved(false)
+    setRxCurrent(false)
   }
 
   async function persistDraft(opts: { keepalive?: boolean } = {}) {
     const cid = idRef.current
     if (!cid || readOnlyRef.current) return
-    const { history: h, diagnosis: d, recommendations: r, prescriptionRequired: pr } = draftRef.current
+    const { history: h, diagnosis: d, recommendations: r, medicines: m, prescriptionRequired: pr } = draftRef.current
+    const meds = m.map(x => (x || '').trim()).filter(Boolean)
     const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${cid}/save`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ history: h.trim(), diagnosis: d.trim(), recommendations: r.trim(), prescriptionRequired: pr }),
+      body: JSON.stringify({ history: h.trim(), diagnosis: d.trim(), recommendations: r.trim(), medicines: meds, prescriptionRequired: pr }),
       keepalive: opts.keepalive,
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -174,11 +200,12 @@ export default function DoctorConsultationDetails() {
   }
 
   async function saveDraft() {
-    if (!data?.id || savingDraft || readOnly) return
+    if (!data?.id || savingDraft || readOnly || !dirty) return
     setDraftSaveErr(null)
     setSavingDraft(true)
     try {
       await persistDraft()
+      setDirty(false)
       setDraftSaved(true)
     } catch (err: any) {
       setDraftSaveErr(err?.message || 'Failed to save progress')
@@ -195,10 +222,17 @@ export default function DoctorConsultationDetails() {
       const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${data.id}/complete`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history: history.trim(), diagnosis: diagnosis.trim(), recommendations: recommendations.trim(), prescriptionRequired }),
+        body: JSON.stringify({
+          history: history.trim(),
+          diagnosis: diagnosis.trim(),
+          recommendations: recommendations.trim(),
+          medicines: medicines.map(m => (m || '').trim()).filter(Boolean),
+          prescriptionRequired,
+        }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       dirtyRef.current = false
+      setDirty(false)
       setData((prev: any) => ({ ...prev, status: 'COMPLETED' }))
     } catch (err: any) {
       setConsultationSaveErr(err?.message || 'Failed to complete consultation')
@@ -207,7 +241,49 @@ export default function DoctorConsultationDetails() {
     }
   }
 
+  // Builds the same default referral letter body ReferralLetter.tsx pre-fills,
+  // then generates and stores it immediately - referral creation is no longer
+  // a separate manual step, it always tracks the latest created prescription.
+  async function autoGenerateReferral() {
+    if (!data?.id) return
+    const fullName = [data.patient?.firstName, data.patient?.lastName].filter(Boolean).join(' ') || 'the patient'
+    const dobStr = data.patient?.dob ? new Date(data.patient.dob).toLocaleDateString() : '—'
+    const loc = data.currentLocation || 'the stated location'
+    const dt = data.createdAt ? new Date(data.createdAt).toLocaleDateString() : 'the date of consultation'
+    const pid = data.patientId || '—'
+    const doctorName = 'Dr. Dimitris–Christos Zachariades'
+    const paragraph =
+`Dear Dr (To Whom it May Concern),
+
+I am writing to refer ${fullName}, born on ${dobStr}, Patient ID: ${pid}. During her travel to ${loc} on ${dt}, she presented with symptoms as assessed during the tele-consultation. Kindly review and consider further evaluation and management.
+
+The patient's relevant medical history and current medication have been reviewed during the consultation. Based on the presenting complaint, please consider local assessment, and additional investigations if clinically indicated.
+
+Thank you for considering this referral. Please feel free to contact me if you require any additional information.
+
+Sincerely,
+
+${doctorName}
+Digital Signature Area
+Referring Practitioner`
+
+    try {
+      const res = await authFetch(`${API_BASE_URL}/doctor/consultations/${data.id}/referrals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paragraph }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const meta = await res.json().catch(() => ({} as any))
+      setReferralId(typeof meta?.id === 'number' ? meta.id : null)
+      setReferralPdfUrl(meta?.pdfUrl ? resolveApiUrl(API_BASE_URL, meta.pdfUrl) : null)
+    } catch (err: any) {
+      setReferralOpenErr(err?.message || 'Failed to auto-generate referral letter.')
+    }
+  }
+
   async function createPrescription() {
+    if (dirty || rxCurrent) return
     setRxErr(null)
     const meds = medicines.map(m => (m || '').trim()).filter(Boolean)
     if (!diagnosis.trim()) { setRxErr('Please enter a diagnosis.'); return }
@@ -223,6 +299,7 @@ export default function DoctorConsultationDetails() {
       if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error(t || `HTTP ${res.status}`) }
       const j = await res.json().catch(() => ({}))
       setRxId(typeof j.id === 'number' ? j.id : null)
+      setRxCurrent(true)
 
       const pdfRes = await authFetch(`${API_BASE_URL}/doctor/prescriptions/${j.id}/pdf`, {})
       if (!pdfRes.ok) throw new Error('Failed to download prescription PDF')
@@ -231,6 +308,8 @@ export default function DoctorConsultationDetails() {
       if (rxUrlRef.current) URL.revokeObjectURL(rxUrlRef.current)
       rxUrlRef.current = url
       setRxPdfUrl(url)
+
+      await autoGenerateReferral()
     } catch (err: any) {
       setRxErr(err?.message || 'Failed to create prescription')
     } finally {
@@ -297,7 +376,6 @@ export default function DoctorConsultationDetails() {
             <div className="dr"><div className="dk">Phone (WhatsApp)</div><div className="dv">{data.contactPhone || '—'}</div></div>
             <div className="dr"><div className="dk">Address</div><div className="dv">{data.contactAddress || '—'}</div></div>
             <div className="dr"><div className="dk">Email</div><div className="dv">{data.patient.email || '—'}</div></div>
-            {waUrl && <a className="bp" href={waUrl} target="_blank" rel="noreferrer" style={{ marginTop: 10, display: 'inline-flex' }}>WhatsApp Patient</a>}
           </details>
 
           <details className="card" open>
@@ -346,10 +424,10 @@ export default function DoctorConsultationDetails() {
           <div className="card">
             <div className="ct">Actions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <a className="bs" href={waUrl || '#'} target={waUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!waUrl} onClick={(e) => { if (!waUrl) e.preventDefault() }}>
+              <a className="bp" href={waUrl || '#'} target={waUrl ? '_blank' : undefined} rel="noreferrer" aria-disabled={!waUrl} onClick={(e) => { if (!waUrl) e.preventDefault() }}>
                 <i className="ti ti-phone" aria-hidden="true" /> Call Patient
               </a>
-              <Link className="bs" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>
+              <Link className="bp" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>
                 <i className="ti ti-history" aria-hidden="true" /> Patient Care History
               </Link>
             </div>
@@ -396,72 +474,72 @@ export default function DoctorConsultationDetails() {
             <textarea value={recommendations} disabled={readOnly} onChange={(e) => { setRecommendations(e.target.value); markDirty() }} placeholder="Provide recommendations…" rows={3} />
           </div>
 
-          <div className="card">
-            {data?.status !== 'COMPLETED' && (
-              <>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button type="button" className="bs" onClick={saveDraft} disabled={savingDraft}>
-                    {savingDraft ? 'Saving…' : 'Save Progress'}
+          {data?.status !== 'COMPLETED' && (
+            <div className="card">
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                <button type="button" className={dirty ? 'bp' : 'bs'} onClick={saveDraft} disabled={savingDraft || !dirty}>
+                  {savingDraft ? 'Saving…' : 'Save'}
+                </button>
+                {prescriptionRequired && (
+                  <button
+                    type="button"
+                    className="bp"
+                    onClick={createPrescription}
+                    disabled={creatingRx || dirty || rxCurrent}
+                    title={dirty ? 'Save your changes first.' : rxCurrent ? 'Prescription already reflects the saved notes.' : undefined}
+                  >
+                    {creatingRx ? 'Creating…' : 'Create Prescription'}
                   </button>
-                  {draftSaved && !savingDraft && <span className="fi-hint" style={{ color: 'var(--text-success, #16a34a)' }}>Saved</span>}
-                  {draftSaveErr && <span className="fi-hint" style={{ color: 'var(--text-danger)' }}>{draftSaveErr}</span>}
-                </div>
-                <div className="fi-hint" style={{ margin: '6px 0 10px' }}>Notes are also saved automatically if you navigate away before completing.</div>
-              </>
-            )}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: data?.status !== 'COMPLETED' ? 10 : 0 }}>
-              {prescriptionRequired && !readOnly && (
-                <button type="button" className="bp" onClick={createPrescription} disabled={creatingRx}>{creatingRx ? 'Creating…' : 'Create Prescription'}</button>
-              )}
-              {rxErr && <span className="fi-hint" style={{ color: 'var(--text-danger)' }}>{rxErr}</span>}
-              {rxId && <span className="tag tok">Prescription created (#{rxId})</span>}
-              {!isNoShow && appointmentStatus === 'SCHEDULED' && !readOnly && (
-                <button type="button" className="bd" onClick={() => setShowNoShowModal(true)}>Mark No-Show</button>
-              )}
-            </div>
-            {data?.status !== 'COMPLETED' && (
-              <>
-                <button type="button" className="bp" onClick={completeConsultation} disabled={savingConsultation || (prescriptionRequired && !rxId)} title={prescriptionRequired && !rxId ? 'Create a prescription first, or select No Prescription.' : undefined}>
+                )}
+                <button
+                  type="button"
+                  className="bp"
+                  onClick={completeConsultation}
+                  disabled={savingConsultation || dirty || (prescriptionRequired && (!rxId || !rxCurrent))}
+                  title={dirty ? 'Save your changes first.' : (prescriptionRequired && (!rxId || !rxCurrent)) ? 'Create a prescription first, or select No Prescription.' : undefined}
+                >
                   {savingConsultation ? 'Completing…' : 'Complete Consultation'}
                 </button>
-                {consultationSaveErr && <div className="fi-hint" style={{ color: 'var(--text-danger)', marginTop: 6 }}>{consultationSaveErr}</div>}
-                {prescriptionRequired && !rxId && <div className="fi-hint" style={{ marginTop: 6 }}>Create a prescription first, or switch to No Prescription to complete.</div>}
-              </>
-            )}
-          </div>
+              </div>
+              {draftSaved && !savingDraft && <span className="fi-hint" style={{ color: 'var(--text-success, #16a34a)' }}>Saved</span>}
+              {draftSaveErr && <div className="fi-hint" style={{ color: 'var(--text-danger)' }}>{draftSaveErr}</div>}
+              {rxErr && <div className="fi-hint" style={{ color: 'var(--text-danger)' }}>{rxErr}</div>}
+              {consultationSaveErr && <div className="fi-hint" style={{ color: 'var(--text-danger)', marginTop: 6 }}>{consultationSaveErr}</div>}
+
+              {!isNoShow && appointmentStatus === 'SCHEDULED' && (
+                <div style={{ marginTop: 10 }}>
+                  <button type="button" className="bd" onClick={() => setShowNoShowModal(true)}>Mark No-Show</button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card">
             <div className="ct">Patient Records</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {rxId ? (
-                <Link
-                  className="bs"
-                  to={`/doctor/consultations/${encodeURIComponent(String(id))}/prescription`}
-                  state={{ diagnosis, medicines, recommendations, history, patientName: `${data.patient.firstName} ${data.patient.lastName}`.trim(), rxId, rxPdfUrl }}
-                >
-                  View Prescription
-                </Link>
-              ) : (
-                <button className="bs" type="button" disabled>View Prescription</button>
-              )}
-              <Link className="bs" to={`/doctor/consultations/${encodeURIComponent(String(id))}/care-history`}>Patient Care History</Link>
-              <Link className="bs" to={`/doctor/consultations/${encodeURIComponent(String(id))}/letter`}>Admin/Miscellaneous Letter</Link>
-              {prescriptionRequired && !readOnly ? (
-                <Link className="bs" to={`/doctor/referral/${encodeURIComponent(String(id ?? data.id))}`}>Referral Letter</Link>
-              ) : (
-                <button className="bs" type="button" disabled>Referral Letter</button>
-              )}
+              {(() => {
+                const href = rxPdfUrl || (rxId ? `${API_BASE_URL}/doctor/prescriptions/${encodeURIComponent(String(rxId))}/pdf` : null)
+                return href ? (
+                  <button className="bp" type="button" onClick={() => openPrescriptionPdf(href)} disabled={openingRx}>
+                    {openingRx ? 'Opening…' : 'View Prescription'}
+                  </button>
+                ) : (
+                  <button className="bs" type="button" disabled>View Prescription</button>
+                )
+              })()}
               {prescriptionRequired && (() => {
                 const href = (typeof referralPdfUrl === 'string' && referralPdfUrl)
                   || ((typeof referralId === 'number' || typeof referralId === 'string') && `${API_BASE_URL}/doctor/referrals/${encodeURIComponent(String(referralId))}/pdf`)
                 return href ? (
-                  <button className="bs" type="button" onClick={() => openReferralPdf(href as string)} disabled={openingReferral}>
+                  <button className="bp" type="button" onClick={() => openReferralPdf(href as string)} disabled={openingReferral}>
                     {openingReferral ? 'Opening…' : 'View generated referral letter'}
                   </button>
                 ) : (
                   <button className="bs" type="button" disabled>View generated referral letter</button>
                 )
               })()}
+              <Link className="bs" to={`/doctor/consultations/${encodeURIComponent(String(id))}/letter`}>Admin/Miscellaneous Letter</Link>
+              {rxOpenErr && <div className="notice n-warn" style={{ width: '100%', marginTop: 8 }}><i className="ti ti-alert-triangle" aria-hidden="true" />{rxOpenErr}</div>}
               {referralOpenErr && <div className="notice n-warn" style={{ width: '100%', marginTop: 8 }}><i className="ti ti-alert-triangle" aria-hidden="true" />{referralOpenErr}</div>}
             </div>
           </div>
