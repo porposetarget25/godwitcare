@@ -410,4 +410,11 @@
   .portal .cal-wrap{overflow-x:auto;}
 }
 
+/* Printing (e.g. Care History's "Print / Save as PDF"): show the record itself,
+   not app chrome - the sidebar/topbar and any element marked .no-print. */
+@media print{
+  .portal .sb,.portal .sb-overlay,.portal .mobile-topbar,.no-print{display:none!important;}
+  .portal .body{padding:0!important;max-width:none!important;}
+}
+
 /* Dark mode: soften the palette without full re-theme (system-wide app doesn't have a toggle yet) */

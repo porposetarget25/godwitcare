@@ -180,11 +180,11 @@ export default function CareHistory() {
                 <div style={{ marginBottom: (canViewPrescription || showReferralButton) ? 10 : 0, fontSize: 13 }}>{it.recommendations || '—'}</div>
 
                 {(canViewPrescription || showReferralButton) && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {canViewPrescription && (
                       <button
                         type="button"
-                        className="bs"
+                        className="bp"
                         onClick={() => navigate(queryString ? `/prescription?${queryString}` : '/prescription', { state: { ...it, patientName: patient.name, allergies: patient.allergies, rxUrl: resolveApiUrl(API_BASE_URL, it.pdfUrl!) } })}
                       >
                         View Prescription
@@ -194,7 +194,7 @@ export default function CareHistory() {
                       canViewReferral ? (
                         <button
                           type="button"
-                          className="bs"
+                          className="bp"
                           onClick={() => onViewReferral(it.consultationId, it.referralPdfUrl!)}
                           disabled={openingReferral === it.consultationId}
                         >
@@ -220,8 +220,7 @@ export default function CareHistory() {
     <>
       <div className="page-head">
         <div className="page-title">Care History</div>
-        <div className="page-head-actions">
-          {!isDoctorView && <Link to={queryString ? `/referral?${queryString}` : '/referral'} className="bs">Referral Letter</Link>}
+        <div className="page-head-actions no-print">
           <Link to={backHref} className="bs">{backLabel}</Link>
           {!loading && !err && data && (
             <button type="button" className="bs" onClick={printPdf}><i className="ti ti-printer" aria-hidden="true" /> Print / Save as PDF</button>
@@ -237,7 +236,7 @@ export default function CareHistory() {
       )}
 
       {!isDoctorView && patients.length > 1 && (
-        <div className="patient-chip-row">
+        <div className="patient-chip-row no-print">
           {patients.map(p => (
             <button
               key={p.patientId}
