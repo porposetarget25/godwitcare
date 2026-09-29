@@ -161,6 +161,13 @@ export default function PreConsultation() {
   // Sections are walked through one at a time; only this index is expanded.
   const [openSectionIndex, setOpenSectionIndex] = useState(0)
 
+  // Incomplete-section validation on submit: names which sections are missing
+  // answers, and briefly flashes them so the patient can find them at a glance.
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [flashSections, setFlashSections] = useState<Set<string>>(new Set())
+  const sectionRefs = React.useRef<Record<string, HTMLDivElement | null>>({})
+  const ALLERGIES_SECTION_TITLE = 'Allergies'
+
   /* ---------- Prefill (NEW mode): Registration → Latest Consultation → /auth/me ---------- */
   useEffect(() => {
     if (isEdit || patientContextLoading || !activePatient) return
@@ -191,13 +198,9 @@ export default function PreConsultation() {
               setContactName(nameOnly)
               if (sel.dob) setDob(sel.dob)
             }
-            const allergyPatient = travelerId
-              ? reg.travelers?.find((t: any) => String(t.id) === String(travelerId))
-              : reg
-            if (typeof allergyPatient?.hasAllergies === 'boolean') {
-              setHasAllergies(allergyPatient.hasAllergies)
-              setAllergyDetails(allergyPatient.allergyDetails || '')
-            }
+            // Allergies is a fresh mandatory question on every new checklist, same as every
+            // other Yes/No question here - it never prefills from a past registration/
+            // consultation answer, even if one exists.
           }
         }
       } catch { /* ignore */ }
@@ -313,19 +316,26 @@ export default function PreConsultation() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting || locked || hasEmergencyAnswer) return
+    setSubmitError(null)
 
-    const unanswered = Object.entries(answers).filter(([, v]) => v === undefined)
-    if (unanswered.length > 0) {
-      alert('Please answer all questions (Yes/No) before submitting.')
-      return
-    }
-    if (hasAllergies === null) {
-      alert('Please answer the allergy question before submitting.')
-      return
-    }
     const trimmedAllergies = allergyDetails.trim()
-    if (hasAllergies && !trimmedAllergies) {
-      alert('Please enter your allergy details.')
+    const allergiesIncomplete = hasAllergies === null || (hasAllergies && !trimmedAllergies)
+    const incompleteFormSections = FORM.filter(s => s.questions.some(q => answers[q.id] === undefined))
+    const incompleteTitles = [
+      ...(allergiesIncomplete ? [ALLERGIES_SECTION_TITLE] : []),
+      ...incompleteFormSections.map(s => s.title),
+    ]
+
+    if (incompleteTitles.length > 0) {
+      setSubmitError(`Following sections are not completely filled: ${incompleteTitles.join(', ')}`)
+      setFlashSections(new Set(incompleteTitles))
+      window.setTimeout(() => setFlashSections(new Set()), 1800)
+
+      if (incompleteFormSections.length > 0) {
+        setOpenSectionIndex(FORM.indexOf(incompleteFormSections[0]))
+      }
+      const firstTarget = sectionRefs.current[incompleteTitles[0]]
+      firstTarget?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
 
@@ -489,7 +499,10 @@ export default function PreConsultation() {
           </div>
         </div>
 
-        <div className="card">
+        <div
+          className={`card${flashSections.has(ALLERGIES_SECTION_TITLE) ? ' flash-incomplete' : ''}`}
+          ref={(el) => { sectionRefs.current[ALLERGIES_SECTION_TITLE] = el }}
+        >
           <div className="ct">Allergies</div>
           <Toggle
             label="Please share any existing Allergies you have been identified with"
@@ -540,7 +553,10 @@ export default function PreConsultation() {
             <React.Fragment key={section.title}>
               {index === 0 && <div className="fi-hint" style={{ margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Emergency Symptom Check</div>}
               {isFirstGeneral && <div className="fi-hint" style={{ margin: '14px 0 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>General Health Questions</div>}
-              <div className={`accordion-item${isOpen ? ' open' : ''}${isCritical ? ' critical' : ''}${complete ? ' complete' : ''}`}>
+              <div
+                className={`accordion-item${isOpen ? ' open' : ''}${isCritical ? ' critical' : ''}${complete ? ' complete' : ''}${flashSections.has(section.title) ? ' flash-incomplete' : ''}`}
+                ref={(el) => { sectionRefs.current[section.title] = el }}
+              >
                 <div className="accordion-header" onClick={() => openSection(index)}>
                   <div className="accordion-header-left">
                     {isCritical && <i className="ti ti-alert-triangle" aria-hidden="true" style={{ color: 'var(--text-danger)' }} />}
@@ -577,6 +593,13 @@ export default function PreConsultation() {
             </React.Fragment>
           )
         })}
+
+        {submitError && !hasEmergencyAnswer && (
+          <div className="notice n-warn" role="alert" style={{ marginTop: 16 }}>
+            <i className="ti ti-alert-triangle" aria-hidden="true" />
+            {submitError}
+          </div>
+        )}
 
         {hasEmergencyAnswer ? (
           <div className="notice n-danger" style={{ marginTop: 16 }}>

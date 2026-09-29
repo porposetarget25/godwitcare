@@ -417,4 +417,11 @@
   .portal .body{padding:0!important;max-width:none!important;}
 }
 
+/* Briefly draws the eye to a section left incomplete on a failed checklist submit. */
+@keyframes flash-incomplete{
+  0%,100%{box-shadow:0 0 0 0 rgba(196,61,44,0);}
+  15%,55%{box-shadow:0 0 0 4px rgba(196,61,44,.35);}
+}
+.portal .flash-incomplete{animation:flash-incomplete 1.8s ease-in-out;}
+
 /* Dark mode: soften the palette without full re-theme (system-wide app doesn't have a toggle yet) */
