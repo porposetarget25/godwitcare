@@ -89,22 +89,17 @@ public class PdfMaker {
                 float rightW = contentWidth - leftW - 10;
                 float rowTop = y;
 
-                // Left: brand (logo + tagline) anchored to rowTop. The logo asset is
-                // icon-only (no baked-in wordmark) - "GodwitCareGlobal" and the tagline
-                // are drawn as real text below, sized off the logo's own width so they
-                // never overlap regardless of its aspect ratio.
-                float brandBoxH = 48f;
-                float logoH = 40f;
-                float logoW = 0f;
+                // Left: brand logo anchored to rowTop. The asset already carries the
+                // "GodwitCareGlobal" wordmark and tagline baked in, so no separate text
+                // is drawn next to it here.
+                float logoH = 64f;
+                float brandBoxH = logoH;
                 if (logoPng != null) {
                     PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
                     float logoAspect = (float) logo.getWidth() / (float) logo.getHeight();
-                    logoW = logoH * logoAspect;
+                    float logoW = logoH * logoAspect;
                     cs.drawImage(logo, margin, rowTop - logoH, logoW, logoH);
                 }
-                float brandTextX = margin + (logoW > 0 ? logoW + 12f : 0f);
-                text(cs, H_BOLD, 16, TEXT, brandTextX, rowTop - 16, "GodwitCareGlobal");
-                text(cs, H_REG, 10, GRAY_500, brandTextX, rowTop - 32, "Care Beyond Borders");
 
                 // Right: patient info panel (dynamic height incl. address)
                 float panelX = margin + leftW + 10;
@@ -527,30 +522,29 @@ public class PdfMaker {
             float y = page.getMediaBox().getHeight() - margin;
 
             try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
-                // === Brand + title header (logo + wordmark + centered title) ===
+                // === Brand + title header (logo, centered title on the same row) ===
+                // The logo asset itself already carries the "GodwitCareGlobal" wordmark
+                // and tagline (baked into the image), so no separate text is drawn next
+                // to it - that previously duplicated the words and fought the image for
+                // space. The page title is vertically centered against the logo's own
+                // midpoint so both sit on the same visual row.
                 {
                     float headerTopY = y;                  // start at current top
-                    float logoH = 36f;                     // visual size of the logo (icon-only asset)
-                    float brandGap = 12f;                  // gap between logo and wordmark
+                    float logoH = 64f;                      // visual size of the logo
 
-                    float logoW = 0f;
                     if (logoPng != null) {
                         PDImageXObject logo = PDImageXObject.createFromByteArray(doc, logoPng, "logo");
                         float ratio = (float) logo.getWidth() / (float) logo.getHeight();
-                        logoW = logoH * ratio;
+                        float logoW = logoH * ratio;
                         cs.drawImage(logo, margin, headerTopY - logoH, logoW, logoH);
                     }
 
-                    // Wordmark (left side), vertically centered against the icon
-                    float wordX = margin + (logoW > 0 ? logoW + brandGap : 0f);
-                    text(cs, H_BOLD, 18, new Color(13, 148, 136), wordX, headerTopY - 14, "GodwitCareGlobal");
-                    text(cs, H_REG,  8,  GRAY_500,                 wordX, headerTopY - 30, "Care Beyond Borders");
-
-                    // Centered page title
-                    centeredText(cs, H_BOLD, 22, new Color(17, 24, 39), page, "Referral Letter", headerTopY - 4);
+                    // Centered page title, vertically centered against the logo
+                    float titleBaselineY = headerTopY - (logoH / 2f) - 8f;
+                    centeredText(cs, H_BOLD, 22, new Color(17, 24, 39), page, "Referral Letter", titleBaselineY);
 
                     // Move below header & add separator
-                    y = headerTopY - Math.max(logoH, 28f) - 16f;
+                    y = headerTopY - logoH - 16f;
                     strokeLine(cs, margin, y, margin + contentWidth, y, GRAY_200, 0.5f);
                     y -= 16f;
                 }
